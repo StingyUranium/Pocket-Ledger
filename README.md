@@ -1,98 +1,75 @@
 # Ledger
 
-Ledger **1.4.0** is a personal, offline Android expense manager targeting **Android 17 / API 37**. It imports SBM Bank India and Axis Bank account alerts, alongside manual income, expenses, and transfers. Credit card parsing is excluded.
+Ledger **1.6.0** is an offline Android expense manager built with Kotlin and Jetpack Compose. It supports Android 9 and later and targets **Android 17 / API 37**. Import SBM Bank India and Axis Bank deposit-account SMS, or record income, expenses, and transfers manually. Credit card parsing is excluded.
 
-Ledger was previously named Pocket Ledger. The upgrade preserves accounts, preferences, transactions, and existing encrypted backups. Its blue wallet icon supports adaptive launcher shapes and Android themed icons.
+## Features
+
+- Monthly overview with Income, Spent, and Balance. A new month starts with zero activity; account balances retain their opening balances and transaction history.
+- Tap Income, Spent, or a spending category to open matching transactions for the selected month. Back returns to the original screen.
+- Graphs tab with category spending, daily spending bars, and six months of income versus spending.
+- Recurring category budgets shared across every month. Spending resets each month; overspending appears as a negative remaining amount.
+- Categories include Uber/Bus, Rent, Fuel, Food, Groceries, Transport, Bills, Health, Shopping, and Investment. Custom categories and remembered merchant rules are supported.
+- Monthly summary and Budget home screen widgets that open the relevant screen when tapped.
+- Light, dark, and system themes, collapsing large titles, spring sheets, push/pop navigation, and elastic scrolling.
+- Local sender confirmation, duplicate detection, transfer matching, and encrypted backups.
 
 ## Getting started
 
-1. Open **Accounts**. Confirm the account suffixes and set each opening date and its balance immediately before that date. Initial zero balances are placeholders. Cash is optional.
-2. Open **SMS ? Enable SMS access** and grant Android permission. Manual entries work without it.
-3. Choose a history range and tap **Preview bank SMS**. The range filters receipt dates; transactions use dates extracted from messages. Confirm selected messages before importing. Opening dates must cover their transaction dates.
-4. Inspect example messages and confirm each bank sender ID. Different carrier prefixes may require separate confirmation. Sender confirmation does not prove a message is authentic.
-5. Enable **Capture new bank alerts**. Capture starts at activation; WorkManager and app resume reconcile missed messages, subject to Android scheduling. Preview history to fill earlier gaps.
-6. Use **+** for manual entries or transfers. Tap entries to edit or delete them. Remember a payee's category when useful; configure monthly limits in **Budgets** and view reports on **Home**.
-7. Save an encrypted backup through **Settings**. Restoring replaces current data and disables capture until you enable it again. Keep the password; it cannot be recovered.
+1. In **Accounts**, map each bank's last four account digits. Set the opening date and balance immediately before that date. The opening date must cover transactions you intend to import.
+2. In **SMS**, enable SMS access, choose a history range, and preview matching messages. The range filters receipt dates; transactions use dates extracted from alerts.
+3. Confirm sender IDs and review incomplete or conflicting messages before saving. Sender confirmation does not prove authenticity.
+4. Enable **Capture new bank alerts** for automatic capture. WorkManager and app resume reconcile missed alerts, subject to Android scheduling.
+5. Use **+** for manual entries and transfers. Tap transactions to edit, categorize, or delete them.
+6. In **Budgets**, set category limits once. The same limits apply to all months; changing a limit updates every month's comparison. Budget remaining measures spending in categories with active limits.
+7. Add widgets through **Settings → Home screen**, or long-press your launcher and choose **Widgets → Ledger**. Resize widgets to fit your home screen.
+8. Save an encrypted backup through **Settings**. Keep its password; it cannot be recovered.
 
-## Supported SMS formats
+## Bank SMS support
 
-| Bank | Formats recognized |
+| Bank | Selected formats |
 |---|---|
 | SBM Bank India | UPI, NEFT, IMPS, IFT, ACH credits/debits, savings interest |
-| Axis Bank | UPI, NEFT, RTGS, IMPS, alternate merchant debits, completed mandate debits, UPI Lite top-ups |
+| Axis Bank | UPI, NEFT, RTGS, IMPS, merchant debits, completed mandate debits, UPI Lite top-ups |
 
-Inbox scanning applies the selected scope: SBM and Axis UPI, NEFT/IMPS/RTGS/IFT, ACH, savings interest, UPI Lite top-ups, completed Axis merchant debits, and deposit-account refunds/reversals. Credit card messages are always excluded. Incomplete selected alerts remain in review rather than being posted automatically.
+Deposit-account refunds and reversals are included. Credit cards, OTPs, failed payments, payment requests, future mandates, mandate maintenance, and blocked-funds notices are excluded.
 
-Automatic saving requires a confirmed sender, mapped account, valid positive amount, direction, date, and usable reference. Interest without a reference, account-less mandate debits, merchant debits without references, and wallet top-ups remain in review. Unknown financial formats require correction. OTPs, credit card alerts, failed payments, payment requests, future mandates, and blocked-funds notices are excluded.
+Automatic saving requires a confirmed sender, mapped account, positive amount, direction, date, and usable reference. Incomplete selected alerts remain in review. Missing references, account-less debits, interest, and wallet top-ups can require manual confirmation. SMS-reported balances are displayed separately from ledger calculations.
 
-Amounts are stored as integer paise in INR. Dates use Asia/Kolkata, and date-only messages retain that precision. SMS balances are shown separately and never overwrite ledger balances. Missing bank alerts and cash activity require manual entries.
+Amounts use integer paise in INR; dates use Asia/Kolkata. Transfers and deleted entries are excluded from income and spending reports. Missing alerts and cash activity require manual entries. Widgets use the current month, follow the device theme, and refresh when ledger data changes and during periodic Android updates.
 
-## Interface and appearance
+## Privacy, backups, and upgrades
 
-The interface uses Jetpack Compose with collapsing 34sp large titles, inline navigation titles, horizontal push/pop for Settings, and independent root tabs. Creation, editing, choices, and import previews use vertical spring sheets with drag-handle dismissal. Android back dismisses the top presentation first. Scroll positions survive tab switches and Settings navigation.
+Ledger has no internet permission, analytics, cloud sync, or account service. Financial SMS and transactions remain on the device. Android automatic backup and device transfer are disabled; SMS links are never opened automatically.
 
-`FluidMotion.kt` centralizes critically damped springs (ratio 1, stiffness 300) and the cubic Bezier (0.25, 1, 0.5, 1). Lists retain Compose momentum flings and apply resisted boundary translation with a spring return instead of Android stretch overscroll. Cards use 12-16dp corners, small controls use 8dp corners, dividers are physical-pixel hairlines, and original vector-like line icons use consistent rounded strokes. Choose Settings > Theme for light, dark, or system appearance.
+Encrypted `.plbackup` files include accounts, transactions, financial SMS, budgets, rules, and import history. Encryption uses PBKDF2-HMAC-SHA256 and AES-256-GCM. Restoring validates the backup before replacing data and disables automatic capture until enabled again.
 
-These are Android adaptations of iOS interaction conventions, not UIKit controls or bundled SF Symbols. Android display density, system back, font scaling, and system animation duration settings remain supported.
-
-## Ledger and upgrade behavior
-
-- Opening balances anchor account balances. Transfers and deleted entries are excluded from spending reports; transfers affect both accounts once.
-- Deduplication includes bank, account, direction, and reference. NEFT/RTGS/IMPS/IFT references include their channel; reused ACH references include their posting date. Conflicting records require review.
-- Matching opposing entries with a unique shared reference, equal amount, different accounts, and dates within 24 hours combine into a transfer. Other likely matches require confirmation. The secondary entry remains hidden as an audit record; editing the combined entry does not recreate it.
-- Dismissed messages and deleted-entry identifiers survive rescans and backups. Parser upgrades preserve legacy keys and manual corrections.
-- On launch, stored review messages are reparsed locally to refresh fields without posting them automatically. This refresh does not read the phone inbox; enabled capture reconciles the inbox separately.
-
-## Privacy and backups
-
-There is no internet permission, account service, analytics, or cloud synchronization. Android automatic backup and device transfer of financial data are disabled. Relevant financial SMS remain as local transaction evidence; links are never opened automatically.
-
-Backups include accounts, transactions, financial SMS, budgets, rules, and import history. Encryption uses PBKDF2-HMAC-SHA256 with 600,000 iterations and random salt, plus AES-256-GCM with a random nonce and authenticated header. Passwords require at least eight characters. Authentication and relationship validation happen before transactional database replacement.
+The package remains `in.thomas.pocketledger`, including upgrades from Pocket Ledger. Room database version 2 migrates old monthly budgets into recurring limits by keeping the latest saved limit per category. Older encrypted backups remain readable. Deleted-entry and dismissed-message identities survive rescans and backups.
 
 ## Build and install
 
-Install JDK 21, SDK platform 37.0, and build tools 37.0.0. Configure `ANDROID_HOME` or an untracked `local.properties`. Run from the project root:
+Use **JDK 21**, SDK platform **37.0**, and build tools **37.0.0**. Configure `ANDROID_HOME` or an ignored `local.properties`, then run from the repository root:
 
 ```powershell
 .\gradlew.bat :app:assembleDebug
-adb install -r .\app\build\outputs\apk\debug\app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n in.thomas.pocketledger/.MainActivity
 ```
 
-The personal package is `in.thomas.pocketledger`, versionCode 4. Keep the same signing key for upgrades. Current APKs use debug signing; uninstalling removes local app data.
+Version 1.6.0 uses versionCode **7**. Keep the same signing key when upgrading. Development APKs use debug signing; uninstalling removes app data.
 
-Pinned dependencies: Gradle 9.8.2, AGP 9.4.1, Kotlin/Compose compiler 2.4.21, Compose BOM 2026.09.00, Activity 1.13.0, Lifecycle 2.11.0, Room 2.8.5, WorkManager 2.12.0, and KSP 2.3.12. The wrapper verifies its distribution checksum.
-
-### Faster development builds
-
-Configuration caching and the local build cache are enabled in `gradle.properties`. The first run populates caches; later runs reuse compatible configuration and task outputs. Use `:app:assembleDebug` for routine edits and run lint before delivery or after substantial changes. Avoid `clean` unless troubleshooting stale outputs. Use Android Studio Compose Preview or Live Edit for layout iterations when supported. USB ADB can reduce installation time compared with wireless ADB.
+Gradle configuration and local build caches are enabled. Use `assembleDebug` for routine builds and avoid `clean` unless diagnosing stale outputs. Dependency versions are pinned in the Gradle files; the wrapper verifies its distribution checksum.
 
 ## Development and validation
 
-See [AGENTS.md](AGENTS.md) for contributor conventions. Main sources are under `app/src/main/`, JVM tests under `app/src/test/`, device tests under `app/src/androidTest/`, and Room schemas under `app/schemas/`.
+See [AGENTS.md](AGENTS.md) for structure and contributor conventions. Commit Room schema JSON from `app/schemas/`. Generated packages, device captures, databases, signing material, and financial backups are ignored by Git. Store local release snapshots in `artifacts/`.
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest :app:lintDebug
 .\gradlew.bat "-Pledger.testApplicationId=in.thomas.pocketledger.validation" :app:connectedDebugAndroidTest
 ```
 
-The second command uses a separate validation package and synthetic messages in in-memory databases. Do not run instrumentation against your personal package: the runner may uninstall its target. Rebuild without the validation property before installing a personal APK from the shared output directory.
+Device tests use a separate application ID and synthetic data. Do not run instrumentation against the personal package: the runner may uninstall its target. Rebuild without the validation property before installing a personal APK.
 
-Version 1.1 passed **44 JVM tests and 17 device tests**, with **zero lint errors**. Coverage includes payment formats, date and money parsing, deduplication, transfers, encryption, sender trust, account mapping, and preservation of legacy records during upgrades.
+Current validation: **49 JVM tests passed**, build and lint passed with **zero lint errors** (13 warnings), and device-test sources compiled. Android 17 checks covered installation, the income filter, negative budget amounts, the category chart, and monthly widget rendering. The latest instrumentation suite has not been run on a device.
 
-A read-only ADB audit checked 1,963 bank-matching messages: 1,843 were fully parsed, 39 needed review, and 81 were excluded. These counts measure extraction, not financial accuracy or authenticity. The audit imported no ledger entries and retained only aggregate results; new fixtures use invented details. Live capture still requires verification with an incoming bank alert after permission and sender confirmation.
-
-Version 1.2 changes presentation and interaction while keeping the parser, repository, database, capture, and backup implementation unchanged. Its validation consists of build/lint and on-device checks of navigation, themes, sheets, and date selection.
-
-## Deliverables and project location
-
-The project is in `C:\Users\Thomas\AppData\Local\PocketLedgerProject` because Windows Controlled Folder Access blocked writes to the originally selected Documents workspace. Security settings were not changed.
-
-Local deliverables:
-
-- [Version 1.4 APK](artifacts/Ledger-1.4.0.apk)
-- [Version 1.4 source snapshot](artifacts/Ledger-source-1.4.0.zip)
-- [UI validation report](artifacts/VALIDATION-1.4.0.md)
-- [Aggregate parser coverage](artifacts/parser-coverage-1.1.0.json)
-
-The source archive is a release snapshot; consult working-tree files for later documentation updates. Recurring entries, receipts, calendar views, asset valuation, cloud sync, and Realbyte migration are outside this version.
+Recurring transactions, receipt attachments, cloud synchronization, and Realbyte data migration are outside the current scope.

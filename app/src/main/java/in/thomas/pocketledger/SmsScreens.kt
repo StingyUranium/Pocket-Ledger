@@ -123,6 +123,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable fun SettingsDialog(capture: Boolean, permission: Boolean, senders: List<TrustedSender>, rules: List<MerchantRule>, dismiss: () -> Unit, export: () -> Unit, restore: () -> Unit, untrust: (TrustedSender) -> Unit, removeRule: (MerchantRule) -> Unit, appSettings: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
     val preferences = remember { context.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE) }
     var appearance by remember { mutableStateOf(preferences.getString("mode", "SYSTEM") ?: "SYSTEM") }
     FluidList(contentPadding = PaddingValues(22.dp, 16.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) { item {
@@ -142,6 +143,17 @@ import androidx.compose.ui.unit.dp
             HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
             Row(verticalAlignment = Alignment.CenterVertically) { Text("Automatic capture", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge); StatusPill(if (capture && permission) "Active" else "Paused", if (capture && permission) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant) }
         }
+        SectionLabel("Home screen")
+        CardBlock {
+            Text("Home screen widgets", style = MaterialTheme.typography.titleMedium)
+            Text("Keep this month’s totals close at hand.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SettingsRow("home", "Add monthly summary", "Income, spending, and balance", onClick = {
+                if (!LedgerWidgets.pin(context, false)) android.widget.Toast.makeText(context, "Long-press your home screen, choose Widgets, then Ledger.", android.widget.Toast.LENGTH_LONG).show()
+            })
+            SettingsRow("budgets", "Add budget widget", "Monthly limits and remaining amount", onClick = {
+                if (!LedgerWidgets.pin(context, true)) android.widget.Toast.makeText(context, "Long-press your home screen, choose Widgets, then Ledger.", android.widget.Toast.LENGTH_LONG).show()
+            })
+        }
         SectionLabel("Backups")
         CardBlock {
             SettingsRow("lock", "Save encrypted backup", "Choose a password and a safe location", onClick = export)
@@ -158,7 +170,7 @@ import androidx.compose.ui.unit.dp
             if (rules.isEmpty()) Text("Remember a payee's category when editing a transaction to use it for future alerts.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             rules.forEach { rule -> Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(rule.merchant, style = MaterialTheme.typography.bodyMedium); Text(rule.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; TextButton(onClick = { removeRule(rule) }) { Text("Remove", color = rust, style = MaterialTheme.typography.bodyMedium) } } }
         }
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) { Text("Ledger", style = MaterialTheme.typography.titleSmall); Text("Version 1.3 · Built for your everyday", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) { Text("Ledger", style = MaterialTheme.typography.titleSmall); Text("Version $version · Built for your everyday", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
         }
     }

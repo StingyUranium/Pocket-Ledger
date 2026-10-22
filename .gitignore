@@ -1,8 +1,51 @@
+# Gradle, Kotlin, and native build output
 .gradle/
 .kotlin/
 **/build/
+.cxx/
+.externalNativeBuild/
+*.hprof
+
+# Local SDK paths and editor state
 local.properties
+.idea/
+*.iml
+.vscode/
+
+# Signing material and local secrets
 *.jks
 *.keystore
-.idea/
-artifacts/
+*.pem
+*.key
+key.properties
+keystore.properties
+.env
+.env.*
+!.env.example
+
+# Generated packages and local deliveries
+*.apk
+*.aab
+*.apks
+*.idsig
+/artifacts/
+
+# Private device data, financial backups, and captures
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.plbackup
+/backups/
+/device-data/
+/captures/
+/screenshots/
+*.log
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini

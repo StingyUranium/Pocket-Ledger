@@ -216,8 +216,8 @@ import java.time.*
         } catch (e: Exception) { error = e.message }
     }) {
         IconTile("budgets", MaterialTheme.colorScheme.tertiary, 56)
-        Text("A little plan for ${YearMonth.parse(b.month).format(java.time.format.DateTimeFormatter.ofPattern("MMMM"))}.", style = MaterialTheme.typography.headlineMedium)
-        Text("Choose a category and give it a monthly limit.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("A plan that carries forward.", style = MaterialTheme.typography.headlineMedium)
+        Text("Choose a category and set its limit for every month.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Pick("Category", category, (defaultCategories + category).distinct(), { it }) { category = it }
             Field(category, { category = it }, "Category name")

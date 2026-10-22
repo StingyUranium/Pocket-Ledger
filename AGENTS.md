@@ -2,31 +2,27 @@
 
 ## Project Structure & Module Organization
 
-Ledger 1.4 is an offline Android app targeting API 37. Kotlin sources are in `app/src/main/java/in/thomas/pocketledger/`: `DesignSystem.kt` defines theme and shared components, `FluidMotion.kt` owns spring sheets and elastic list wrappers, Compose screens handle UI, `Repository.kt` coordinates imports and ledger updates, `Database.kt` defines Room entities, and parsing, capture, and encrypted backups have dedicated files. Resources and the manifest are under `app/src/main/`. JVM tests use `app/src/test/`; device tests use `app/src/androidTest/`. Keep Room schemas in `app/schemas/`. Generated deliveries belong in `artifacts/`, outside source commits.
+Ledger is an offline Kotlin Android app targeting API 37. Sources are under `app/src/main/java/in/thomas/pocketledger/`. `MainActivity.kt` owns navigation; Compose screens, `DesignSystem.kt`, and `FluidMotion.kt` handle presentation. `GraphsScreen.kt` renders charts, `Reports.kt` calculates summaries, and `LedgerWidgets.kt` manages home screen widgets. `Database.kt`, `Repository.kt`, `SmsParser.kt`, and `Backup.kt` handle financial data. Resources are under `app/src/main/res/`, JVM tests under `app/src/test/`, and device tests under `app/src/androidTest/`. Commit Room schemas from `app/schemas/`.
 
 ## Build, Test, and Development Commands
 
-Use JDK 21, SDK platform 37.0, and build tools 37.0.0. Configure `ANDROID_HOME` or an untracked `local.properties`. Run from the repository root:
+Use JDK 21, SDK platform 37.0, and build tools 37.0.0. Set `ANDROID_HOME` or an ignored `local.properties`. Run from the repository root:
 
-- `.\gradlew.bat :app:assembleDebug` builds the personal app.
-- `.\gradlew.bat :app:testDebugUnitTest :app:lintDebug` runs JVM tests and Android Lint.
-- `.\gradlew.bat "-Pledger.testApplicationId=in.thomas.pocketledger.validation" :app:connectedDebugAndroidTest` runs device tests under a separate application ID.
-- `adb install -r .\app\build\outputs\apk\debug\app-debug.apk` updates the installed app.
+- `.\gradlew.bat :app:assembleDebug` builds the personal APK.
+- `.\gradlew.bat :app:testDebugUnitTest :app:lintDebug` runs JVM tests and lint.
+- `.\gradlew.bat "-Pledger.testApplicationId=in.thomas.pocketledger.validation" :app:connectedDebugAndroidTest` runs isolated device tests.
+- `adb install -r app/build/outputs/apk/debug/app-debug.apk` installs an update.
 
-For routine UI iterations, run `:app:assembleDebug` only; run lint before delivery or after substantial changes. Configuration and local build caches are enabled in `gradle.properties`. Avoid `clean` unless diagnosing stale outputs; use Compose Preview or Live Edit for layout work when available.
-
-Rebuild without the validation property before installing the personal APK. Avoid instrumenting the personal package: the test runner may uninstall its target afterward.
+Never run instrumentation against the personal package; the runner may uninstall it. Rebuild without the validation property before installing a personal APK. Reuse build caches; avoid routine `clean` builds.
 
 ## Coding Style & Architecture
 
-Use four-space indentation, PascalCase classes and composables, and camelCase functions and properties. Prefer readable Kotlin blocks. Keep UI, parsing, persistence, and cryptography separate. Reuse fluid motion specs and elastic list wrappers; keep root tabs separate from push/pop routes and creation sheets. Store money as integer paise and interpret transaction dates in Asia/Kolkata. Android Lint is configured; no standalone formatter is configured.
+Use four spaces, PascalCase classes/composables, and camelCase functions/properties. Reuse shared motion and theme components. Keep root tabs independent from push/pop transaction views. Store money as integer paise and use Asia/Kolkata dates. Budgets are recurring category limits; spending calculations use the selected month. Preserve negative remaining amounts. Exclude transfers and deleted entries from reports. Keep widgets consistent with `Reports.kt` and preserve migration and backup compatibility.
 
-## Parser & Testing Guidelines
+## Testing Guidelines
 
-New inbox scans accept the selected SBM/Axis scope: UPI, NEFT, IMPS, RTGS, IFT, ACH, savings interest, UPI Lite top-ups, completed Axis merchant debits, and deposit-account refunds/reversals. Exclude credit cards, OTPs, requests, and future or mandate-maintenance notices. Keep incomplete selected transactions in review. Preserve existing UPI keys, legacy identities, dismissal tombstones, and manual corrections. Scope ACH references to posting dates. Refresh stored review fields without automatically posting them.
+Use JUnit 4 and AndroidX Test; name files `*Test.kt` and methods after behavior. Add meaningful synthetic fixtures for parser, money, migration, and backup changes. Preserve SMS identities, dismissal tombstones, and manual corrections. Capture supports selected SBM/Axis deposit-account alerts; exclude credit cards, OTPs, and payment requests. Validate UI changes with build/lint and focused device checks. No coverage percentage is enforced.
 
-Use JUnit 4 and AndroidX Test. Name files `*Test.kt` and methods after behavior. Add synthetic regression fixtures for parser and upgrade changes; never save real phone messages in source. Device tests use in-memory Room databases. Version 1.1 validation passed 44 JVM and 17 device tests; no coverage percentage is enforced.
+## Commit, Pull Request & Security Guidelines
 
-## Commit, Review & Security
-
-No commit history establishes a convention. Use imperative subjects, such as `Expand bank SMS parsing`. Describe behavior, validation, relevant issues, and UI screenshots in PRs. Keep processing local. Never commit personal SMS, passwords, signing keys, local SDK paths, generated binaries, or caches.
+Follow existing imperative commit subjects, such as `Add recurring budgets and financial charts`. PRs should describe behavior, validation, relevant issues, and UI screenshots. Keep processing local. Never commit personal SMS, databases, financial backups, signing material, or generated packages. Store local deliveries in ignored `artifacts/`; track synthetic fixtures and schema JSON.

@@ -74,7 +74,7 @@ class RepositoryTest {
     @Test fun backupRestoresAllDataAndTombstonesAtomically() = runBlocking {
         repo.trust("VM-AXISBK", "AXIS"); repo.ingest(listOf(candidate()))
         val entry = db.dao().allEntries().single(); repo.save(entry.copy(category = "Food"), true); repo.delete(entry)
-        db.dao().budget(Budget("2026-10", "Food", 10000))
+        db.dao().budget(Budget("Food", 10000))
         val password = "test-password".toCharArray(); val bytes = Backup.export(db, password)
         db.dao().clearEntries(); db.dao().clearMessages(); db.dao().clearBudgets(); db.dao().clearRules(); db.dao().clearSenders()
         prefs.edit().putBoolean("enabled", true).commit()

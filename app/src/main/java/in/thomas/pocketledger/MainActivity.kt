@@ -40,19 +40,32 @@ fun dayMillis(v: String) = LocalDate.parse(v.trim()).atStartOfDay(india).toInsta
 fun inMonth(e: Entry, m: YearMonth) = YearMonth.from(Instant.ofEpochMilli(e.date).atZone(india)) == m
 
 class MainActivity : ComponentActivity() {
+    private var launchRequest by mutableStateOf<Intent?>(null)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        launchRequest = intent
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT), navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT))
         setContent {
             PocketTheme {
-                Ledger((application as LedgerApp).repo)
+                Ledger((application as LedgerApp).repo, launchRequest)
             }
         }
     }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        launchRequest = intent
+    }
+}
+
+private sealed interface LedgerRoute {
+    data object Tabs : LedgerRoute
+    data object Settings : LedgerRoute
+    data class Transactions(val type: String, val category: String) : LedgerRoute
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun Ledger(repo: Repository) {
+@Composable fun Ledger(repo: Repository, launchRequest: Intent? = null) {
     val dao = repo.dao
     val accounts by remember { dao.accounts() }.collectAsStateWithLifecycle(emptyList())
     val allEntries by remember { dao.entries() }.collectAsStateWithLifecycle(emptyList())
@@ -65,6 +78,8 @@ class MainActivity : ComponentActivity() {
     var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }; var month by remember { mutableStateOf(YearMonth.now(india)) }
     var editor by remember { mutableStateOf<Entry?>(null) }; var accountEditor by remember { mutableStateOf<Account?>(null) }
     var settings by remember { mutableStateOf(false) }; var disclosure by remember { mutableStateOf(false) }
+    var details by remember { mutableStateOf<LedgerRoute.Transactions?>(null) }
+    val openTransactions: (String, String) -> Unit = { type, category -> details = LedgerRoute.Transactions(type, category) }
     var capture by remember { mutableStateOf(repo.prefs.getBoolean("enabled", false)) }
     var permission by remember { mutableStateOf(repo.hasSmsPermission()) }
     var busy by remember { mutableStateOf(false) }
@@ -95,64 +110,85 @@ class MainActivity : ComponentActivity() {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { permission = repo.hasSmsPermission(); capture = repo.prefs.getBoolean("enabled", false); work { repo.reconcile() } } }
         owner.lifecycle.addObserver(observer); onDispose { owner.lifecycle.removeObserver(observer) }
     }
-    BackHandler(settings) { settings = false }
+    LaunchedEffect(launchRequest) {
+        launchRequest?.getStringExtra("ledger_route")?.let { destination ->
+            settings = false
+            details = null
+            month = YearMonth.now(india)
+            tab = if (destination == "budget") 3 else 0
+            if (destination == "income") openTransactions("INCOME", "ALL")
+            if (destination == "expense") openTransactions("EXPENSE", "ALL")
+        }
+    }
+    val route: LedgerRoute = if (settings) LedgerRoute.Settings else details ?: LedgerRoute.Tabs
+    BackHandler(route != LedgerRoute.Tabs) { if (settings) settings = false else details = null }
     val density = LocalDensity.current
     val collapseRange = with(density) { 56.dp.toPx() }
     val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val titleOffsets = remember { mutableStateMapOf<String, Float>() }
-    val routeKey = if (settings) "settings" else "tab-$tab"
+    val routeKey = if (route == LedgerRoute.Tabs) "tab-$tab" else route.toString()
     val collapseOffset = titleOffsets[routeKey] ?: 0f
-    val titleScroll = remember(tab, settings, collapseRange) { object : NestedScrollConnection {
+    val titleScroll = remember(routeKey, collapseRange) { object : NestedScrollConnection {
         override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
             titleOffsets[routeKey] = ((titleOffsets[routeKey] ?: 0f) - consumed.y).coerceIn(0f, collapseRange)
             return Offset.Zero
         }
     } }
-    val titles = listOf("Overview", "Activity", "Accounts", "Budgets", "Inbox")
+    val titles = listOf("Overview", "Activity", "Accounts", "Budgets", "Inbox", "Graphs")
     Scaffold(
         topBar = {
             PocketHeader(
-                title = if (settings) "Settings" else titles[tab],
+                title = when (val current = route) {
+                    LedgerRoute.Settings -> "Settings"
+                    LedgerRoute.Tabs -> titles[tab]
+                    is LedgerRoute.Transactions -> if (current.category != "ALL") current.category else if (current.type == "INCOME") "Income" else "Spent"
+                },
                 collapse = collapseOffset / collapseRange,
-                back = if (settings) ({ settings = false }) else null,
+                back = if (route != LedgerRoute.Tabs) ({ if (settings) settings = false else details = null }) else null,
                 settings = { settings = true },
-                add = if (!settings && tab <= 1) ({
+                add = if (!settings && (tab <= 1 || details != null)) ({
                     accounts.firstOrNull()?.let {
-                        editor = Entry(UUID.randomUUID().toString(), it.id, type = "EXPENSE", amount = 0, date = System.currentTimeMillis())
+                        editor = Entry(UUID.randomUUID().toString(), it.id, type = details?.type ?: "EXPENSE", category = details?.category?.takeUnless { category -> category == "ALL" } ?: "Uncategorized", amount = 0, date = System.currentTimeMillis())
                     }
                 }) else null
             )
         },
-        bottomBar = { if (!settings) PocketTabBar(tab, messages.count { it.status == "REVIEW" }) { tab = it } },
+        bottomBar = { if (route == LedgerRoute.Tabs) PocketTabBar(tab, messages.count { it.status == "REVIEW" }) { tab = it } },
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snack) }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().nestedScroll(titleScroll)) {
-            AnimatedContent(targetState = settings, transitionSpec = {
-                if (targetState) {
+            AnimatedContent(targetState = route, transitionSpec = {
+                if (targetState == LedgerRoute.Settings || initialState == LedgerRoute.Tabs) {
                     (slideInHorizontally(fluidSpring()) { it } + fadeIn(fluidTween())) togetherWith
                         slideOutHorizontally(fluidSpring()) { -it / 3 }
                 } else {
                     slideInHorizontally(fluidSpring()) { -it / 3 } togetherWith
                         (slideOutHorizontally(fluidSpring()) { it } + fadeOut(fluidTween()))
                 }
-            }, label = "navigation stack", modifier = Modifier.fillMaxSize()) { showSettings ->
-            pageState.SaveableStateProvider(if (showSettings) "settings" else "tabs") {
-            if (showSettings) {
+            }, label = "navigation stack", modifier = Modifier.fillMaxSize()) { shownRoute ->
+            pageState.SaveableStateProvider(shownRoute.toString()) {
+            if (shownRoute == LedgerRoute.Settings) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     SettingsDialog(capture, permission, senders, rules, { settings = false }, { passwordMode = "export" }, { chooseRestore.launch(arrayOf("*/*")) }, { work { dao.untrust(it.sender, it.bank) } }, { work { dao.removeRule(it.merchant) } }, { repo.context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${repo.context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
                 }
+            } else if (shownRoute is LedgerRoute.Transactions) {
+                Column(Modifier.fillMaxSize()) {
+                    MonthPicker(month) { month = it }
+                    Transactions(entries, accounts, month, shownRoute.type, shownRoute.category) { editor = it }
+                }
             } else Column(Modifier.fillMaxSize()) {
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (tab in listOf(0, 1, 3)) MonthPicker(month) { month = it }
+            if (tab in listOf(0, 1, 3, 5)) MonthPicker(month) { month = it }
             Box(Modifier.weight(1f)) {
                 val page = tab
                 pageState.SaveableStateProvider("tab-$page") {
                 when (page) {
-                    0 -> Overview(accounts, entries, messages, month, budgets, { tab = 2 }, { tab = 4 }) { editor = it }
+                    0 -> Overview(accounts, entries, messages, month, budgets, { tab = 2 }, { tab = 4 }, openTransactions) { editor = it }
                     1 -> Transactions(entries, accounts, month) { editor = it }
                     2 -> AccountsScreen(accounts, entries, messages, { accountEditor = it }, { accountEditor = Account(UUID.randomUUID().toString(), "", "CASH", "", openingDate = dayMillis(LocalDate.now(india).withDayOfMonth(1).toString())) })
                     3 -> BudgetScreen(budgets, entries, month) { work { dao.budget(it) } }
+                    5 -> GraphsScreen(entries, month, { month = it }, openTransactions)
                     4 -> SmsScreen(messages, entries, accounts, senders, permission, capture, from, to, { from = it }, { to = it },
                         { disclosure = true }, { enabled ->
                             if (enabled && !permission) disclosure = true else {

@@ -171,14 +171,14 @@ val positive = Color(0xFF248A3D)
         Column {
             HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.navigationBarsPadding().padding(horizontal = 6.dp, vertical = 7.dp)) {
-                listOf("Home", "Entries", "Accounts", "Budgets", "SMS").forEachIndexed { index, label ->
+                listOf("Home", "Entries", "Accounts", "Budgets", "SMS", "Graphs").forEachIndexed { index, label ->
                     val color by animateColorAsState(if (selected == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, animationSpec = fluidSpring(), label = "tab tint")
                     Column(
                         Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).selectable(selected == index, onClick = { change(index) }, role = Role.Tab).padding(vertical = 7.dp),
                         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Box {
-                            AppIcon(listOf("home", "entries", "accounts", "budgets", "sms")[index], Modifier.size(23.dp), color)
+                            AppIcon(listOf("home", "entries", "accounts", "budgets", "sms", "chart")[index], Modifier.size(23.dp), color)
                             if (index == 4 && pending > 0) Badge(Modifier.align(Alignment.TopEnd).offset(x = 12.dp, y = (-5).dp)) { Text(if (pending > 99) "99+" else "$pending") }
                         }
                         Text(label, style = MaterialTheme.typography.labelSmall, color = color)

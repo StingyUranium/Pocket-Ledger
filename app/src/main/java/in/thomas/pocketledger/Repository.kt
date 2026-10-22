@@ -7,15 +7,28 @@ import android.provider.Telephony
 import androidx.room.Room
 import androidx.room.withTransaction
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
 import java.util.UUID
 
 class LedgerApp : Application() {
-    val db by lazy { Room.databaseBuilder(this, LedgerDatabase::class.java, "ledger.db").build() }
+    private val widgetScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val db by lazy { Room.databaseBuilder(this, LedgerDatabase::class.java, "ledger.db").addMigrations(MIGRATION_1_2).build() }
     val repo by lazy { Repository(this, db) }
-    override fun onCreate() { super.onCreate(); androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork("sms-reconcile", androidx.work.ExistingPeriodicWorkPolicy.KEEP, androidx.work.PeriodicWorkRequestBuilder<SmsWorker>(15, java.util.concurrent.TimeUnit.MINUTES).build()) }
+    override fun onCreate() {
+        super.onCreate()
+        androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork("sms-reconcile", androidx.work.ExistingPeriodicWorkPolicy.KEEP, androidx.work.PeriodicWorkRequestBuilder<SmsWorker>(15, java.util.concurrent.TimeUnit.MINUTES).build())
+        widgetScope.launch {
+            combine(db.dao().entries(), db.dao().budgets()) { entries, budgets -> entries to budgets }.collect { (entries, budgets) ->
+                if (LedgerWidgets.hasWidgets(this@LedgerApp)) {
+                    runCatching { LedgerWidgets.render(this@LedgerApp, entries, budgets) }
+                        .onFailure { android.util.Log.e("LedgerWidgets", "Could not refresh widgets", it) }
+                }
+            }
+        }
+    }
 }
 data class Candidate(val sender: String, val body: String, val received: Long, val parsed: ParsedSms) { val key get() = SmsParser.key(parsed, sender, body, received) }
 class Repository(val context: Context, val db: LedgerDatabase) {

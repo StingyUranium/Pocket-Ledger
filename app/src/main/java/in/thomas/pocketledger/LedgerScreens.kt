@@ -45,14 +45,14 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
         Box(Modifier.size(144.dp).align(Alignment.BottomEnd).offset(x = 68.dp, y = 68.dp).clip(CircleShape).background(Color.White.copy(alpha = .04f)))
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Total balance", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFCDD6E4), modifier = Modifier.weight(1f))
+                Text("Monthly balance", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFCDD6E4), modifier = Modifier.weight(1f))
                 AppIcon("wallet", Modifier.size(22.dp), Color(0xFFCDD6E4))
             }
             Text(money(total), color = Color.White, fontSize = 38.sp, lineHeight = 44.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1.3).sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif)
             Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.weight(1f)) {
                     Box(Modifier.size(5.dp).background(Color(0xFF73DBAC), CircleShape))
-                    Text("$accountCount accounts · all recorded dates", color = Color(0xFFCDD6E4), style = MaterialTheme.typography.bodySmall)
+                    Text("$accountCount accounts · selected month", color = Color(0xFFCDD6E4), style = MaterialTheme.typography.bodySmall)
                 }
                 Text("INR", style = MaterialTheme.typography.labelMedium, color = Color.White, modifier = Modifier.clip(RoundedCornerShape(7.dp)).background(Color.White.copy(alpha = .1f)).padding(horizontal = 9.dp, vertical = 5.dp))
             }
@@ -60,27 +60,31 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
     }
 }
 
-@Composable private fun MoneyStat(label: String, amount: Long, income: Boolean, modifier: Modifier = Modifier) {
-    Surface(modifier, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
+@Composable private fun MoneyStat(label: String, amount: Long, income: Boolean, modifier: Modifier = Modifier, open: () -> Unit) {
+    Surface(onClick = open, modifier = modifier, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 AppIcon(if (income) "income" else "expense", Modifier.size(16.dp), if (income) MaterialTheme.colorScheme.tertiary else rust)
-                Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(money(amount), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
-@Composable fun Overview(accounts: List<Account>, entries: List<Entry>, messages: List<SmsRecord>, month: YearMonth, budgets: List<Budget>, setup: () -> Unit, review: () -> Unit, edit: (Entry) -> Unit) {
-    val monthly = entries.filter { inMonth(it, month) }
+@Composable fun Overview(accounts: List<Account>, entries: List<Entry>, messages: List<SmsRecord>, month: YearMonth, budgets: List<Budget>, setup: () -> Unit, review: () -> Unit, openTransactions: (String, String) -> Unit, edit: (Entry) -> Unit) {
+    val monthly = entries.filter { !it.deleted && inMonth(it, month) }
     val income = monthly.filter { it.type == "INCOME" }.sumOf { it.amount }
     val expense = monthly.filter { it.type == "EXPENSE" }.sumOf { it.amount }
     val pending = messages.count { it.status == "REVIEW" }
     val totals = monthly.filter { it.type == "EXPENSE" }.groupBy { it.category }.mapValues { it.value.sumOf { entry -> entry.amount } }.toList().sortedByDescending { it.second }
     FluidList(contentPadding = PaddingValues(22.dp, 10.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        item { BalanceCard(accounts.sumOf { balance(it, entries) }, accounts.size) }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { MoneyStat("Income", income, true, Modifier.weight(1f)); MoneyStat("Spent", expense, false, Modifier.weight(1f)) } }
+        item { BalanceCard(income - expense, accounts.size) }
+        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            MoneyStat("Income", income, true, Modifier.weight(1f)) { openTransactions("INCOME", "ALL") }
+            MoneyStat("Spent", expense, false, Modifier.weight(1f)) { openTransactions("EXPENSE", "ALL") }
+        } }
         if (pending > 0) item {
             Surface(onClick = review, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer) {
                 Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
@@ -109,14 +113,15 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
             CardBlock {
                 totals.forEachIndexed { index, (category, amount) ->
                     val color = categoryColor(index)
-                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClickLabel = "View $category transactions") { openTransactions("EXPENSE", category) }.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                             Box(Modifier.size(8.dp).background(color, CircleShape))
                             Text(category, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                             Text(money(amount), style = MaterialTheme.typography.titleSmall)
+                            AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         LinearProgressIndicator(progress = { if (expense == 0L) 0f else (amount.toDouble() / expense).toFloat() }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape), color = color, trackColor = color.copy(alpha = .1f), drawStopIndicator = {})
-                        budgets.find { it.month == month.toString() && it.category == category && it.amount > 0 }?.let {
+                        budgets.find { it.category == category && it.amount > 0 }?.let {
                             Text("${money(it.amount - amount)} left of ${money(it.amount)}", style = MaterialTheme.typography.bodySmall, color = if (amount > it.amount) rust else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -134,7 +139,7 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
     }
 }
 
-private fun categoryColor(index: Int) = listOf(Color(0xFF007AFF), Color(0xFFAF52DE), Color(0xFFFF9500), Color(0xFF32ADE6), Color(0xFF34C759), Color(0xFFFF6482))[index % 6]
+fun categoryColor(index: Int) = listOf(Color(0xFF007AFF), Color(0xFFAF52DE), Color(0xFFFF9500), Color(0xFF32ADE6), Color(0xFF34C759), Color(0xFFFF6482))[index % 6]
 
 @Composable fun EntryRow(e: Entry, accounts: List<Account>, divider: Boolean = false, click: () -> Unit) {
     val tint = when (e.type) { "INCOME" -> MaterialTheme.colorScheme.tertiary; "TRANSFER" -> MaterialTheme.colorScheme.primary; else -> MaterialTheme.colorScheme.onSurface }
@@ -154,11 +159,11 @@ private fun categoryColor(index: Int) = listOf(Color(0xFF007AFF), Color(0xFFAF52
     }
 }
 
-@Composable fun Transactions(entries: List<Entry>, accounts: List<Account>, month: YearMonth, edit: (Entry) -> Unit) {
+@Composable fun Transactions(entries: List<Entry>, accounts: List<Account>, month: YearMonth, initialType: String = "ALL", initialCategory: String = "ALL", edit: (Entry) -> Unit) {
     var search by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("ALL") }
+    var type by remember(initialType) { mutableStateOf(initialType) }
     var account by remember { mutableStateOf("ALL") }
-    var category by remember { mutableStateOf("ALL") }
+    var category by remember(initialCategory) { mutableStateOf(initialCategory) }
     val filtered = entries.filter { inMonth(it, month) && (type == "ALL" || it.type == type) && (account == "ALL" || it.accountId == account || it.destinationId == account) && (category == "ALL" || it.category == category) && "${it.payee} ${it.note} ${it.category}".contains(search, true) }
     val groups = filtered.groupBy { dayText(it.date) }
     Column {
@@ -224,7 +229,7 @@ private fun categoryColor(index: Int) = listOf(Color(0xFF007AFF), Color(0xFFAF52
 
 @Composable fun BudgetScreen(budgets: List<Budget>, entries: List<Entry>, month: YearMonth, save: (Budget) -> Unit) {
     var edit by remember { mutableStateOf<Budget?>(null) }
-    val current = budgets.filter { it.month == month.toString() && it.amount > 0 }
+    val current = budgets.filter { it.amount > 0 }
     val spentByCategory = entries.filter { it.type == "EXPENSE" && inMonth(it, month) }.groupBy { it.category }.mapValues { it.value.sumOf { entry -> entry.amount } }
     val planned = current.sumOf { it.amount }
     val spent = current.sumOf { spentByCategory[it.category] ?: 0L }
@@ -235,10 +240,10 @@ private fun categoryColor(index: Int) = listOf(Color(0xFF007AFF), Color(0xFFAF52
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) { Text("Room for what matters", style = MaterialTheme.typography.titleMedium); Text("Your monthly spending plan", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            Text(if (planned > 0) money((planned - spent).coerceAtLeast(0)) else "Make a little room", style = MaterialTheme.typography.headlineMedium)
+            Text(if (planned > 0) money(planned - spent) else "Make a little room", style = MaterialTheme.typography.headlineMedium, color = if (spent > planned) rust else MaterialTheme.colorScheme.onSurface)
             Text(if (planned > 0) "Left across your budgeted categories" else "Set a limit. Give every category a little direction.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (planned > 0) LinearProgressIndicator(progress = { (spent.toDouble() / planned).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = if (spent > planned) rust else MaterialTheme.colorScheme.tertiary, trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
-            Button(onClick = { edit = Budget(month.toString(), "Food", 0) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(8.dp)) { AppIcon("plus", Modifier.size(17.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(7.dp)); Text("Set a budget") }
+            Button(onClick = { edit = Budget("Food", 0) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(8.dp)) { AppIcon("plus", Modifier.size(17.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(7.dp)); Text("Set a budget") }
         } }
         item { SectionTitle("Your categories") }
         if (current.isEmpty()) item { Empty("Create your first category budget to track spending as the month unfolds.", "Good things start with a plan", "budgets") }
@@ -249,7 +254,7 @@ private fun categoryColor(index: Int) = listOf(Color(0xFF007AFF), Color(0xFFAF52
                 Row(verticalAlignment = Alignment.CenterVertically) { Text(b.category, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f)); StatusPill(if (over) "Over budget" else "${((amount.toDouble() / b.amount) * 100).toInt()}% used", if (over) rust else MaterialTheme.colorScheme.primary) }
                 Row(verticalAlignment = Alignment.Bottom) { Text(money(amount), style = MaterialTheme.typography.titleLarge); Text(" / ${money(b.amount)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 LinearProgressIndicator(progress = { (amount.toDouble() / b.amount).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape), color = if (over) rust else MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
-                Text(if (over) "${money(amount - b.amount)} over your limit" else "${money(b.amount - amount)} remaining", style = MaterialTheme.typography.bodySmall, color = if (over) rust else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${money(b.amount - amount)} remaining", style = MaterialTheme.typography.bodySmall, color = if (over) rust else MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -1,0 +1,12 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center_vertical" android:padding="14dp" android:background="@drawable/widget_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@id/widget_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/widget_month_preview" android:textColor="@color/widget_text" android:textSize="14sp" android:fontFamily="sans-serif-medium" android:maxLines="1" android:ellipsize="end" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/widget_open" android:textColor="@color/widget_accent" android:textSize="12sp" />
+    </LinearLayout>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="@string/widget_remaining_label" android:textColor="@color/widget_secondary" android:textSize="12sp" />
+    <TextView android:id="@+id/widget_remaining" android:layout_width="match_parent" android:layout_height="32dp" android:text="@string/widget_amount_preview" android:textColor="@color/widget_text" android:textSize="28sp" android:fontFamily="sans-serif-medium" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="16sp" android:autoSizeMaxTextSize="28sp" android:autoSizeStepGranularity="1sp" />
+    <ProgressBar android:id="@+id/widget_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_marginVertical="4dp" android:max="1000" android:progress="0" android:progressTint="@color/widget_accent" android:progressBackgroundTint="@color/widget_panel" />
+    <TextView android:id="@+id/widget_budget_meta" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/widget_budget_preview" android:textColor="@color/widget_secondary" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
+</LinearLayout>

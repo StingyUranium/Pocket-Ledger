@@ -51,12 +51,15 @@ object Backup {
         val entries = objects(root.getJSONArray("entries")).map { Entry(it.getString("id"), it.getString("accountId"), it.str("destinationId"), it.getString("type"), it.getLong("amount"), it.getLong("date"), it.getBoolean("dateOnly"), it.getString("payee"), it.getString("category"), it.getString("note"), it.str("smsKey"), it.getBoolean("deleted")) }
         val messages = objects(root.getJSONArray("messages")).map { SmsRecord(it.getString("key"), it.getString("sender"), it.getString("body"), it.getLong("received"), it.getString("bank"), it.str("suffix"), it.longOrNull("amount"), it.str("direction"), it.longOrNull("date"), it.getBoolean("dateOnly"), it.getString("payee"), it.str("reference"), it.longOrNull("balance"), it.getBoolean("complete"), it.getString("status"), it.getString("reason")) }
         val senders = objects(root.getJSONArray("senders")).map { TrustedSender(it.getString("sender"), it.getString("bank")) }
-        val budgets = objects(root.getJSONArray("budgets")).map { Budget(it.getString("month"), it.getString("category"), it.getLong("amount")) }
+        val budgets = objects(root.getJSONArray("budgets")).groupBy { it.getString("category") }.map { (category, records) ->
+            val latest = records.maxByOrNull { if (it.has("month") && !it.isNull("month")) it.getString("month") else "" }!!
+            Budget(category, latest.getLong("amount"))
+        }
         val rules = objects(root.getJSONArray("rules")).map { MerchantRule(it.getString("merchant"), it.getString("category")) }
         val ids = accounts.map { it.id }.toSet(); val keys = messages.map { it.key }.toSet()
         require(accounts.isNotEmpty() && ids.size == accounts.size && entries.map { it.id }.distinct().size == entries.size && keys.size == messages.size) { "Backup contains duplicate or missing records" }
         require(entries.all { it.amount > 0 && it.accountId in ids && it.type in listOf("INCOME", "EXPENSE", "TRANSFER") && (it.type != "TRANSFER" || it.destinationId in ids && it.destinationId != it.accountId) && (it.smsKey == null || it.smsKey in keys) }) { "Backup contains invalid transactions" }
-        require(budgets.all { it.amount >= 0 && runCatching { java.time.YearMonth.parse(it.month) }.isSuccess }) { "Backup contains invalid budgets" }
+        require(budgets.all { it.category.isNotBlank() && it.amount >= 0 }) { "Backup contains invalid budgets" }
         repo.replaceData {
             clearEntries(); clearMessages(); clearAccounts(); clearSenders(); clearBudgets(); clearRules()
             accounts.forEach { account(it) }; messages.forEach { message(it) }; entries.forEach { entry(it) }

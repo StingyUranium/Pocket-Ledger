@@ -1,12 +1,14 @@
 package `in`.thomas.pocketledger
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity data class Account(@PrimaryKey val id: String, val name: String, val bank: String, val suffix: String, val opening: Long = 0, val openingDate: Long = 0)
 @Entity data class Entry(@PrimaryKey val id: String, val accountId: String, val destinationId: String? = null, val type: String, val amount: Long, val date: Long, val dateOnly: Boolean = false, val payee: String = "", val category: String = "Uncategorized", val note: String = "", val smsKey: String? = null, val deleted: Boolean = false)
 @Entity data class SmsRecord(@PrimaryKey val key: String, val sender: String, val body: String, val received: Long, val bank: String, val suffix: String?, val amount: Long?, val direction: String?, val date: Long?, val dateOnly: Boolean, val payee: String, val reference: String?, val balance: Long?, val complete: Boolean, val status: String = "REVIEW", val reason: String = "Confirm sender and account")
 @Entity(primaryKeys = ["sender", "bank"]) data class TrustedSender(val sender: String, val bank: String)
-@Entity(primaryKeys = ["month", "category"]) data class Budget(val month: String, val category: String, val amount: Long)
+@Entity data class Budget(@PrimaryKey val category: String, val amount: Long)
 @Entity data class MerchantRule(@PrimaryKey val merchant: String, val category: String)
 fun SmsRecord.parsed() = ParsedSms(bank, suffix, amount, direction, date, dateOnly, payee, reference, balance, complete)
 @Dao interface LedgerDao {
@@ -39,7 +41,15 @@ fun SmsRecord.parsed() = ParsedSms(bank, suffix, amount, direction, date, dateOn
     @Query("DELETE FROM Budget") suspend fun clearBudgets()
     @Query("DELETE FROM MerchantRule") suspend fun clearRules()
 }
-@Database(entities = [Account::class, Entry::class, SmsRecord::class, TrustedSender::class, Budget::class, MerchantRule::class], version = 1, exportSchema = true)
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE Budget_new (category TEXT NOT NULL, amount INTEGER NOT NULL, PRIMARY KEY(category))")
+        db.execSQL("INSERT INTO Budget_new (category, amount) SELECT b.category, b.amount FROM Budget b WHERE b.month = (SELECT MAX(b2.month) FROM Budget b2 WHERE b2.category = b.category)")
+        db.execSQL("DROP TABLE Budget")
+        db.execSQL("ALTER TABLE Budget_new RENAME TO Budget")
+    }
+}
+@Database(entities = [Account::class, Entry::class, SmsRecord::class, TrustedSender::class, Budget::class, MerchantRule::class], version = 2, exportSchema = true)
 abstract class LedgerDatabase : RoomDatabase() { abstract fun dao(): LedgerDao }
 fun balance(account: Account, entries: List<Entry>): Long = entries.filter { !it.deleted && it.date >= account.openingDate }.fold(account.opening) { sum, e -> sum + when { e.type == "TRANSFER" && e.destinationId == account.id -> e.amount; e.accountId != account.id -> 0; e.type == "INCOME" -> e.amount; else -> -e.amount } }
-val defaultCategories = listOf("Uncategorized", "Food", "Groceries", "Transport", "Shopping", "Bills", "Health", "Entertainment", "Salary", "Investment", "Other")
+val defaultCategories = listOf("Uncategorized", "Food", "Groceries", "Transport", "Uber/Bus", "Fuel", "Rent", "Shopping", "Bills", "Health", "Entertainment", "Salary", "Investment", "Other")
