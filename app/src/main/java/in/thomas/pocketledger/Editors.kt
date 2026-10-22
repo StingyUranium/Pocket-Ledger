@@ -144,7 +144,7 @@ import java.time.*
         Segments(listOf("EXPENSE" to "Expense", "INCOME" to "Income", "TRANSFER" to "Transfer"), type) { type = it }
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text("AMOUNT IN INR", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextField(amount, { amount = it; error = null }, placeholder = { Text("0.00", fontSize = 40.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .45f)) }, prefix = { Text("? ", fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true,
+            TextField(amount, { amount = it; error = null }, placeholder = { Text("0.00", fontSize = 40.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .45f)) }, prefix = { Text("₹ ", fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true,
                 textStyle = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp, fontWeight = FontWeight.Medium), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = fieldColors(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         }
         error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
@@ -157,19 +157,19 @@ import java.time.*
             if (type == "TRANSFER") Pick("To account", target, accounts.filter { it.id != account }.map { it.id }, { value -> accounts.find { it.id == value }?.name.orEmpty() }) { target = it }
             Field(payee, { payee = it }, "Payee or description")
             if (type != "TRANSFER") {
-                Pick("Category", category, (defaultCategories + category + "Add category?").distinct(), { it }) {
-                    if (it == "Add category?") customCategory = true else { category = it; customCategory = false }
+                Pick("Category", category, (defaultCategories + category + "Add category…").distinct(), { it }) {
+                    if (it == "Add category…") customCategory = true else { category = it; customCategory = false }
                 }
                 if (customCategory) Field(category, { category = it }, "Custom category")
             }
             DateField(date, { date = it }, "Date")
-            Field(time, { time = it }, "Time ? HH:MM:SS, optional (IST)")
+            Field(time, { time = it }, "Time · HH:MM:SS, optional (IST)")
             Field(note, { note = it }, "Note, optional")
         }
         if (type != "TRANSFER") CardBlock {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(Modifier.weight(1f)) { Text("Remember category", style = MaterialTheme.typography.bodyLarge); Text("Use this category for future alerts from this payee.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                PocketSwitch(rememberMerchant) { rememberMerchant = it }
+                PocketSwitch(rememberMerchant, "Remember category") { rememberMerchant = it }
             }
         }
         sms?.let { SectionLabel("Original bank message"); CardBlock { Text(it.sender, style = MaterialTheme.typography.titleSmall); Text(it.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }

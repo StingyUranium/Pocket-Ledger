@@ -1,99 +1,176 @@
 package `in`.thomas.pocketledger
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 @Composable fun SmsScreen(messages: List<SmsRecord>, entries: List<Entry>, accounts: List<Account>, senders: List<TrustedSender>, permission: Boolean, capture: Boolean, from: String, to: String, setFrom: (String) -> Unit, setTo: (String) -> Unit, request: () -> Unit, toggle: (Boolean) -> Unit, scan: () -> Unit, trust: (TrustedSender) -> Unit, review: (SmsRecord) -> Unit, dismiss: (SmsRecord) -> Unit, link: (Pair<Entry, Entry>) -> Unit) {
     var showAll by remember { mutableStateOf(false) }
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val pending = messages.count { it.status == "REVIEW" }
+    LazyColumn(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { CardBlock {
-            SectionTitle("Your bank alerts, organized")
-            Text("SBM Bank India + Axis Bank · account transactions only. All processing stays on this phone.")
-            if (!permission) Button(onClick = request) { Text("Enable SMS access") }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Capture new bank alerts", modifier = Modifier.weight(1f).padding(top = 12.dp)); Switch(capture && permission, toggle) }
-            if (capture && !permission) Text("SMS access is missing. Grant permission or check Settings.", color = rust)
-            Text("Historical import", style = MaterialTheme.typography.titleSmall)
-            Field(from, setFrom, "From (YYYY-MM-DD)"); Field(to, setTo, "Through (YYYY-MM-DD)")
-            OutlinedButton(onClick = scan, enabled = permission, modifier = Modifier.fillMaxWidth()) { Text("Preview bank SMS") }
-            Text("Adjust opening dates and balances in Accounts before importing older messages.", style = MaterialTheme.typography.bodySmall)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                IconTile("shield", MaterialTheme.colorScheme.tertiary, 48)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text("Less typing. More living.", style = MaterialTheme.typography.titleMedium); Text("SBM Bank India & Axis Bank", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            Text("Turn bank alerts into everyday clarity. Processed privately on your phone.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!permission) Button(onClick = request, modifier = Modifier.fillMaxWidth().height(48.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(13.dp)) { Text("Enable SMS access") }
+            HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text("Automatic capture", style = MaterialTheme.typography.bodyLarge); Text(if (capture && permission) "Ready for your next bank alert" else "Capture new bank transactions", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                PocketSwitch(capture && permission, "Automatic capture", toggle)
+            }
+            if (capture && !permission) Text("Grant SMS access in Settings to resume capture.", style = MaterialTheme.typography.bodySmall, color = rust)
+        } }
+        item { SectionLabel("Bring in your history") }
+        item { CardBlock {
+            Text("Start with a date range", style = MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.weight(1f)) { DateField(from, setFrom, "From") }
+                Box(Modifier.weight(1f)) { DateField(to, setTo, "Through") }
+            }
+            Button(onClick = scan, enabled = permission, modifier = Modifier.fillMaxWidth().height(48.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(13.dp)) { AppIcon("search", Modifier.size(17.dp), if (permission) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(8.dp)); Text("Preview bank SMS") }
+            Text("Check account opening dates and balances before importing older alerts.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } }
         val candidates = messages.map { TrustedSender(normalizedSender(it.sender), it.bank) }.distinct().filter { it !in senders }
-        if (candidates.isNotEmpty()) item { SectionTitle("Confirm your bank senders") }
+        if (candidates.isNotEmpty()) item { SectionLabel("Confirm bank senders") }
         items(candidates) { t -> CardBlock {
-            Text("${t.bank} · ${t.sender}")
-            messages.firstOrNull { normalizedSender(it.sender) == t.sender && it.bank == t.bank }?.let { Text(it.body.take(260), style = MaterialTheme.typography.bodySmall) }
-            TextButton(onClick = { trust(t) }) { Text("Review and trust sender") }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { BankMark(t.bank); Column(Modifier.weight(1f)) { Text(t.sender, style = MaterialTheme.typography.titleMedium); Text(t.bank, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+            messages.firstOrNull { normalizedSender(it.sender) == t.sender && it.bank == t.bank }?.let { Text(it.body, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            TextButton(onClick = { trust(t) }, contentPadding = PaddingValues(0.dp)) { Text("Review and trust sender"); Spacer(Modifier.width(5.dp)); AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.primary) }
         } }
         val possible = entries.filter { it.type == "EXPENSE" }.flatMap { out -> entries.filter { it.type == "INCOME" && it.accountId != out.accountId && it.amount == out.amount && kotlin.math.abs(it.date - out.date) <= 86_400_000L }.map { out to it } }.take(10)
-        if (possible.isNotEmpty()) item { SectionTitle("Possible account transfers") }
+        if (possible.isNotEmpty()) item { SectionLabel("Possible transfers") }
         items(possible) { (out, inc) -> CardBlock {
-            Text("${money(out.amount)} · ${dayText(out.date)}")
-            Text("${accounts.find { it.id == out.accountId }?.name} → ${accounts.find { it.id == inc.accountId }?.name}")
-            Text("${out.payee} / ${inc.payee}", style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = { link(out to inc) }) { Text("Link as transfer") }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { IconTile("transfer"); Column(Modifier.weight(1f)) { Text(money(out.amount), style = MaterialTheme.typography.titleLarge); Text(displayDate(out.date), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+            Text("${accounts.find { it.id == out.accountId }?.name} → ${accounts.find { it.id == inc.accountId }?.name}", style = MaterialTheme.typography.bodyMedium)
+            Text("${out.payee} / ${inc.payee}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { link(out to inc) }, contentPadding = PaddingValues(0.dp)) { Text("Link as transfer") }
         } }
-        item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { SectionTitle(if (showAll) "Financial SMS history" else "Needs review"); TextButton(onClick = { showAll = !showAll }) { Text(if (showAll) "Review only" else "Show all") } } }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { SectionTitle("Bank messages"); Spacer(Modifier.weight(1f)); if (pending > 0) StatusPill("$pending to review") }
+                Segments(listOf("REVIEW" to "Needs review", "ALL" to "All messages"), if (showAll) "ALL" else "REVIEW") { showAll = it == "ALL" }
+            }
+        }
         val list = messages.filter { showAll || it.status == "REVIEW" }
-        if (list.isEmpty()) item { Empty("Nothing needs review. Preview your bank SMS to get started.") }
-        items(list, key = { it.key }) { m -> CardBlock {
-            SectionTitle("${m.bank} · ${m.suffix ?: "Unmapped account"}")
-            Text("${m.direction ?: "Unknown type"} · ${m.amount?.let(::money) ?: "Check amount"} · ${m.date?.let(::dayText) ?: "Check date"}")
-            Text(m.payee.ifBlank { m.sender })
-            Text(m.body, style = MaterialTheme.typography.bodySmall)
-            Text(if (m.status == "REVIEW") m.reason else m.status.lowercase().replaceFirstChar(Char::titlecase), color = if (m.status == "REVIEW") rust else pine)
-            if (m.status == "REVIEW") Row { TextButton(onClick = { review(m) }) { Text("Edit and save") }; TextButton(onClick = { dismiss(m) }) { Text("Dismiss") } }
-        } }
+        if (list.isEmpty()) item { Empty(if (showAll) "Preview your bank alerts to start building a clearer picture." else "You're all caught up. Alerts that need a closer look will appear here.", if (showAll) "Your inbox, simplified" else "A little peace of mind", "sms") }
+        items(list, key = { it.key }) { m ->
+            var expanded by remember(m.key) { mutableStateOf(false) }
+            CardBlock {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BankMark(m.bank)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(m.payee.ifBlank { if (m.bank == "SBM") "SBM Bank India" else "Axis Bank" }, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text("${m.bank} · ${m.suffix?.let { "•••• $it" } ?: "Choose account"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(m.amount?.let(::money) ?: "Check amount", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    StatusPill(if (m.status == "REVIEW") "Review" else m.status.lowercase().replaceFirstChar(Char::titlecase), if (m.status == "REVIEW") Color(0xFFAC6500) else MaterialTheme.colorScheme.tertiary)
+                }
+                Text("${m.direction?.lowercase()?.replaceFirstChar(Char::titlecase) ?: "Check type"} · ${m.date?.let(::displayDate) ?: "Check date"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (m.status == "REVIEW") Text(m.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { Text(if (expanded) "Hide original message" else "View original message", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f)); AppIcon("down", Modifier.size(12.dp), MaterialTheme.colorScheme.primary) }
+                AnimatedVisibility(expanded) { Text("${m.sender}\n\n${m.body}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                if (m.status == "REVIEW") Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = { review(m) }, modifier = Modifier.weight(1f)) { Text("Edit & save") }; TextButton(onClick = { dismiss(m) }) { Text("Dismiss", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+            }
+        }
     }
 }
 
 @Composable fun ImportPreview(candidates: List<Candidate>, known: Set<String>, accounts: List<Account>, dismiss: () -> Unit, import: (List<Candidate>) -> Unit) {
-    var selected by remember { mutableStateOf(candidates.filter { it.key !in known }.map { it.key }.toSet()) }
-    AlertDialog(onDismissRequest = dismiss, title = { Text("Preview · ${candidates.size} bank messages") }, text = {
-        LazyColumn(Modifier.heightIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item { Text("Existing and dismissed messages are skipped. Unconfirmed senders or incomplete matches go to review. SMS dates determine the transaction date.") }
-            if (candidates.isEmpty()) item { Text("No supported account alerts found in this range.") }
-            items(candidates, key = { it.key }) { c ->
-                Row {
-                    Checkbox(checked = c.key in selected, enabled = c.key !in known, onCheckedChange = { if (it) selected = selected + c.key else selected = selected - c.key })
-                    Column(Modifier.weight(1f)) {
-                        Text("${c.parsed.bank} · ${c.parsed.amount?.let(::money) ?: "Check amount"}")
-                        Text("${c.parsed.payee} · ${c.parsed.date?.let(::dayText) ?: "Unknown date"}", style = MaterialTheme.typography.bodySmall)
-                        Text("Sender: ${c.sender}", style = MaterialTheme.typography.bodySmall)
-                        if (c.key in known) Text("Already imported or dismissed", color = pine)
-                        val a = accounts.singleOrNull { it.bank == c.parsed.bank && it.suffix == c.parsed.suffix }
-                        if (a == null || c.parsed.date == null || c.parsed.date < a.openingDate) Text("Needs account mapping or earlier opening date", color = rust)
-                        Text(c.body.take(350), style = MaterialTheme.typography.bodySmall)
+    var selected by remember { mutableStateOf(candidates.indices.filter { candidates[it].key !in known }.toSet()) }
+    LedgerSheet("Preview alerts", dismiss, "Import (${selected.size})", { import(candidates.filterIndexed { index, _ -> index in selected }) }, scrollContent = false, actionEnabled = selected.isNotEmpty()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { IconTile("sms"); Column { Text("${candidates.size} bank alerts found", style = MaterialTheme.typography.titleMedium); Text("Choose what belongs in your ledger.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+        Text("Existing and dismissed messages are skipped. Unconfirmed senders and incomplete details go to review.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (candidates.isEmpty()) item { Empty("Try another date range or check your bank's alert settings.", "No supported alerts found", "search") }
+            itemsIndexed(candidates, key = { index, _ -> index }) { index, c ->
+                CardBlock {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(index in selected, enabled = c.key !in known, onCheckedChange = { if (it) selected = selected + index else selected = selected - index })
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text(c.parsed.amount?.let(::money) ?: "Check amount", style = MaterialTheme.typography.titleMedium); Text(c.parsed.payee.ifBlank { c.parsed.bank }, style = MaterialTheme.typography.bodyMedium, maxLines = 2); Text("${c.parsed.bank} · ${c.parsed.date?.let(::displayDate) ?: "Check date"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
+                    Text("Sender: ${c.sender}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (c.key in known) StatusPill("Already imported or dismissed", MaterialTheme.colorScheme.onSurfaceVariant)
+                    val account = accounts.singleOrNull { it.bank == c.parsed.bank && it.suffix == c.parsed.suffix }
+                    if (account == null || c.parsed.date == null || c.parsed.date < account.openingDate) Text("Needs account mapping or an earlier opening date", style = MaterialTheme.typography.bodySmall, color = rust)
+                    Text(c.body.take(350), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
-    }, confirmButton = { TextButton(enabled = selected.isNotEmpty(), onClick = { import(candidates.filter { it.key in selected }) }) { Text("Import ${selected.size}") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } })
+    }
+}
+
+@Composable private fun SettingsRow(icon: String, title: String, subtitle: String? = null, tint: Color = MaterialTheme.colorScheme.primary, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        IconTile(icon, tint, 36)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) { Text(title, style = MaterialTheme.typography.bodyLarge); subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+        AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable fun SettingsDialog(capture: Boolean, permission: Boolean, senders: List<TrustedSender>, rules: List<MerchantRule>, dismiss: () -> Unit, export: () -> Unit, restore: () -> Unit, untrust: (TrustedSender) -> Unit, removeRule: (MerchantRule) -> Unit, appSettings: () -> Unit) {
-    AlertDialog(onDismissRequest = dismiss, title = { Text("Settings & backup") }, text = {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionTitle("Private by design"); Text("Offline · INR · Asia/Kolkata\nNo account, cloud service, analytics, or internet permission.")
-            Text("SMS access: ${if (permission) "granted" else "not granted"}\nNew alert capture: ${if (capture) "on" else "off"}")
-            TextButton(onClick = appSettings) { Text("Android app permissions") }
-            HorizontalDivider(); SectionTitle("Encrypted backups")
-            Text("Backups include financial SMS, balances, rules, and import history. Choose a safe location and keep your password.", style = MaterialTheme.typography.bodySmall)
-            Button(onClick = export, modifier = Modifier.fillMaxWidth()) { Text("Save encrypted backup") }
-            OutlinedButton(onClick = restore, modifier = Modifier.fillMaxWidth()) { Text("Restore backup") }
-            HorizontalDivider(); SectionTitle("Trusted SMS senders")
-            if (senders.isEmpty()) Text("Confirm sender IDs from your SMS inbox after previewing history.")
-            senders.forEach { sender -> Row { Text("${sender.bank} · ${sender.sender}", modifier = Modifier.weight(1f).padding(top = 12.dp)); TextButton(onClick = { untrust(sender) }) { Text("Remove") } } }
-            SectionTitle("Remembered categories")
-            if (rules.isEmpty()) Text("Choose ‘Remember this payee’s category’ while editing a transaction.")
-            rules.forEach { rule -> Row { Text("${rule.merchant} → ${rule.category}", modifier = Modifier.weight(1f).padding(top = 12.dp)); TextButton(onClick = { removeRule(rule) }) { Text("Remove") } } }
-            Text("Pocket Ledger 1.1 · Android 17", style = MaterialTheme.typography.labelSmall)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val preferences = remember { context.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE) }
+    var appearance by remember { mutableStateOf(preferences.getString("mode", "SYSTEM") ?: "SYSTEM") }
+    LedgerSheet("Settings", dismiss, closeLabel = "Close") {
+        CardBlock {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) { IconTile("shield", MaterialTheme.colorScheme.tertiary, 50); Column { Text("A little more private.", style = MaterialTheme.typography.titleMedium); Text("Your money stays with you.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+            Text("Your finances are processed and stored on this device.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-    }, confirmButton = { TextButton(onClick = dismiss) { Text("Done") } })
+        SectionLabel("Appearance")
+        Pick("Theme", appearance, listOf("SYSTEM", "LIGHT", "DARK"), { when (it) { "LIGHT" -> "Light"; "DARK" -> "Dark"; else -> "Follow system" } }) {
+            appearance = it
+            preferences.edit().putString("mode", it).apply()
+        }
+        SectionLabel("Permissions & capture")
+        CardBlock {
+            SettingsRow("sms", "SMS access", if (permission) "Permission granted" else "Permission not granted", onClick = appSettings)
+            HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Automatic capture", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge); StatusPill(if (capture && permission) "Active" else "Paused", if (capture && permission) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        SectionLabel("Backups")
+        CardBlock {
+            SettingsRow("lock", "Save encrypted backup", "Choose a password and a safe location", onClick = export)
+            HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsRow("backup", "Restore a backup", "Replace data from a saved backup", onClick = restore)
+        }
+        SectionLabel("Trusted senders")
+        CardBlock {
+            if (senders.isEmpty()) Text("Confirm your bank's sender IDs after previewing SMS history.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            senders.forEach { sender -> Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(sender.sender, style = MaterialTheme.typography.bodyLarge); Text(sender.bank, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; TextButton(onClick = { untrust(sender) }) { Text("Remove", color = rust, style = MaterialTheme.typography.bodyMedium) } } }
+        }
+        SectionLabel("Remembered categories")
+        CardBlock {
+            if (rules.isEmpty()) Text("Remember a payee's category when editing a transaction to use it for future alerts.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            rules.forEach { rule -> Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(rule.merchant, style = MaterialTheme.typography.bodyMedium); Text(rule.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; TextButton(onClick = { removeRule(rule) }) { Text("Remove", color = rust, style = MaterialTheme.typography.bodyMedium) } } }
+        }
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) { Text("Ledger", style = MaterialTheme.typography.titleSmall); Text("Version 1.3 · Built for your everyday", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+
+@Composable fun SmsPermissionSheet(dismiss: () -> Unit, proceed: () -> Unit) {
+    LedgerSheet("Bank SMS", dismiss, "Continue", proceed, closeLabel = "Later") {
+        IconTile("shield", MaterialTheme.colorScheme.tertiary, 58)
+        Text("Your bank alerts.\nA little more useful.", style = MaterialTheme.typography.headlineMedium)
+        Text("Ledger reads your SMS inbox to identify SBM Bank India and Axis Bank account transactions. Processing happens on this phone.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        CardBlock {
+            Text("You're in control", style = MaterialTheme.typography.titleMedium)
+            Text("Only matching financial messages are retained. OTPs, credit card alerts, and unrelated messages are excluded. Preview history before saving, confirm your bank senders, and turn capture off at any time.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("Continue to choose SMS permissions in Android.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }

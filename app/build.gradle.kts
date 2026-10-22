@@ -11,8 +11,8 @@ android {
         applicationId = providers.gradleProperty("ledger.testApplicationId").orElse("in.thomas.pocketledger").get()
         minSdk = 28
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 4
+        versionName = "1.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }

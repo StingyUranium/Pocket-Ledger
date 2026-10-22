@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -29,9 +31,9 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
     Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { change(month.minusMonths(1)) }, modifier = Modifier.size(42.dp)) { AppIcon("left", Modifier.size(15.dp), MaterialTheme.colorScheme.primary) }
+                IconButton(onClick = { change(month.minusMonths(1)) }, modifier = Modifier.size(42.dp).semantics { contentDescription = "Previous month" }) { AppIcon("left", Modifier.size(15.dp), MaterialTheme.colorScheme.primary) }
                 Text(month.format(DateTimeFormatter.ofPattern("MMMM yyyy")), style = MaterialTheme.typography.titleSmall)
-                IconButton(onClick = { change(month.plusMonths(1)) }, modifier = Modifier.size(42.dp)) { AppIcon("right", Modifier.size(15.dp), MaterialTheme.colorScheme.primary) }
+                IconButton(onClick = { change(month.plusMonths(1)) }, modifier = Modifier.size(42.dp).semantics { contentDescription = "Next month" }) { AppIcon("right", Modifier.size(15.dp), MaterialTheme.colorScheme.primary) }
             }
         }
         Spacer(Modifier.weight(1f))
@@ -52,7 +54,7 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
             Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.weight(1f)) {
                     Box(Modifier.size(5.dp).background(Color(0xFF73DBAC), CircleShape))
-                    Text("$accountCount accounts ? all recorded dates", color = Color(0xFFCDD6E4), style = MaterialTheme.typography.bodySmall)
+                    Text("$accountCount accounts · all recorded dates", color = Color(0xFFCDD6E4), style = MaterialTheme.typography.bodySmall)
                 }
                 Text("INR", style = MaterialTheme.typography.labelMedium, color = Color.White, modifier = Modifier.clip(RoundedCornerShape(7.dp)).background(Color.White.copy(alpha = .1f)).padding(horizontal = 9.dp, vertical = 5.dp))
             }
@@ -143,10 +145,10 @@ private fun categoryColor(index: Int) = listOf(Color(0xFF007AFF), Color(0xFFAF52
             IconTile(when (e.type) { "INCOME" -> "income"; "TRANSFER" -> "transfer"; else -> "receipt" }, if (e.type == "EXPENSE") MaterialTheme.colorScheme.primary else tint)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(e.payee.ifBlank { if (e.type == "TRANSFER") "Account transfer" else e.category }, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(if (e.type == "TRANSFER") "${accounts.find { it.id == e.accountId }?.name.orEmpty()} ? ${accounts.find { it.id == e.destinationId }?.name.orEmpty()}" else "${e.category} ? ${accounts.find { it.id == e.accountId }?.name.orEmpty()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(if (e.type == "TRANSFER") "${accounts.find { it.id == e.accountId }?.name.orEmpty()} → ${accounts.find { it.id == e.destinationId }?.name.orEmpty()}" else "${e.category} · ${accounts.find { it.id == e.accountId }?.name.orEmpty()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.widthIn(max = 140.dp)) {
-                Text((if (e.type == "INCOME") "+" else if (e.type == "EXPENSE") "?" else "") + money(e.amount), style = MaterialTheme.typography.titleSmall, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text((if (e.type == "INCOME") "+" else if (e.type == "EXPENSE") "−" else "") + money(e.amount), style = MaterialTheme.typography.titleSmall, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(Instant.ofEpochMilli(e.date).atZone(india).format(DateTimeFormatter.ofPattern("d MMM")), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -201,7 +203,7 @@ private fun categoryColor(index: Int) = listOf(Color(0xFF007AFF), Color(0xFFAF52
                     BankMark(a.bank)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(a.name, style = MaterialTheme.typography.titleMedium)
-                        Text(if (a.bank == "CASH") "Cash account" else "Account ???? ${a.suffix}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (a.bank == "CASH") "Cash account" else "Account •••• ${a.suffix}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     AppIcon("right", Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -213,11 +215,11 @@ private fun categoryColor(index: Int) = listOf(Color(0xFF007AFF), Color(0xFFAF52
                 }
                 Text("From ${displayDate(a.openingDate)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 messages.filter { it.bank == a.bank && it.suffix == a.suffix && it.balance != null && it.status in listOf("SAVED", "LINKED") }.maxByOrNull { it.date ?: it.received }?.let {
-                    Text("Bank reported ${money(it.balance!!)} ? ${displayDate(it.date ?: it.received)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Text("Bank reported ${money(it.balance!!)} · ${displayDate(it.date ?: it.received)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
-        item { Button(onClick = add, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(15.dp)) { AppIcon("plus", Modifier.size(18.dp), Color.White); Spacer(Modifier.width(8.dp)); Text("Add account") } }
+        item { Button(onClick = add, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(15.dp)) { AppIcon("plus", Modifier.size(18.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(8.dp)); Text("Add account") } }
         item { Text("Opening balances represent your money just before the chosen date. Bank-reported balances are shown separately.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp)) }
     }
 }
@@ -238,7 +240,7 @@ private fun categoryColor(index: Int) = listOf(Color(0xFF007AFF), Color(0xFFAF52
             Text(if (planned > 0) money((planned - spent).coerceAtLeast(0)) else "Make a little room", style = MaterialTheme.typography.headlineMedium)
             Text(if (planned > 0) "Left across your budgeted categories" else "Set a limit. Give every category a little direction.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (planned > 0) LinearProgressIndicator(progress = { (spent.toDouble() / planned).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = if (spent > planned) rust else MaterialTheme.colorScheme.tertiary, trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
-            Button(onClick = { edit = Budget(month.toString(), "Food", 0) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(13.dp)) { AppIcon("plus", Modifier.size(17.dp), Color.White); Spacer(Modifier.width(7.dp)); Text("Set a budget") }
+            Button(onClick = { edit = Budget(month.toString(), "Food", 0) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(13.dp)) { AppIcon("plus", Modifier.size(17.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(7.dp)); Text("Set a budget") }
         } }
         item { SectionTitle("Your categories") }
         if (current.isEmpty()) item { Empty("Create your first category budget to track spending as the month unfolds.", "Good things start with a plan", "budgets") }

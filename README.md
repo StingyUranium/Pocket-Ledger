@@ -1,6 +1,8 @@
-# Pocket Ledger
+# Ledger
 
-Pocket Ledger **1.1.0** is a personal, offline Android expense manager targeting **Android 17 / API 37**. It imports SBM Bank India and Axis Bank account alerts, alongside manual income, expenses, and transfers. Credit card parsing is excluded.
+Ledger **1.3.0** is a personal, offline Android expense manager targeting **Android 17 / API 37**. It imports SBM Bank India and Axis Bank account alerts, alongside manual income, expenses, and transfers. Credit card parsing is excluded.
+
+Ledger was previously named Pocket Ledger. The upgrade preserves accounts, preferences, transactions, and existing encrypted backups. Its blue wallet icon supports adaptive launcher shapes and Android themed icons.
 
 ## Getting started
 
@@ -22,6 +24,10 @@ Pocket Ledger **1.1.0** is a personal, offline Android expense manager targeting
 Automatic saving requires a confirmed sender, mapped account, valid positive amount, direction, date, and usable reference. Interest without a reference, account-less mandate debits, merchant debits without references, and wallet top-ups remain in review. Unknown financial formats require correction. OTPs, credit card alerts, failed payments, payment requests, future mandates, and blocked-funds notices are excluded.
 
 Amounts are stored as integer paise in INR. Dates use Asia/Kolkata, and date-only messages retain that precision. SMS balances are shown separately and never overwrite ledger balances. Missing bank alerts and cash activity require manual entries.
+
+## Interface and appearance
+
+The interface is built entirely with Jetpack Compose: large page titles, grouped surfaces, a dark balance card, consistent line icons, animated tabs and switches, and bottom sheets for editing. Activity is grouped by date, original bank messages can be expanded on demand, and calendar pickers handle dates. Choose **Settings → Appearance → Theme** for light, dark, or system appearance.
 
 ## Ledger and upgrade behavior
 
@@ -47,9 +53,13 @@ adb install -r .\app\build\outputs\apk\debug\app-debug.apk
 adb shell am start -n in.thomas.pocketledger/.MainActivity
 ```
 
-The personal package is `in.thomas.pocketledger`, versionCode 2. Keep the same signing key for upgrades. Current APKs use debug signing; uninstalling removes local app data.
+The personal package is `in.thomas.pocketledger`, versionCode 4. Keep the same signing key for upgrades. Current APKs use debug signing; uninstalling removes local app data.
 
 Pinned dependencies: Gradle 9.8.2, AGP 9.4.1, Kotlin/Compose compiler 2.4.21, Compose BOM 2026.09.00, Activity 1.13.0, Lifecycle 2.11.0, Room 2.8.5, WorkManager 2.12.0, and KSP 2.3.12. The wrapper verifies its distribution checksum.
+
+### Faster development builds
+
+Configuration caching and the local build cache are enabled in `gradle.properties`. The first run populates caches; later runs reuse compatible configuration and task outputs. Use `:app:assembleDebug` for routine edits and run lint before delivery or after substantial changes. Avoid `clean` unless troubleshooting stale outputs. Use Android Studio Compose Preview or Live Edit for layout iterations when supported. USB ADB can reduce installation time compared with wireless ADB.
 
 ## Development and validation
 
@@ -66,15 +76,17 @@ Version 1.1 passed **44 JVM tests and 17 device tests**, with **zero lint errors
 
 A read-only ADB audit checked 1,963 bank-matching messages: 1,843 were fully parsed, 39 needed review, and 81 were excluded. These counts measure extraction, not financial accuracy or authenticity. The audit imported no ledger entries and retained only aggregate results; new fixtures use invented details. Live capture still requires verification with an incoming bank alert after permission and sender confirmation.
 
+Version 1.2 changes presentation and interaction while keeping the parser, repository, database, capture, and backup implementation unchanged. Its validation consists of build/lint and on-device checks of navigation, themes, sheets, and date selection.
+
 ## Deliverables and project location
 
 The project is in `C:\Users\Thomas\AppData\Local\PocketLedgerProject` because Windows Controlled Folder Access blocked writes to the originally selected Documents workspace. Security settings were not changed.
 
 Local deliverables:
 
-- [Version 1.1 APK](artifacts/PocketLedger-1.1.0.apk)
-- [Version 1.1 source snapshot](artifacts/PocketLedger-source-1.1.0.zip)
-- [Validation report](artifacts/VALIDATION-1.1.0.md)
+- [Version 1.3 APK](artifacts/Ledger-1.3.0.apk)
+- [Version 1.3 source snapshot](artifacts/Ledger-source-1.3.0.zip)
+- [UI validation report](artifacts/VALIDATION-1.3.0.md)
 - [Aggregate parser coverage](artifacts/parser-coverage-1.1.0.json)
 
 The source archive is a release snapshot; consult working-tree files for later documentation updates. Recurring entries, receipts, calendar views, asset valuation, cloud sync, and Realbyte migration are outside this version.

@@ -1,6 +1,6 @@
 package `in`.thomas.pocketledger
 
-import android.app.Activity
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.*
@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.IntOffset
 import androidx.core.view.WindowCompat
 import kotlin.math.cos
 import kotlin.math.sin
@@ -43,9 +44,19 @@ val cream = Color(0xFFF2F2F7)
 val positive = Color(0xFF248A3D)
 
 @Composable fun PocketTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val context = LocalContext.current
+    val preferences = remember { context.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE) }
+    var appearance by remember { mutableStateOf(preferences.getString("mode", "SYSTEM") ?: "SYSTEM") }
+    DisposableEffect(preferences) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { store, key ->
+            if (key == "mode") appearance = store.getString("mode", "SYSTEM") ?: "SYSTEM"
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    val dark = when (appearance) { "LIGHT" -> false; "DARK" -> true; else -> isSystemInDarkTheme() }
     val view = LocalView.current
-    val activity = LocalContext.current as? Activity
+    val activity = LocalActivity.current
     SideEffect {
         activity?.let {
             WindowCompat.getInsetsController(it.window, view).apply {
@@ -55,12 +66,12 @@ val positive = Color(0xFF248A3D)
         }
     }
     val scheme = if (dark) darkColorScheme(
-        primary = Color(0xFF64ADFF), secondary = Color(0xFF64ADFF), tertiary = Color(0xFF30D158),
+        primary = Color(0xFF64ADFF), onPrimary = Color(0xFF00244C), secondary = Color(0xFF64ADFF), tertiary = Color(0xFF30D158),
         background = Color(0xFF000000), surface = Color(0xFF1C1C1E), surfaceVariant = Color(0xFF2C2C2E),
         onBackground = Color(0xFFF5F5F7), onSurface = Color(0xFFF5F5F7), onSurfaceVariant = Color(0xFFAEAEB2),
         outlineVariant = Color(0xFF38383A), primaryContainer = Color(0xFF142A45), onPrimaryContainer = Color(0xFF9AC9FF)
     ) else lightColorScheme(
-        primary = pine, secondary = pine, tertiary = positive,
+        primary = pine, onPrimary = Color.White, secondary = pine, tertiary = positive,
         background = cream, surface = Color.White, surfaceVariant = Color(0xFFE9E9EF),
         onBackground = Color(0xFF17171B), onSurface = Color(0xFF17171B), onSurfaceVariant = Color(0xFF75757D),
         outlineVariant = Color(0xFFE5E5EA), primaryContainer = Color(0xFFE8F2FF), onPrimaryContainer = Color(0xFF005BC1)
@@ -123,13 +134,13 @@ val positive = Color(0xFF248A3D)
         onClick = onClick, shape = CircleShape,
         color = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
         modifier = Modifier.size(44.dp).semantics { contentDescription = description }
-    ) { Box(contentAlignment = Alignment.Center) { AppIcon(icon, tint = if (filled) Color.White else MaterialTheme.colorScheme.onSurface) } }
+    ) { Box(contentAlignment = Alignment.Center) { AppIcon(icon, tint = if (filled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface) } }
 }
 
 @Composable fun PocketHeader(title: String, settings: () -> Unit, add: (() -> Unit)?) {
     Column(Modifier.statusBarsPadding().padding(horizontal = 22.dp).padding(top = 12.dp, bottom = 8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("POCKET LEDGER", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.6.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("LEDGER", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.6.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 AppIcon("lock", Modifier.size(11.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("On device", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -207,18 +218,18 @@ val positive = Color(0xFF248A3D)
     }
 }
 
-@Composable fun PocketSwitch(checked: Boolean, change: (Boolean) -> Unit) {
+@Composable fun PocketSwitch(checked: Boolean, description: String, change: (Boolean) -> Unit) {
     val color by animateColorAsState(if (checked) Color(0xFF34C759) else MaterialTheme.colorScheme.outlineVariant, label = "switch track")
     val x by animateDpAsState(if (checked) 22.dp else 2.dp, label = "switch thumb")
-    Box(Modifier.size(54.dp, 48.dp).toggleable(checked, role = Role.Switch, onValueChange = change), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(54.dp, 48.dp).semantics { contentDescription = description }.toggleable(checked, role = Role.Switch, onValueChange = change), contentAlignment = Alignment.Center) {
         Box(Modifier.size(52.dp, 32.dp).clip(CircleShape).background(color)) {
-            Box(Modifier.offset(x = x, y = 2.dp).size(28.dp).shadow(2.dp, CircleShape).background(Color.White, CircleShape))
+            Box(Modifier.offset { IntOffset(x.roundToPx(), 2.dp.roundToPx()) }.size(28.dp).shadow(2.dp, CircleShape).background(Color.White, CircleShape))
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun LedgerSheet(title: String, dismiss: () -> Unit, actionLabel: String = "Done", action: () -> Unit = dismiss, closeLabel: String = "Cancel", content: @Composable ColumnScope.() -> Unit) {
+@Composable fun LedgerSheet(title: String, dismiss: () -> Unit, actionLabel: String = "Done", action: () -> Unit = dismiss, closeLabel: String = "Cancel", scrollContent: Boolean = true, actionEnabled: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
     ModalBottomSheet(
         onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.background, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
@@ -228,10 +239,11 @@ val positive = Color(0xFF248A3D)
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = dismiss) { Text(closeLabel, fontWeight = FontWeight.Normal) }
                 Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2)
-                TextButton(onClick = action) { Text(actionLabel) }
+                TextButton(onClick = action, enabled = actionEnabled) { Text(actionLabel) }
             }
             HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp), content = content)
+            val contentModifier = Modifier.weight(1f).then(if (scrollContent) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(20.dp).padding(bottom = 24.dp)
+            Column(contentModifier, verticalArrangement = Arrangement.spacedBy(18.dp), content = content)
         }
     }
 }

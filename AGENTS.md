@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-Pocket Ledger 1.1 is an offline Android app targeting API 37. Kotlin sources are in `app/src/main/java/in/thomas/pocketledger/`: Compose screens handle UI, `Repository.kt` coordinates imports and ledger updates, `Database.kt` defines Room entities, and parsing, capture, and encrypted backups have dedicated files. Resources and the manifest are under `app/src/main/`. JVM tests use `app/src/test/`; device tests use `app/src/androidTest/`. Keep Room schemas in `app/schemas/`. Generated deliveries belong in `artifacts/`, outside source commits.
+Ledger 1.3 is an offline Android app targeting API 37. Kotlin sources are in `app/src/main/java/in/thomas/pocketledger/`: `DesignSystem.kt` defines theme and shared components, Compose screens handle UI, `Repository.kt` coordinates imports and ledger updates, `Database.kt` defines Room entities, and parsing, capture, and encrypted backups have dedicated files. Resources and the manifest are under `app/src/main/`. JVM tests use `app/src/test/`; device tests use `app/src/androidTest/`. Keep Room schemas in `app/schemas/`. Generated deliveries belong in `artifacts/`, outside source commits.
 
 ## Build, Test, and Development Commands
 
@@ -12,6 +12,8 @@ Use JDK 21, SDK platform 37.0, and build tools 37.0.0. Configure `ANDROID_HOME` 
 - `.\gradlew.bat :app:testDebugUnitTest :app:lintDebug` runs JVM tests and Android Lint.
 - `.\gradlew.bat "-Pledger.testApplicationId=in.thomas.pocketledger.validation" :app:connectedDebugAndroidTest` runs device tests under a separate application ID.
 - `adb install -r .\app\build\outputs\apk\debug\app-debug.apk` updates the installed app.
+
+For routine UI iterations, run `:app:assembleDebug` only; run lint before delivery or after substantial changes. Configuration and local build caches are enabled in `gradle.properties`. Avoid `clean` unless diagnosing stale outputs; use Compose Preview or Live Edit for layout work when available.
 
 Rebuild without the validation property before installing the personal APK. Avoid instrumenting the personal package: the test runner may uninstall its target afterward.
 

@@ -23,7 +23,7 @@ object BackupCrypto {
         return header + salt + iv + c.doFinal(data)
     }
     fun decrypt(data: ByteArray, password: CharArray): ByteArray {
-        require(data.size in 52..33_554_432 && data.copyOfRange(0, 8).contentEquals(header)) { "This is not a Pocket Ledger backup" }
+        require(data.size in 52..33_554_432 && data.copyOfRange(0, 8).contentEquals(header)) { "This is not a Ledger backup" }
         val c = Cipher.getInstance("AES/GCM/NoPadding"); c.init(Cipher.DECRYPT_MODE, key(password, data.copyOfRange(8, 24)), GCMParameterSpec(128, data.copyOfRange(24, 36))); c.updateAAD(header)
         return try { c.doFinal(data, 36, data.size - 36) } catch (_: javax.crypto.AEADBadTagException) { error("Incorrect password or damaged backup") }
     }

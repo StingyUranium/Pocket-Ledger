@@ -11,25 +11,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -38,7 +23,6 @@ import kotlinx.coroutines.*
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.*
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 
@@ -124,21 +108,23 @@ class MainActivity : ComponentActivity() {
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (tab in listOf(0, 1, 3)) MonthPicker(month) { month = it }
-            when (tab) {
-                0 -> Overview(accounts, entries, messages, month, budgets, { tab = 2 }, { tab = 4 }) { editor = it }
-                1 -> Transactions(entries, accounts, month) { editor = it }
-                2 -> AccountsScreen(accounts, entries, messages, { accountEditor = it }, { accountEditor = Account(UUID.randomUUID().toString(), "", "CASH", "", openingDate = dayMillis(LocalDate.now(india).withDayOfMonth(1).toString())) })
-                3 -> BudgetScreen(budgets, entries, month) { work { dao.budget(it) } }
-                4 -> SmsScreen(messages, entries, accounts, senders, permission, capture, from, to, { from = it }, { to = it },
-                    { disclosure = true }, { enabled ->
-                        if (enabled && !permission) disclosure = true else {
-                            capture = enabled; repo.prefs.edit().putBoolean("enabled", enabled).putLong("from", System.currentTimeMillis()).apply()
-                        }
-                    }, { work { val f = dayMillis(from); val t = dayMillis(to) + 86_400_000L; require(f < t) { "Start date must precede end date" }; val list = repo.scan(f, t); withContext(Dispatchers.Main) { preview = list } } },
-                    { trustCandidate = it }, { record ->
-                        val a = accounts.firstOrNull { it.bank == record.bank && it.suffix == record.suffix } ?: accounts.firstOrNull()
-                        a?.let { editor = Entry(UUID.randomUUID().toString(), it.id, type = record.direction ?: "EXPENSE", amount = record.amount ?: 0, date = record.date ?: record.received, dateOnly = record.dateOnly, payee = record.payee, smsKey = record.key) }
-                    }, { work { repo.dismiss(it) } }, { transferCandidate = it })
+            androidx.compose.animation.Crossfade(targetState = tab, modifier = Modifier.weight(1f), animationSpec = androidx.compose.animation.core.tween(180), label = "screen") { page ->
+                when (page) {
+                    0 -> Overview(accounts, entries, messages, month, budgets, { tab = 2 }, { tab = 4 }) { editor = it }
+                    1 -> Transactions(entries, accounts, month) { editor = it }
+                    2 -> AccountsScreen(accounts, entries, messages, { accountEditor = it }, { accountEditor = Account(UUID.randomUUID().toString(), "", "CASH", "", openingDate = dayMillis(LocalDate.now(india).withDayOfMonth(1).toString())) })
+                    3 -> BudgetScreen(budgets, entries, month) { work { dao.budget(it) } }
+                    4 -> SmsScreen(messages, entries, accounts, senders, permission, capture, from, to, { from = it }, { to = it },
+                        { disclosure = true }, { enabled ->
+                            if (enabled && !permission) disclosure = true else {
+                                capture = enabled; repo.prefs.edit().putBoolean("enabled", enabled).putLong("from", System.currentTimeMillis()).apply()
+                            }
+                        }, { work { val f = dayMillis(from); val t = dayMillis(to) + 86_400_000L; require(f < t) { "Start date must precede end date" }; val list = repo.scan(f, t); withContext(Dispatchers.Main) { preview = list } } },
+                        { trustCandidate = it }, { record ->
+                            val a = accounts.firstOrNull { it.bank == record.bank && it.suffix == record.suffix } ?: accounts.firstOrNull()
+                            a?.let { editor = Entry(UUID.randomUUID().toString(), it.id, type = record.direction ?: "EXPENSE", amount = record.amount ?: 0, date = record.date ?: record.received, dateOnly = record.dateOnly, payee = record.payee, smsKey = record.key) }
+                        }, { work { repo.dismiss(it) } }, { transferCandidate = it })
+                }
             }
         }
     }
@@ -152,7 +138,10 @@ class MainActivity : ComponentActivity() {
     deleteCandidate?.let { e -> Confirm("Delete transaction?", "This entry will leave your balances and reports. Its source SMS will stay dismissed during future scans.", { deleteCandidate = null }) { work { repo.delete(e); withContext(Dispatchers.Main) { deleteCandidate = null; editor = null } } } }
     transferCandidate?.let { pair -> Confirm("Link as a transfer?", "Combine these two entries into one transfer between your accounts. It will be excluded from income and spending.", { transferCandidate = null }) { work { repo.linkTransfer(pair.first, pair.second); withContext(Dispatchers.Main) { transferCandidate = null } } } }
     trustCandidate?.let { t -> Confirm("Trust ${t.sender}?", "Confirm this is your ${t.bank} transaction sender. Complete messages for mapped accounts will be saved, including reviewed historical messages. Sender IDs alone cannot prove authenticity.", { trustCandidate = null }) { work { repo.trust(t.sender, t.bank); withContext(Dispatchers.Main) { trustCandidate = null } } } }
-    if (disclosure) AlertDialog(onDismissRequest = { disclosure = false }, title = { Text("Import bank SMS") }, text = { Text("Pocket Ledger reads your SMS inbox to identify SBM Bank India and Axis Bank account transactions. Parsing happens on this phone. Only matching financial messages are retained. OTPs, credit card alerts, and unrelated messages are excluded. You can preview history before saving, confirm sender IDs, and turn capture off at any time.") }, confirmButton = { TextButton(onClick = { disclosure = false; requestSms.launch(arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS)) }) { Text("Continue") } }, dismissButton = { TextButton(onClick = { disclosure = false }) { Text("Later") } })
+    if (disclosure) SmsPermissionSheet(
+        dismiss = { disclosure = false },
+        proceed = { disclosure = false; requestSms.launch(arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS)) }
+    )
     preview?.let { candidates ->
         val knownKeys = messages.flatMap { listOf(it.key, SmsParser.key(it.parsed(), it.sender, it.body, it.received)) }.toSet()
         ImportPreview(candidates, knownKeys, accounts, { preview = null }) { selected -> work { repo.ingest(selected, forceReview = true); repo.processReview(); withContext(Dispatchers.Main) { preview = null; snack.showSnackbar("Imported ${selected.size} selected messages. Check the review inbox.") } } }
@@ -160,7 +149,7 @@ class MainActivity : ComponentActivity() {
     if (settings) SettingsDialog(capture, permission, senders, rules, { settings = false }, { passwordMode = "export" }, { chooseRestore.launch(arrayOf("*/*")) }, { work { dao.untrust(it.sender, it.bank) } }, { work { dao.removeRule(it.merchant) } }, { repo.context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${repo.context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
     passwordMode?.let { mode -> PasswordDialog(mode, { passwordMode = null; restoreUri = null }) { pass ->
         passwordMode = null
-        if (mode == "export") { secret = pass; export.launch("PocketLedger-${LocalDate.now(india)}.plbackup") }
+        if (mode == "export") { secret = pass; export.launch("Ledger-${LocalDate.now(india)}.plbackup") }
         else {
             val uri = restoreUri; restoreUri = null
             if (uri != null) work { try {
