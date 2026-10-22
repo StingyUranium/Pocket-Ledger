@@ -1,6 +1,6 @@
 # Ledger
 
-Ledger **1.3.0** is a personal, offline Android expense manager targeting **Android 17 / API 37**. It imports SBM Bank India and Axis Bank account alerts, alongside manual income, expenses, and transfers. Credit card parsing is excluded.
+Ledger **1.4.0** is a personal, offline Android expense manager targeting **Android 17 / API 37**. It imports SBM Bank India and Axis Bank account alerts, alongside manual income, expenses, and transfers. Credit card parsing is excluded.
 
 Ledger was previously named Pocket Ledger. The upgrade preserves accounts, preferences, transactions, and existing encrypted backups. Its blue wallet icon supports adaptive launcher shapes and Android themed icons.
 
@@ -21,13 +21,19 @@ Ledger was previously named Pocket Ledger. The upgrade preserves accounts, prefe
 | SBM Bank India | UPI, NEFT, IMPS, IFT, ACH credits/debits, savings interest |
 | Axis Bank | UPI, NEFT, RTGS, IMPS, alternate merchant debits, completed mandate debits, UPI Lite top-ups |
 
+Inbox scanning applies the selected scope: SBM and Axis UPI, NEFT/IMPS/RTGS/IFT, ACH, savings interest, UPI Lite top-ups, completed Axis merchant debits, and deposit-account refunds/reversals. Credit card messages are always excluded. Incomplete selected alerts remain in review rather than being posted automatically.
+
 Automatic saving requires a confirmed sender, mapped account, valid positive amount, direction, date, and usable reference. Interest without a reference, account-less mandate debits, merchant debits without references, and wallet top-ups remain in review. Unknown financial formats require correction. OTPs, credit card alerts, failed payments, payment requests, future mandates, and blocked-funds notices are excluded.
 
 Amounts are stored as integer paise in INR. Dates use Asia/Kolkata, and date-only messages retain that precision. SMS balances are shown separately and never overwrite ledger balances. Missing bank alerts and cash activity require manual entries.
 
 ## Interface and appearance
 
-The interface is built entirely with Jetpack Compose: large page titles, grouped surfaces, a dark balance card, consistent line icons, animated tabs and switches, and bottom sheets for editing. Activity is grouped by date, original bank messages can be expanded on demand, and calendar pickers handle dates. Choose **Settings → Appearance → Theme** for light, dark, or system appearance.
+The interface uses Jetpack Compose with collapsing 34sp large titles, inline navigation titles, horizontal push/pop for Settings, and independent root tabs. Creation, editing, choices, and import previews use vertical spring sheets with drag-handle dismissal. Android back dismisses the top presentation first. Scroll positions survive tab switches and Settings navigation.
+
+`FluidMotion.kt` centralizes critically damped springs (ratio 1, stiffness 300) and the cubic Bezier (0.25, 1, 0.5, 1). Lists retain Compose momentum flings and apply resisted boundary translation with a spring return instead of Android stretch overscroll. Cards use 12-16dp corners, small controls use 8dp corners, dividers are physical-pixel hairlines, and original vector-like line icons use consistent rounded strokes. Choose Settings > Theme for light, dark, or system appearance.
+
+These are Android adaptations of iOS interaction conventions, not UIKit controls or bundled SF Symbols. Android display density, system back, font scaling, and system animation duration settings remain supported.
 
 ## Ledger and upgrade behavior
 
@@ -84,9 +90,9 @@ The project is in `C:\Users\Thomas\AppData\Local\PocketLedgerProject` because Wi
 
 Local deliverables:
 
-- [Version 1.3 APK](artifacts/Ledger-1.3.0.apk)
-- [Version 1.3 source snapshot](artifacts/Ledger-source-1.3.0.zip)
-- [UI validation report](artifacts/VALIDATION-1.3.0.md)
+- [Version 1.4 APK](artifacts/Ledger-1.4.0.apk)
+- [Version 1.4 source snapshot](artifacts/Ledger-source-1.4.0.zip)
+- [UI validation report](artifacts/VALIDATION-1.4.0.md)
 - [Aggregate parser coverage](artifacts/parser-coverage-1.1.0.json)
 
 The source archive is a release snapshot; consult working-tree files for later documentation updates. Recurring entries, receipts, calendar views, asset valuation, cloud sync, and Realbyte migration are outside this version.

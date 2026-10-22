@@ -38,7 +38,7 @@ class Repository(val context: Context, val db: LedgerDatabase) {
         val result = mutableListOf<Candidate>()
         context.contentResolver.query(Telephony.Sms.Inbox.CONTENT_URI, arrayOf("address", "body", "date"), "date >= ? AND date < ?", arrayOf(from.toString(), to.toString()), "date ASC")?.use { c ->
             while (c.moveToNext()) {
-                val body = c.getString(1).orEmpty(); val parsed = SmsParser.parse(body) ?: continue
+                val body = c.getString(1).orEmpty(); val parsed = SmsParser.parseSelected(body) ?: continue
                 result += Candidate(c.getString(0).orEmpty(), body, c.getLong(2), parsed)
             }
         }
@@ -133,7 +133,7 @@ class Repository(val context: Context, val db: LedgerDatabase) {
     suspend fun dismiss(m: SmsRecord) { dao.message(m.copy(status = "DISMISSED")) }
     suspend fun refreshStoredReviews() {
         val candidates = dao.allMessages().filter { it.status == "REVIEW" }.mapNotNull { message ->
-            SmsParser.parse(message.body)?.let { Candidate(message.sender, message.body, message.received, it) }
+            SmsParser.parseSelected(message.body)?.let { Candidate(message.sender, message.body, message.received, it) }
         }
         if (candidates.isNotEmpty()) ingest(candidates, forceReview = true)
     }

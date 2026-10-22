@@ -3,6 +3,9 @@ package `in`.thomas.pocketledger
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.*
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
@@ -14,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -92,7 +96,7 @@ val positive = Color(0xFF248A3D)
             labelMedium = base.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
             labelSmall = base.copy(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium)
         ),
-        shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(22.dp), extraLarge = RoundedCornerShape(28.dp)),
+        shapes = Shapes(extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(8.dp), medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(16.dp), extraLarge = RoundedCornerShape(16.dp)),
         content = content
     )
 }
@@ -131,36 +135,44 @@ val positive = Color(0xFF248A3D)
 
 @Composable fun RoundIconButton(icon: String, description: String, filled: Boolean = false, onClick: () -> Unit) {
     Surface(
-        onClick = onClick, shape = CircleShape,
+        onClick = onClick, shape = RoundedCornerShape(8.dp),
         color = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
         modifier = Modifier.size(44.dp).semantics { contentDescription = description }
     ) { Box(contentAlignment = Alignment.Center) { AppIcon(icon, tint = if (filled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface) } }
 }
 
-@Composable fun PocketHeader(title: String, settings: () -> Unit, add: (() -> Unit)?) {
-    Column(Modifier.statusBarsPadding().padding(horizontal = 22.dp).padding(top = 12.dp, bottom = 8.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("LEDGER", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.6.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                AppIcon("lock", Modifier.size(11.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("On device", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+@Composable fun PocketHeader(title: String, settings: () -> Unit, add: (() -> Unit)?, collapse: Float = 0f, back: (() -> Unit)? = null) {
+    val progress = collapse.coerceIn(0f, 1f)
+    Column(Modifier.statusBarsPadding().background(MaterialTheme.colorScheme.background.copy(alpha = .97f))) {
+        Box(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 12.dp)) {
+            if (back != null) TextButton(onClick = back, modifier = Modifier.align(Alignment.CenterStart)) {
+                AppIcon("left", Modifier.size(18.dp), MaterialTheme.colorScheme.primary)
+                Text("Back")
+            }
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Center).alpha(progress))
+            Row(Modifier.align(Alignment.CenterEnd), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (back == null) RoundIconButton("settings", "Settings", onClick = settings)
+                add?.let { RoundIconButton("plus", "Add transaction", true, it) }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
-            RoundIconButton("settings", "Settings", onClick = settings)
-            add?.let { RoundIconButton("plus", "Add transaction", true, it) }
+        Box(Modifier.fillMaxWidth().height(56.dp * (1f - progress)).clipToBounds().padding(horizontal = 22.dp)) {
+            Text(title, style = MaterialTheme.typography.headlineLarge,
+                modifier = Modifier.alpha(1f - progress).graphicsLayer {
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                    scaleX = 1f - progress * .15f; scaleY = scaleX
+                })
         }
+        HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = progress))
     }
 }
 
 @Composable fun PocketTabBar(selected: Int, pending: Int, change: (Int) -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = .98f)) {
         Column {
-            HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.navigationBarsPadding().padding(horizontal = 6.dp, vertical = 7.dp)) {
                 listOf("Home", "Entries", "Accounts", "Budgets", "SMS").forEachIndexed { index, label ->
-                    val color by animateColorAsState(if (selected == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, label = "tab tint")
+                    val color by animateColorAsState(if (selected == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, animationSpec = fluidSpring(), label = "tab tint")
                     Column(
                         Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).selectable(selected == index, onClick = { change(index) }, role = Role.Tab).padding(vertical = 7.dp),
                         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)
@@ -178,7 +190,7 @@ val positive = Color(0xFF248A3D)
 }
 
 @Composable fun CardBlock(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface) {
+    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
@@ -209,7 +221,7 @@ val positive = Color(0xFF248A3D)
         values.forEach { (value, title) ->
             val active = selected == value
             Box(
-                Modifier.weight(1f).then(if (active) Modifier.shadow(2.dp, RoundedCornerShape(9.dp)) else Modifier).clip(RoundedCornerShape(9.dp))
+                Modifier.weight(1f).then(if (active) Modifier.shadow(2.dp, RoundedCornerShape(8.dp)) else Modifier).clip(RoundedCornerShape(8.dp))
                     .background(if (active) MaterialTheme.colorScheme.surface else Color.Transparent)
                     .selectable(active, onClick = { change(value) }, role = Role.Tab).padding(vertical = 9.dp, horizontal = 4.dp),
                 contentAlignment = Alignment.Center
@@ -219,8 +231,8 @@ val positive = Color(0xFF248A3D)
 }
 
 @Composable fun PocketSwitch(checked: Boolean, description: String, change: (Boolean) -> Unit) {
-    val color by animateColorAsState(if (checked) Color(0xFF34C759) else MaterialTheme.colorScheme.outlineVariant, label = "switch track")
-    val x by animateDpAsState(if (checked) 22.dp else 2.dp, label = "switch thumb")
+    val color by animateColorAsState(if (checked) Color(0xFF34C759) else MaterialTheme.colorScheme.outlineVariant, animationSpec = fluidSpring(), label = "switch track")
+    val x by animateDpAsState(if (checked) 22.dp else 2.dp, animationSpec = fluidSpring(), label = "switch thumb")
     Box(Modifier.size(54.dp, 48.dp).semantics { contentDescription = description }.toggleable(checked, role = Role.Switch, onValueChange = change), contentAlignment = Alignment.Center) {
         Box(Modifier.size(52.dp, 32.dp).clip(CircleShape).background(color)) {
             Box(Modifier.offset { IntOffset(x.roundToPx(), 2.dp.roundToPx()) }.size(28.dp).shadow(2.dp, CircleShape).background(Color.White, CircleShape))
@@ -230,19 +242,15 @@ val positive = Color(0xFF248A3D)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun LedgerSheet(title: String, dismiss: () -> Unit, actionLabel: String = "Done", action: () -> Unit = dismiss, closeLabel: String = "Cancel", scrollContent: Boolean = true, actionEnabled: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
-    ModalBottomSheet(
-        onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.background, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 2.dp).size(34.dp, 5.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .3f))) }
-    ) {
+    FluidModalSheet(dismiss) { close ->
         Column(Modifier.fillMaxWidth().fillMaxHeight(.94f).imePadding()) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = dismiss) { Text(closeLabel, fontWeight = FontWeight.Normal) }
+                TextButton(onClick = close) { Text(closeLabel, fontWeight = FontWeight.Normal) }
                 Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2)
                 TextButton(onClick = action, enabled = actionEnabled) { Text(actionLabel) }
             }
-            HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-            val contentModifier = Modifier.weight(1f).then(if (scrollContent) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(20.dp).padding(bottom = 24.dp)
+            HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
+            val contentModifier = Modifier.weight(1f).then(if (scrollContent) Modifier.elasticScroll().verticalScroll(rememberScrollState(), overscrollEffect = null) else Modifier).padding(20.dp).padding(bottom = 24.dp)
             Column(contentModifier, verticalArrangement = Arrangement.spacedBy(18.dp), content = content)
         }
     }

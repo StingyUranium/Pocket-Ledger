@@ -3,7 +3,6 @@ package `in`.thomas.pocketledger
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
@@ -18,15 +17,15 @@ import androidx.compose.ui.unit.dp
 @Composable fun SmsScreen(messages: List<SmsRecord>, entries: List<Entry>, accounts: List<Account>, senders: List<TrustedSender>, permission: Boolean, capture: Boolean, from: String, to: String, setFrom: (String) -> Unit, setTo: (String) -> Unit, request: () -> Unit, toggle: (Boolean) -> Unit, scan: () -> Unit, trust: (TrustedSender) -> Unit, review: (SmsRecord) -> Unit, dismiss: (SmsRecord) -> Unit, link: (Pair<Entry, Entry>) -> Unit) {
     var showAll by remember { mutableStateOf(false) }
     val pending = messages.count { it.status == "REVIEW" }
-    LazyColumn(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    FluidList(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { CardBlock {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 IconTile("shield", MaterialTheme.colorScheme.tertiary, 48)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text("Less typing. More living.", style = MaterialTheme.typography.titleMedium); Text("SBM Bank India & Axis Bank", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             Text("Turn bank alerts into everyday clarity. Processed privately on your phone.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (!permission) Button(onClick = request, modifier = Modifier.fillMaxWidth().height(48.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(13.dp)) { Text("Enable SMS access") }
-            HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            if (!permission) Button(onClick = request, modifier = Modifier.fillMaxWidth().height(48.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) { Text("Enable SMS access") }
+            HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text("Automatic capture", style = MaterialTheme.typography.bodyLarge); Text(if (capture && permission) "Ready for your next bank alert" else "Capture new bank transactions", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 PocketSwitch(capture && permission, "Automatic capture", toggle)
@@ -40,7 +39,7 @@ import androidx.compose.ui.unit.dp
                 Box(Modifier.weight(1f)) { DateField(from, setFrom, "From") }
                 Box(Modifier.weight(1f)) { DateField(to, setTo, "Through") }
             }
-            Button(onClick = scan, enabled = permission, modifier = Modifier.fillMaxWidth().height(48.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(13.dp)) { AppIcon("search", Modifier.size(17.dp), if (permission) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(8.dp)); Text("Preview bank SMS") }
+            Button(onClick = scan, enabled = permission, modifier = Modifier.fillMaxWidth().height(48.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) { AppIcon("search", Modifier.size(17.dp), if (permission) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(8.dp)); Text("Preview bank SMS") }
             Text("Check account opening dates and balances before importing older alerts.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } }
         val candidates = messages.map { TrustedSender(normalizedSender(it.sender), it.bank) }.distinct().filter { it !in senders }
@@ -83,7 +82,7 @@ import androidx.compose.ui.unit.dp
                 Text("${m.direction?.lowercase()?.replaceFirstChar(Char::titlecase) ?: "Check type"} · ${m.date?.let(::displayDate) ?: "Check date"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (m.status == "REVIEW") Text(m.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { Text(if (expanded) "Hide original message" else "View original message", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f)); AppIcon("down", Modifier.size(12.dp), MaterialTheme.colorScheme.primary) }
-                AnimatedVisibility(expanded) { Text("${m.sender}\n\n${m.body}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                AnimatedVisibility(expanded, enter = androidx.compose.animation.expandVertically(animationSpec = fluidSpring()) + androidx.compose.animation.fadeIn(animationSpec = fluidTween()), exit = androidx.compose.animation.shrinkVertically(animationSpec = fluidSpring()) + androidx.compose.animation.fadeOut(animationSpec = fluidTween())) { Text("${m.sender}\n\n${m.body}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (m.status == "REVIEW") Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = { review(m) }, modifier = Modifier.weight(1f)) { Text("Edit & save") }; TextButton(onClick = { dismiss(m) }) { Text("Dismiss", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             }
         }
@@ -95,7 +94,7 @@ import androidx.compose.ui.unit.dp
     LedgerSheet("Preview alerts", dismiss, "Import (${selected.size})", { import(candidates.filterIndexed { index, _ -> index in selected }) }, scrollContent = false, actionEnabled = selected.isNotEmpty()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { IconTile("sms"); Column { Text("${candidates.size} bank alerts found", style = MaterialTheme.typography.titleMedium); Text("Choose what belongs in your ledger.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         Text("Existing and dismissed messages are skipped. Unconfirmed senders and incomplete details go to review.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        FluidList(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (candidates.isEmpty()) item { Empty("Try another date range or check your bank's alert settings.", "No supported alerts found", "search") }
             itemsIndexed(candidates, key = { index, _ -> index }) { index, c ->
                 CardBlock {
@@ -126,7 +125,8 @@ import androidx.compose.ui.unit.dp
     val context = androidx.compose.ui.platform.LocalContext.current
     val preferences = remember { context.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE) }
     var appearance by remember { mutableStateOf(preferences.getString("mode", "SYSTEM") ?: "SYSTEM") }
-    LedgerSheet("Settings", dismiss, closeLabel = "Close") {
+    FluidList(contentPadding = PaddingValues(22.dp, 16.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) { item {
+        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         CardBlock {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) { IconTile("shield", MaterialTheme.colorScheme.tertiary, 50); Column { Text("A little more private.", style = MaterialTheme.typography.titleMedium); Text("Your money stays with you.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             Text("Your finances are processed and stored on this device.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -139,13 +139,13 @@ import androidx.compose.ui.unit.dp
         SectionLabel("Permissions & capture")
         CardBlock {
             SettingsRow("sms", "SMS access", if (permission) "Permission granted" else "Permission not granted", onClick = appSettings)
-            HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
             Row(verticalAlignment = Alignment.CenterVertically) { Text("Automatic capture", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge); StatusPill(if (capture && permission) "Active" else "Paused", if (capture && permission) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         SectionLabel("Backups")
         CardBlock {
             SettingsRow("lock", "Save encrypted backup", "Choose a password and a safe location", onClick = export)
-            HorizontalDivider(thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
             SettingsRow("backup", "Restore a backup", "Replace data from a saved backup", onClick = restore)
         }
         SectionLabel("Trusted senders")
@@ -159,6 +159,8 @@ import androidx.compose.ui.unit.dp
             rules.forEach { rule -> Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(rule.merchant, style = MaterialTheme.typography.bodyMedium); Text(rule.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; TextButton(onClick = { removeRule(rule) }) { Text("Remove", color = rust, style = MaterialTheme.typography.bodyMedium) } } }
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) { Text("Ledger", style = MaterialTheme.typography.titleSmall); Text("Version 1.3 · Built for your everyday", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+        }
     }
 }
 

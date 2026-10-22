@@ -23,6 +23,16 @@ object SmsParser {
         RegexOption.IGNORE_CASE
     )
 
+    /** The transaction groups enabled for the user's SBM and Axis inbox scan. */
+    private val selectedGroups = Regex(
+        "\\bUPI/(?:P2A|P2P|P2M)/|\\b(?:NEFT|IMPS|RTGS|IFT)/|" +
+            "\\bACH_(?:CR|DR)/|\\bInt\\.Pd\\b|successful\\s+top-up\\s+of|" +
+            "your\\s+a/c\\s+has\\s+been\\s+debited\\s+towards|" +
+            "debited\\s+from\\s+a/c\\s+no\\.?.*?\\s+on\\s+.+?\\s+\\d{2}-\\d{2}-\\d{2,4}.*?axis\\s+bank|" +
+            "\\b(?:refund(?:ed)?|revers(?:al|ed)|chargeback)\\b",
+        RegexOption.IGNORE_CASE
+    )
+
     private fun find(pattern: String, text: String, group: Int = 1): String? =
         Regex(pattern, RegexOption.IGNORE_CASE).find(text)?.groupValues?.get(group)
 
@@ -76,9 +86,14 @@ object SmsParser {
         return Details(null, "")
     }
 
-    fun parse(body: String): ParsedSms? {
+    fun parse(body: String): ParsedSms? = parseInternal(body, allowFailedRefund = false)
+
+    private fun parseInternal(body: String, allowFailedRefund: Boolean): ParsedSms? {
         val text = body.replace(Regex("\\s+"), " ").trim()
-        if (ignored.containsMatchIn(text)) return null
+        val completedRefund = allowFailedRefund &&
+            Regex("\\b(?:refund(?:ed)?|revers(?:al|ed)|chargeback)\\b", RegexOption.IGNORE_CASE).containsMatchIn(text) &&
+            Regex("\\bcredited\\b", RegexOption.IGNORE_CASE).containsMatchIn(text)
+        if (ignored.containsMatchIn(text) && !completedRefund) return null
         val bank = when {
             Regex("SBM\\s+BANK\\s*(?:\\(INDIA\\)|INDIA)", RegexOption.IGNORE_CASE).containsMatchIn(text) -> "SBM"
             text.contains("Axis Bank", true) -> "AXIS"
@@ -120,6 +135,16 @@ object SmsParser {
         // Account-less mandates, interest credits without references, and wallet top-ups need review.
         val complete = suffix != null && amount != null && date.millis != null && detail.reference != null && !topUp
         return ParsedSms(bank, suffix, amount, direction, date.millis, date.dateOnly, detail.payee, detail.reference, balance, complete)
+    }
+
+    /** Restrict inbox imports to completed UPI/bank transfers, Axis merchant debits,
+     * and deposit-account refunds. The general parser remains available for legacy
+     * record compatibility and parser fixture coverage. */
+    fun parseSelected(body: String): ParsedSms? {
+        val text = body.replace(Regex("\\s+"), " ").trim()
+        if (!selectedGroups.containsMatchIn(text)) return null
+        if (Regex("credit\\s*card", RegexOption.IGNORE_CASE).containsMatchIn(text)) return null
+        return parseInternal(text, allowFailedRefund = true)
     }
 
     fun bodyKey(sender: String, body: String, received: Long): String =

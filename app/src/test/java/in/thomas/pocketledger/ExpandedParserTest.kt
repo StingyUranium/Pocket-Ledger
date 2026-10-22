@@ -152,4 +152,22 @@ class ExpandedParserTest {
         assertNull(SmsParser.parse("Your request to modify limit/manage usage facility on Debit Card no. XX2222 is processed - Axis Bank"))
         assertNull(SmsParser.parse("Your SBM Niyo Global Debit card ending with XX1111 has been blocked. SBM Bank India"))
     }
+
+    @Test fun selectedScopeIncludesChosenBankTransfersAndMerchantDebits() {
+        assertNotNull(SmsParser.parseSelected(sbm("UPI/P2P/628368490342/SAMPLE/", true)))
+        assertNotNull(SmsParser.parseSelected(sbm("IFT/ABCDEF1234567890ABCDEF1234567890")))
+        assertNotNull(SmsParser.parseSelected("Your A/c has been debited towards Sample Merchant for INR 123.45 on 20-10-26. examplemandate@okaxis - Axis Bank"))
+        assertNotNull(SmsParser.parseSelected("INR 123.45 credited A/c no. XX2222 20-10-26, 12:30:45 UPI/P2A/123456789012/Sample - Axis Bank"))
+    }
+
+    @Test fun selectedScopeExcludesUnchosenTypesAndCardAlerts() {
+        assertNotNull(SmsParser.parseSelected(sbm("ACH_DR/SAMPLE MUTUAL FUND/TPZMUT123456")))
+        assertNotNull(SmsParser.parseSelected(sbm("12345678901234:Int.Pd:01-09-26", true)))
+        val lite = SmsParser.parseSelected("UPI LITE enabled on UPI App for A/c no. XX2222 with successful top-up of INR 123.45 on 20-10-26 12:30:45 IST. Ref no. 123456789012345678 - Axis Bank")!!
+        assertFalse(lite.complete)
+        assertEquals("UPI Lite top-up", lite.payee)
+        assertNull(SmsParser.parseSelected("Dear Customer, reversal of INR 123.45 is credited to your SBM Niyo Global Credit Card due to failed transaction. SBM Bank India"))
+        val refund = SmsParser.parseSelected("INR 123.45 credited to your Axis Bank account from refund")!!
+        assertFalse(refund.complete)
+    }
 }

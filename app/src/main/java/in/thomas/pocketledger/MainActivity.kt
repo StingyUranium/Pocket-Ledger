@@ -12,6 +12,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.ui.input.nestedscroll.*
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -88,27 +95,59 @@ class MainActivity : ComponentActivity() {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { permission = repo.hasSmsPermission(); capture = repo.prefs.getBoolean("enabled", false); work { repo.reconcile() } } }
         owner.lifecycle.addObserver(observer); onDispose { owner.lifecycle.removeObserver(observer) }
     }
+    BackHandler(settings) { settings = false }
+    val density = LocalDensity.current
+    val collapseRange = with(density) { 56.dp.toPx() }
+    val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+    val titleOffsets = remember { mutableStateMapOf<String, Float>() }
+    val routeKey = if (settings) "settings" else "tab-$tab"
+    val collapseOffset = titleOffsets[routeKey] ?: 0f
+    val titleScroll = remember(tab, settings, collapseRange) { object : NestedScrollConnection {
+        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+            titleOffsets[routeKey] = ((titleOffsets[routeKey] ?: 0f) - consumed.y).coerceIn(0f, collapseRange)
+            return Offset.Zero
+        }
+    } }
     val titles = listOf("Overview", "Activity", "Accounts", "Budgets", "Inbox")
     Scaffold(
         topBar = {
             PocketHeader(
-                title = titles[tab],
+                title = if (settings) "Settings" else titles[tab],
+                collapse = collapseOffset / collapseRange,
+                back = if (settings) ({ settings = false }) else null,
                 settings = { settings = true },
-                add = if (tab <= 1) ({
+                add = if (!settings && tab <= 1) ({
                     accounts.firstOrNull()?.let {
                         editor = Entry(UUID.randomUUID().toString(), it.id, type = "EXPENSE", amount = 0, date = System.currentTimeMillis())
                     }
                 }) else null
             )
         },
-        bottomBar = { PocketTabBar(tab, messages.count { it.status == "REVIEW" }) { tab = it } },
+        bottomBar = { if (!settings) PocketTabBar(tab, messages.count { it.status == "REVIEW" }) { tab = it } },
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snack) }
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
+        Column(Modifier.padding(padding).fillMaxSize().nestedScroll(titleScroll)) {
+            AnimatedContent(targetState = settings, transitionSpec = {
+                if (targetState) {
+                    (slideInHorizontally(fluidSpring()) { it } + fadeIn(fluidTween())) togetherWith
+                        slideOutHorizontally(fluidSpring()) { -it / 3 }
+                } else {
+                    slideInHorizontally(fluidSpring()) { -it / 3 } togetherWith
+                        (slideOutHorizontally(fluidSpring()) { it } + fadeOut(fluidTween()))
+                }
+            }, label = "navigation stack", modifier = Modifier.fillMaxSize()) { showSettings ->
+            pageState.SaveableStateProvider(if (showSettings) "settings" else "tabs") {
+            if (showSettings) {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    SettingsDialog(capture, permission, senders, rules, { settings = false }, { passwordMode = "export" }, { chooseRestore.launch(arrayOf("*/*")) }, { work { dao.untrust(it.sender, it.bank) } }, { work { dao.removeRule(it.merchant) } }, { repo.context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${repo.context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
+                }
+            } else Column(Modifier.fillMaxSize()) {
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (tab in listOf(0, 1, 3)) MonthPicker(month) { month = it }
-            androidx.compose.animation.Crossfade(targetState = tab, modifier = Modifier.weight(1f), animationSpec = androidx.compose.animation.core.tween(180), label = "screen") { page ->
+            Box(Modifier.weight(1f)) {
+                val page = tab
+                pageState.SaveableStateProvider("tab-$page") {
                 when (page) {
                     0 -> Overview(accounts, entries, messages, month, budgets, { tab = 2 }, { tab = 4 }) { editor = it }
                     1 -> Transactions(entries, accounts, month) { editor = it }
@@ -128,8 +167,9 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-    editor?.let { current -> EntryEditor(current, accounts, messages.find { it.key == current.smsKey }, { editor = null }, { entry, remember -> work { repo.save(entry, remember); withContext(Dispatchers.Main) { editor = null } } }, if (allEntries.any { it.id == current.id }) { { deleteCandidate = current } } else null) }
-    accountEditor?.let { a -> AccountEditor(a, { accountEditor = null }) { edited -> work {
+    } } } }
+    FluidPresentation(editor) { current -> EntryEditor(current, accounts, messages.find { it.key == current.smsKey }, { editor = null }, { entry, remember -> work { repo.save(entry, remember); withContext(Dispatchers.Main) { editor = null } } }, if (allEntries.any { it.id == current.id }) { { deleteCandidate = current } } else null) }
+    FluidPresentation(accountEditor) { a -> AccountEditor(a, { accountEditor = null }) { edited -> work {
         require(edited.name.isNotBlank()) { "Name is required" }; require(edited.bank == "CASH" || edited.suffix.matches(Regex("\\d{4}"))) { "Enter the account's last four digits" }
         require(accounts.none { it.id != edited.id && it.bank == edited.bank && it.suffix == edited.suffix && edited.bank != "CASH" }) { "This account is already mapped" }
         require(entries.none { (it.accountId == edited.id || it.destinationId == edited.id) && it.date < edited.openingDate }) { "Opening date cannot be after an existing transaction" }
@@ -142,12 +182,12 @@ class MainActivity : ComponentActivity() {
         dismiss = { disclosure = false },
         proceed = { disclosure = false; requestSms.launch(arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS)) }
     )
-    preview?.let { candidates ->
+    FluidPresentation(preview) { candidates ->
         val knownKeys = messages.flatMap { listOf(it.key, SmsParser.key(it.parsed(), it.sender, it.body, it.received)) }.toSet()
         ImportPreview(candidates, knownKeys, accounts, { preview = null }) { selected -> work { repo.ingest(selected, forceReview = true); repo.processReview(); withContext(Dispatchers.Main) { preview = null; snack.showSnackbar("Imported ${selected.size} selected messages. Check the review inbox.") } } }
     }
-    if (settings) SettingsDialog(capture, permission, senders, rules, { settings = false }, { passwordMode = "export" }, { chooseRestore.launch(arrayOf("*/*")) }, { work { dao.untrust(it.sender, it.bank) } }, { work { dao.removeRule(it.merchant) } }, { repo.context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${repo.context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
-    passwordMode?.let { mode -> PasswordDialog(mode, { passwordMode = null; restoreUri = null }) { pass ->
+
+    FluidPresentation(passwordMode) { mode -> PasswordDialog(mode, { passwordMode = null; restoreUri = null }) { pass ->
         passwordMode = null
         if (mode == "export") { secret = pass; export.launch("Ledger-${LocalDate.now(india)}.plbackup") }
         else {

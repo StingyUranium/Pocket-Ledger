@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-Ledger 1.3 is an offline Android app targeting API 37. Kotlin sources are in `app/src/main/java/in/thomas/pocketledger/`: `DesignSystem.kt` defines theme and shared components, Compose screens handle UI, `Repository.kt` coordinates imports and ledger updates, `Database.kt` defines Room entities, and parsing, capture, and encrypted backups have dedicated files. Resources and the manifest are under `app/src/main/`. JVM tests use `app/src/test/`; device tests use `app/src/androidTest/`. Keep Room schemas in `app/schemas/`. Generated deliveries belong in `artifacts/`, outside source commits.
+Ledger 1.4 is an offline Android app targeting API 37. Kotlin sources are in `app/src/main/java/in/thomas/pocketledger/`: `DesignSystem.kt` defines theme and shared components, `FluidMotion.kt` owns spring sheets and elastic list wrappers, Compose screens handle UI, `Repository.kt` coordinates imports and ledger updates, `Database.kt` defines Room entities, and parsing, capture, and encrypted backups have dedicated files. Resources and the manifest are under `app/src/main/`. JVM tests use `app/src/test/`; device tests use `app/src/androidTest/`. Keep Room schemas in `app/schemas/`. Generated deliveries belong in `artifacts/`, outside source commits.
 
 ## Build, Test, and Development Commands
 
@@ -19,11 +19,11 @@ Rebuild without the validation property before installing the personal APK. Avoi
 
 ## Coding Style & Architecture
 
-Use four-space indentation, PascalCase classes and composables, and camelCase functions and properties. Prefer readable Kotlin blocks. Keep UI, parsing, persistence, and cryptography separate. Store money as integer paise and interpret transaction dates in Asia/Kolkata. Android Lint is configured; no standalone formatter is configured.
+Use four-space indentation, PascalCase classes and composables, and camelCase functions and properties. Prefer readable Kotlin blocks. Keep UI, parsing, persistence, and cryptography separate. Reuse fluid motion specs and elastic list wrappers; keep root tabs separate from push/pop routes and creation sheets. Store money as integer paise and interpret transaction dates in Asia/Kolkata. Android Lint is configured; no standalone formatter is configured.
 
 ## Parser & Testing Guidelines
 
-Support observed SBM and Axis account formats; exclude credit cards, OTPs, requests, and future mandates. Keep ambiguous transactions in review. Preserve existing UPI keys, legacy message identities, dismissal tombstones, and manual corrections. Scope reused ACH references to posting dates. Refresh stored review fields without automatically posting them.
+New inbox scans accept the selected SBM/Axis scope: UPI, NEFT, IMPS, RTGS, IFT, ACH, savings interest, UPI Lite top-ups, completed Axis merchant debits, and deposit-account refunds/reversals. Exclude credit cards, OTPs, requests, and future or mandate-maintenance notices. Keep incomplete selected transactions in review. Preserve existing UPI keys, legacy identities, dismissal tombstones, and manual corrections. Scope ACH references to posting dates. Refresh stored review fields without automatically posting them.
 
 Use JUnit 4 and AndroidX Test. Name files `*Test.kt` and methods after behavior. Add synthetic regression fixtures for parser and upgrade changes; never save real phone messages in source. Device tests use in-memory Room databases. Version 1.1 validation passed 44 JVM and 17 device tests; no coverage percentage is enforced.
 

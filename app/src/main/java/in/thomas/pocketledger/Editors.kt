@@ -3,7 +3,6 @@ package `in`.thomas.pocketledger
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -66,10 +65,10 @@ import java.time.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun ChoiceSheet(label: String, value: String, options: List<String>, display: (String) -> String, dismiss: () -> Unit, change: (String) -> Unit) {
-    ModalBottomSheet(onDismissRequest = dismiss, containerColor = MaterialTheme.colorScheme.background, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
+    LedgerSheet(label, dismiss, closeLabel = "Cancel") {
         Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             SectionTitle(label)
-            LazyColumn(Modifier.heightIn(max = 440.dp).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface)) {
+            FluidList(Modifier.heightIn(max = 440.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface)) {
                 if (options.isEmpty()) item { Text("No options available", modifier = Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(options.distinct(), key = { it }) { option ->
                     Column(Modifier.fillMaxWidth().clickable { change(option); dismiss() }) {
@@ -77,7 +76,7 @@ import java.time.*
                             Text(display(option), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), color = if (option == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             if (option == value) AppIcon("check", Modifier.size(19.dp), MaterialTheme.colorScheme.primary)
                         }
-                        if (option != options.lastOrNull()) HorizontalDivider(Modifier.padding(start = 17.dp), thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                        if (option != options.lastOrNull()) HorizontalDivider(Modifier.padding(start = 17.dp), thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
             }
@@ -145,7 +144,7 @@ import java.time.*
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text("AMOUNT IN INR", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextField(amount, { amount = it; error = null }, placeholder = { Text("0.00", fontSize = 40.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .45f)) }, prefix = { Text("₹ ", fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true,
-                textStyle = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp, fontWeight = FontWeight.Medium), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = fieldColors(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                textStyle = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp, fontWeight = FontWeight.Medium), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = fieldColors(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         }
         error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
         SectionLabel("Details")

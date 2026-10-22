@@ -9,7 +9,7 @@ class SmsReceiver : BroadcastReceiver() {
         val repo = (context.applicationContext as LedgerApp).repo
         if (!repo.prefs.getBoolean("enabled", false)) return
         val parts = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-        val body = parts.joinToString("") { it.messageBody.orEmpty() }; val parsed = SmsParser.parse(body) ?: return
+        val body = parts.joinToString("") { it.messageBody.orEmpty() }; val parsed = SmsParser.parseSelected(body) ?: return
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try { repo.ingest(listOf(Candidate(parts.firstOrNull()?.originatingAddress.orEmpty(), body, parts.firstOrNull()?.timestampMillis ?: System.currentTimeMillis(), parsed)), requireCapture = true) }
