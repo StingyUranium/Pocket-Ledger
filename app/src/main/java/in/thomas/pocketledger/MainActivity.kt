@@ -24,6 +24,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -35,7 +36,9 @@ import java.time.*
 import java.util.Locale
 import java.util.UUID
 
-fun money(v: Long): String = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")).format(BigDecimal.valueOf(v, 2))
+// NumberFormat is expensive to create and not thread-safe; money() runs per row and on widget threads.
+private val rupeeFormat = ThreadLocal.withInitial { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
+fun money(v: Long): String = rupeeFormat.get().format(BigDecimal.valueOf(v, 2))
 fun amountText(v: Long) = BigDecimal.valueOf(v, 2).toPlainString()
 fun dayText(v: Long) = Instant.ofEpochMilli(v).atZone(india).toLocalDate().toString()
 fun dayMillis(v: String) = LocalDate.parse(v.trim()).atStartOfDay(india).toInstant().toEpochMilli()
@@ -199,6 +202,7 @@ private sealed interface LedgerRoute {
         }
     }
     val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+    val calculationCache = remember { CalculationCache() }
     val titles = destinationLabels
     // Keep the shared card data ready while detail pages are open, including during back previews.
     val overviewReport by backgroundCalculation(entries, budgets, month) { calculateOverviewReport(entries, budgets, month) }
@@ -206,7 +210,7 @@ private sealed interface LedgerRoute {
     val expandedEditor = LocalLedgerWindowWidth.current >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.3f
     val editorContent by rememberUpdatedState<@Composable (Entry) -> Unit> { current -> EntryEditor(current, accounts, messages.find { it.key == current.smsKey }, { editor = null }, { entry, remember -> work { repo.save(entry, remember); withContext(Dispatchers.Main) { editor = null } } }, if (allEntries.any { it.id == current.id }) { { deleteCandidate = current } } else null) }
     val presentEntry = remember { movableContentOf<Entry> { current -> key(current.id) { editorContent(current) } } }
-    CompositionLocalProvider(LocalLedgerBusy provides busy, LocalLedgerOperationError provides operationError, LocalLedgerClearError provides { operationError = null }) {
+    CompositionLocalProvider(LocalCalculationCache provides calculationCache, LocalLedgerBusy provides busy,LocalLedgerOperationError provides operationError, LocalLedgerClearError provides { operationError = null }) {
     SharedTransitionLayout {
     CompositionLocalProvider(LocalLedgerSharedScope provides this) {
     BoxWithConstraints(Modifier.fillMaxSize().motionSurface(active = navigation.isRunning)) {
@@ -273,9 +277,12 @@ private sealed interface LedgerRoute {
                     }
                 }) else null
             )
-            if (shownRoute is LedgerRoute.Transactions || (shownRoute == LedgerRoute.Tabs && tab in listOf(0, 1, 3, 5))) {
-                MonthPicker(month) { month = it }
-            }
+            // Animate the picker so switching between tabs with and without it does not jump the content.
+            AnimatedVisibility(
+                visible = shownRoute is LedgerRoute.Transactions || (shownRoute == LedgerRoute.Tabs && tab in listOf(0, 1, 3, 5)),
+                enter = if (reducedMotion) EnterTransition.None else expandVertically(ledgerNavigationTween()) + fadeIn(fluidTween()),
+                exit = if (reducedMotion) ExitTransition.None else shrinkVertically(ledgerNavigationTween()) + fadeOut(fluidTween())
+            ) { MonthPicker(month) { month = it } }
             }
         },
         bottomBar = { if (!wide && shownRoute == LedgerRoute.Tabs) PocketTabBar(tab, pending) { tab = it } },
@@ -306,8 +313,9 @@ private sealed interface LedgerRoute {
             if (busy) Text("Updating ledger...", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
                 val page = tab
+                val entrance = rememberDestinationEntrance(page)
                 pageState.SaveableStateProvider("tab-$page") {
-                Box(Modifier.widthIn(max = 840.dp).fillMaxSize()) {
+                Box(Modifier.widthIn(max = 840.dp).fillMaxSize().graphicsLayer { alpha = entrance.value }) {
                 when (page) {
                     6 -> MoreScreen(pending, { tab = it }, { settings = true })
                     0 -> Overview(accounts, entries, messages, month, budgets, overviewReport, { tab = 2 }, { tab = 4 }, openTransactions) { editor = it }

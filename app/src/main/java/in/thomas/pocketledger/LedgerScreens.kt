@@ -25,13 +25,19 @@ import androidx.compose.ui.unit.sp
 import java.time.*
 import java.time.format.DateTimeFormatter
 
-fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).format(DateTimeFormatter.ofPattern("d MMM yyyy"))
+// Pattern parsing is costly and these run per row, so build each formatter once.
+private val dayMonthYearFormat = DateTimeFormatter.ofPattern("d MMM yyyy")
+private val dayMonthFormat = DateTimeFormatter.ofPattern("d MMM")
+internal val monthYearFormat = DateTimeFormatter.ofPattern("MMMM yyyy")
+internal val shortMonthYearFormat = DateTimeFormatter.ofPattern("MMM yyyy")
+
+fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).format(dayMonthYearFormat)
 
 @Composable fun MonthPicker(month: YearMonth, change: (YearMonth) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { change(month.minusMonths(1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Previous month" }) { AppIcon("left", tint = MaterialTheme.colorScheme.primary) }
-            Text(month.format(DateTimeFormatter.ofPattern("MMMM yyyy")), style = MaterialTheme.typography.titleMedium,
+            Text(month.format(monthYearFormat), style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
             IconButton(onClick = { change(month.plusMonths(1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Next month" }) { AppIcon("right", tint = MaterialTheme.colorScheme.primary) }
         }
@@ -156,7 +162,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
         else "${e.category} \u00b7 ${accounts.find { it.id == e.accountId }?.name.orEmpty()}"
     }
     val amount = remember(e.type, e.amount) { (if (e.type == "INCOME") "+" else if (e.type == "EXPENSE") "\u2212" else "") + money(e.amount) }
-    val date = remember(e.date) { Instant.ofEpochMilli(e.date).atZone(india).format(DateTimeFormatter.ofPattern("d MMM")) }
+    val date = remember(e.date) { Instant.ofEpochMilli(e.date).atZone(india).format(dayMonthFormat) }
     val largeText = LocalDensity.current.fontScale > 1.3f
     val interaction = remember { MutableInteractionSource() }
     Column(Modifier.fillMaxWidth().heightIn(min = 72.dp).premiumPressEffect(interaction, pressedScale = .993f).clickable(interactionSource = interaction, indication = androidx.compose.foundation.LocalIndication.current, onClickLabel = "Edit transaction", onClick = click)) {
@@ -184,7 +190,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     var type by rememberSaveable(initialType) { mutableStateOf(initialType) }
     var account by rememberSaveable { mutableStateOf("ALL") }
     var category by rememberSaveable(initialCategory) { mutableStateOf(initialCategory) }
-    val result by backgroundCalculation(entries, month, type, account, category, search) {
+    val result by backgroundCalculation(entries, month, type, account, category, search, cacheKey = "transactions-$initialType-$initialCategory") {
         entries.filter { !it.deleted && inMonth(it, month) && (type == "ALL" || it.type == type) &&
             (account == "ALL" || it.accountId == account || it.destinationId == account) &&
             (category == "ALL" || it.category == category) && "${it.payee} ${it.note} ${it.category}".contains(search, true) }
@@ -233,7 +239,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
 }
 
 @Composable fun AccountsScreen(accounts: List<Account>, entries: List<Entry>, messages: List<SmsRecord>, edit: (Account) -> Unit, add: () -> Unit) {
-    val calculatedBalances by backgroundCalculation(accounts, entries) { accounts.associate { it.id to balance(it, entries) } }
+    val calculatedBalances by backgroundCalculation(accounts, entries, cacheKey = "balances") { accounts.associate { it.id to balance(it, entries) } }
     val balances = calculatedBalances ?: run { LedgerSkeleton(); return }
     val bankBalances = remember(messages) { messages.filter { it.balance != null && it.status in listOf("SAVED", "LINKED") }
         .groupBy { it.bank to it.suffix }.mapValues { (_, records) -> records.maxByOrNull { it.date ?: it.received } } }
@@ -270,7 +276,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     var edit by remember { mutableStateOf<Budget?>(null) }
     var allocationView by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     val current = remember(budgets) { budgets.filter { it.amount > 0 } }
-    val spending by backgroundCalculation(entries, month) { entries.filter { !it.deleted && it.type == "EXPENSE" && inMonth(it, month) }.groupBy { it.category }.mapValues { it.value.sumOf { entry -> entry.amount } } }
+    val spending by backgroundCalculation(entries, month, cacheKey = "budget-spending") { entries.filter { !it.deleted && it.type == "EXPENSE" && inMonth(it, month) }.groupBy { it.category }.mapValues { it.value.sumOf { entry -> entry.amount } } }
     val spentByCategory = spending ?: run { LedgerSkeleton(); return }
     val planned = current.sumOf { it.amount }
     val spent = current.sumOf { spentByCategory[it.category] ?: 0L }

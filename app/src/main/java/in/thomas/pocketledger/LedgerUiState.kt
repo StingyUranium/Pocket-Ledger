@@ -31,12 +31,32 @@ fun ledgerSnapshots(dao: LedgerDao): Flow<LedgerReadState> {
         }.flowOn(Dispatchers.Default)
 }
 
-/** Cancel obsolete reports and never show the previous month's values as current. */
+/** Latest result per call site, so revisiting a root tab with unchanged inputs paints immediately. */
+class CalculationCache {
+    private class Stored(val inputs: List<Any?>, val value: Any)
+    private val stored = HashMap<String, Stored>()
+    @Suppress("UNCHECKED_CAST")
+    fun <T> find(key: String, inputs: List<Any?>): T? = stored[key]?.takeIf { it.inputs == inputs }?.value as T?
+    fun store(key: String, inputs: List<Any?>, value: Any) { stored[key] = Stored(inputs, value) }
+}
+val LocalCalculationCache = staticCompositionLocalOf<CalculationCache?> { null }
+
+/**
+ * Cancel obsolete reports and never show the previous month's values as current. A [cacheKey]
+ * reuses the last result only when every input is equal, which avoids a skeleton flash on tab switches.
+ */
 @Composable
-fun <T> backgroundCalculation(vararg inputs: Any?, calculation: () -> T): State<T?> {
+fun <T> backgroundCalculation(vararg inputs: Any?, cacheKey: String? = null, calculation: () -> T): State<T?> {
     val dependencies = inputs.toList()
-    val result = remember(dependencies) { mutableStateOf<T?>(null) }
-    LaunchedEffect(dependencies) { result.value = withContext(Dispatchers.Default) { calculation() } }
+    val cache = LocalCalculationCache.current
+    val result = remember(dependencies) { mutableStateOf<T?>(cacheKey?.let { cache?.find<T>(it, dependencies) }) }
+    LaunchedEffect(dependencies) {
+        if (result.value == null) {
+            val value = withContext(Dispatchers.Default) { calculation() }
+            result.value = value
+            if (cacheKey != null && value != null) cache?.store(cacheKey, dependencies, value)
+        }
+    }
     return result
 }
 

@@ -55,6 +55,20 @@ fun Modifier.motionSurface(active: Boolean = false): Modifier = composed {
         }
 }
 
+/**
+ * Short fade when a root destination replaces another, hiding the hard cut. The alpha is created in
+ * the same composition as the new page, so it never paints one fully opaque frame first. The initial
+ * composition, route changes (which have their own transition) and reduced motion are not animated.
+ */
+@Composable fun rememberDestinationEntrance(key: Any): Animatable<Float, AnimationVector1D> {
+    val reduced = LocalReducedMotion.current
+    val composed = remember { booleanArrayOf(false) }
+    val alpha = remember(key) { Animatable(if (reduced || !composed[0]) 1f else 0f) }
+    SideEffect { composed[0] = true }
+    LaunchedEffect(alpha) { if (alpha.value < 1f) alpha.animateTo(1f, tween(LedgerMotion.standard, easing = FluidEasing)) }
+    return alpha
+}
+
 @Composable fun FluidList(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),

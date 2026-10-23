@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
     var showAll by remember { mutableStateOf(false) }
     val pending = remember(messages) { messages.count { it.status == "REVIEW" } }
     val senderCandidates = remember(messages, senders) { messages.map { TrustedSender(normalizedSender(it.sender), it.bank) }.distinct().filter { it !in senders } }
-    val transfers by backgroundCalculation(entries) {
+    val transfers by backgroundCalculation(entries, cacheKey = "transfer-candidates") {
         val credits = entries.filter { it.type == "INCOME" }.groupBy { it.amount }
         entries.asSequence().filter { it.type == "EXPENSE" }.flatMap { out ->
             credits[out.amount].orEmpty().asSequence().filter { it.accountId != out.accountId && kotlin.math.abs(it.date - out.date) <= 86_400_000L }.map { out to it }

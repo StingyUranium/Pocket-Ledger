@@ -52,13 +52,13 @@ fun Modifier.premiumPressEffect(
 ): Modifier = composed {
     val pressed by interactionSource.collectIsPressedAsState()
     val reduced = LocalReducedMotion.current
-    val scale by animateFloatAsState(
-        if (pressed && enabled && !reduced) pressedScale else 1f,
-        if (reduced) snap() else LedgerMotion.responsive(), label = "press scale"
+    // One animation per control: lists create this for every row, and the value is only read at draw time.
+    val press by animateFloatAsState(
+        if (pressed && enabled) 1f else 0f,
+        if (reduced) snap() else LedgerMotion.responsive(), label = "press"
     )
-    val opacity by animateFloatAsState(
-        if (pressed && enabled) .88f else 1f,
-        if (reduced) snap() else tween(LedgerMotion.fast), label = "press tone"
-    )
-    graphicsLayer { scaleX = scale; scaleY = scale; alpha = opacity }
+    graphicsLayer {
+        val scale = if (reduced) 1f else 1f - (1f - pressedScale) * press
+        scaleX = scale; scaleY = scale; alpha = 1f - .12f * press
+    }
 }

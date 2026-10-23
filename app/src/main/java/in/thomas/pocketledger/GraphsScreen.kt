@@ -28,7 +28,7 @@ private data class GraphReport(
 
 @Composable fun GraphsScreen(entries: List<Entry>, month: YearMonth, changeMonth: (YearMonth) -> Unit, openTransactions: (String, String) -> Unit) {
     val locale = LocalConfiguration.current.locales[0]
-    val report by backgroundCalculation(entries, month) {
+    val report by backgroundCalculation(entries, month, cacheKey = "graphs") {
         val expenses = entries.filter { !it.deleted && it.type == "EXPENSE" && inMonth(it, month) }
         GraphReport(
             expenses.sumOf { it.amount },
@@ -100,8 +100,8 @@ private data class GraphReport(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Box(Modifier.size(8.dp).background(expenseColor, CircleShape)); Text("Spent", style = MaterialTheme.typography.bodySmall) }
             }
             history.forEach { (period, summary) ->
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).ledgerClickable(onClickLabel = "View ${period.format(DateTimeFormatter.ofPattern("MMMM yyyy"))}") { changeMonth(period) }.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(period.format(DateTimeFormatter.ofPattern("MMM yyyy")), style = MaterialTheme.typography.titleSmall)
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).ledgerClickable(onClickLabel = "View ${period.format(monthYearFormat)}") { changeMonth(period) }.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(period.format(shortMonthYearFormat), style = MaterialTheme.typography.titleSmall)
                     LinearProgressIndicator(progress = { (summary.income.toDouble() / scale).toFloat() }, modifier = Modifier.fillMaxWidth().height(7.dp).clip(CircleShape), color = incomeColor, trackColor = trackColor, drawStopIndicator = {})
                     LinearProgressIndicator(progress = { (summary.spent.toDouble() / scale).toFloat() }, modifier = Modifier.fillMaxWidth().height(7.dp).clip(CircleShape), color = expenseColor, trackColor = trackColor, drawStopIndicator = {})
                     Text("Income ${money(summary.income)}  ·  Spent ${money(summary.spent)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
