@@ -2,10 +2,12 @@ package `in`.thomas.pocketledger
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.activity.BackEventCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
 import org.junit.Before
+import org.junit.Assert.assertEquals
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import android.view.WindowManager
@@ -56,6 +58,57 @@ class RedesignUiTest {
         ui.onNodeWithText("Cancel").performClick()
         ui.waitUntil(10_000) { ui.onAllNodesWithText("New transaction").fetchSemanticsNodes().isEmpty() }
         ui.onNodeWithText("Monthly balance").assertExists()
+    }
+
+    @Test fun metricPagesSettleAfterRepeatedOpenAndBack() {
+        ready()
+        repeat(3) {
+            ui.onNodeWithText("Spent").performClick()
+            ui.onNodeWithText("Spent this month").assertIsDisplayed()
+            ui.onNodeWithText("Monthly balance").assertDoesNotExist()
+            ui.onNodeWithContentDescription("Back").performClick()
+            ui.onNodeWithText("Monthly balance").assertIsDisplayed()
+            ui.onNodeWithText("Spent this month").assertDoesNotExist()
+            ui.onNodeWithText("Income").performClick()
+            ui.onNodeWithText("Income this month").assertIsDisplayed()
+            ui.onNodeWithText("Spent this month").assertDoesNotExist()
+            ui.onNodeWithText("Monthly balance").assertDoesNotExist()
+            ui.onNodeWithContentDescription("Back").performClick()
+            ui.onNodeWithText("Monthly balance").assertIsDisplayed()
+            ui.onNodeWithText("Income this month").assertDoesNotExist()
+        }
+    }
+
+    @Test fun predictiveBackCancellationAndCompletionKeepMetricAndHeaderTogether() {
+        ready()
+        ui.waitUntil(10_000) { ui.onAllNodesWithText("Updating ledger...").fetchSemanticsNodes().isEmpty() }
+        val overviewTop = ui.onNodeWithText("Monthly balance").fetchSemanticsNode().boundsInRoot.top
+        ui.onNodeWithText("Spent").performClick()
+        ui.onNodeWithText("Spent this month").assertIsDisplayed()
+        val dispatcher = ui.activity.onBackPressedDispatcher
+        fun previewBack() {
+            ui.runOnUiThread { dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 400f, 0f, BackEventCompat.EDGE_LEFT)) }
+            ui.waitForIdle()
+            ui.runOnUiThread { dispatcher.dispatchOnBackProgressed(BackEventCompat(150f, 400f, .6f, BackEventCompat.EDGE_LEFT)) }
+            ui.waitForIdle()
+            assertEquals("Overview stays in place behind the moving metric card", overviewTop,
+                ui.onNodeWithText("Monthly balance").fetchSemanticsNode().boundsInRoot.top, 1f)
+        }
+        previewBack()
+        ui.runOnUiThread { dispatcher.dispatchOnBackCancelled() }
+        ui.waitForIdle()
+        ui.onNodeWithText("Spent").assertIsDisplayed()
+        ui.onNodeWithText("Spent this month").assertIsDisplayed()
+        ui.onNodeWithText("Monthly balance").assertDoesNotExist()
+        previewBack()
+        ui.runOnUiThread { dispatcher.onBackPressed() }
+        ui.waitForIdle()
+        ui.onNodeWithText("Monthly balance").assertIsDisplayed()
+        ui.onNodeWithText("Spent this month").assertDoesNotExist()
+        ui.onNodeWithContentDescription("Back").assertDoesNotExist()
+        ui.onNodeWithText("Income").performClick()
+        ui.onNodeWithText("Income this month").assertIsDisplayed()
+        ui.onNodeWithText("Spent this month").assertDoesNotExist()
     }
 
     @Test fun appearanceControlsAndRecurringBudgetsAreAvailable() {

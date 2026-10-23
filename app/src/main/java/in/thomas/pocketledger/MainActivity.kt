@@ -121,6 +121,15 @@ private sealed interface LedgerRoute {
     var deleteCandidate by remember { mutableStateOf<Entry?>(null) }
     var transferCandidate by remember { mutableStateOf<Pair<Entry, Entry>?>(null) }
     fun work(block: suspend () -> Unit) { scope.launch { activeWork++; operationError = null; try { withContext(Dispatchers.IO) { block() } } catch (e: Exception) { if (e is CancellationException) throw e; operationError = e.message ?: "Could not complete this action"; snack.showSnackbar(operationError!!) } finally { activeWork-- } } }
+    val requestNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(capture) {
+        if (capture && android.os.Build.VERSION.SDK_INT >= 33 &&
+            repo.context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED &&
+            !repo.prefs.getBoolean("notification_permission_requested", false)) {
+            repo.prefs.edit().putBoolean("notification_permission_requested", true).apply()
+            requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     val requestSms = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permission = repo.hasSmsPermission() }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val pass = secret; secret = null
@@ -154,24 +163,47 @@ private sealed interface LedgerRoute {
             if (destination == "expense") openTransactions("EXPENSE", "ALL")
         }
     }
+    LaunchedEffect(launchRequest, snapshot != null) {
+        val id = launchRequest?.getStringExtra(CategoryNotifications.EXTRA_ENTRY_ID)
+        if (id != null && snapshot != null) {
+            settings = false
+            details = null
+            tab = 1
+            entries.singleOrNull { it.id == id }?.let { editor = it }
+            CategoryNotifications.cancel(repo.context, id)
+            launchRequest.removeExtra(CategoryNotifications.EXTRA_ENTRY_ID)
+        }
+    }
     val route: LedgerRoute = if (settings) LedgerRoute.Settings else details ?: LedgerRoute.Tabs
     val reducedMotion = LocalReducedMotion.current
     val seekState = remember { SeekableTransitionState<LedgerRoute>(route) }
     val navigation = rememberTransition(seekState, label = "ledger navigation")
-    LaunchedEffect(route) { seekState.animateTo(route) }
+    var predictiveBackInProgress by remember { mutableStateOf(false) }
+    // One owner settles both ordinary navigation and completed/cancelled back gestures.
+    // A gesture only seeks; it must not race another coroutine finishing the same transition.
+    LaunchedEffect(route, predictiveBackInProgress, reducedMotion) {
+        if (!predictiveBackInProgress) {
+            if (!reducedMotion) seekState.animateTo(route, tween(LedgerNavigationDurationMillis, easing = LinearEasing))
+            seekState.snapTo(route)
+        }
+    }
     val backTarget: LedgerRoute = if (settings) details ?: LedgerRoute.Tabs else LedgerRoute.Tabs
     PredictiveBackHandler(enabled = route != LedgerRoute.Tabs) { events ->
+        predictiveBackInProgress = true
         try {
-            events.collect { event -> seekState.seekTo(event.progress, backTarget) }
-            seekState.animateTo(backTarget)
+            events.collect { event ->
+                if (!reducedMotion) seekState.seekTo(event.progress, backTarget)
+            }
             if (settings) settings = false else details = null
-        } catch (cancelled: CancellationException) {
-            withContext(NonCancellable) { seekState.animateTo(route) }
-            throw cancelled
+        } finally {
+            // On cancellation the route stays unchanged, so the settling effect restores it.
+            predictiveBackInProgress = false
         }
     }
     val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val titles = destinationLabels
+    // Keep the shared card data ready while detail pages are open, including during back previews.
+    val overviewReport by backgroundCalculation(entries, budgets, month) { calculateOverviewReport(entries, budgets, month) }
     val pending = remember(messages) { messages.count { it.status == "REVIEW" } }
     val expandedEditor = LocalLedgerWindowWidth.current >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.3f
     val editorContent by rememberUpdatedState<@Composable (Entry) -> Unit> { current -> EntryEditor(current, accounts, messages.find { it.key == current.smsKey }, { editor = null }, { entry, remember -> work { repo.save(entry, remember); withContext(Dispatchers.Main) { editor = null } } }, if (allEntries.any { it.id == current.id }) { { deleteCandidate = current } } else null) }
@@ -182,26 +214,55 @@ private sealed interface LedgerRoute {
     BoxWithConstraints(Modifier.fillMaxSize().motionSurface(active = navigation.isRunning)) {
     val wide = maxWidth >= 600.dp
     Row(Modifier.fillMaxSize()) {
-    if (wide && route == LedgerRoute.Tabs) PocketNavigationRail(tab, pending, { tab = it }, { settings = true })
+    navigation.AnimatedContent(
+        transitionSpec = {
+            val forward = targetState == LedgerRoute.Settings || initialState == LedgerRoute.Tabs
+            val metricNavigation = tab == 0 && (
+                (initialState == LedgerRoute.Tabs && (targetState as? LedgerRoute.Transactions)?.category == "ALL") ||
+                    (targetState == LedgerRoute.Tabs && (initialState as? LedgerRoute.Transactions)?.category == "ALL")
+                )
+            val transform = if (reducedMotion) {
+                EnterTransition.None togetherWith ExitTransition.None
+            } else if (metricNavigation) {
+                // Only the shared Income/Spent card travels. Overview remains stationary
+                // underneath the detail page, which reveals itself around the moving card.
+                if (forward) fadeIn(ledgerNavigationTween()) togetherWith ExitTransition.None
+                else EnterTransition.None togetherWith fadeOut(ledgerNavigationTween())
+            } else if (forward) {
+                slideInVertically(ledgerNavigationTween()) { it } togetherWith
+                    slideOutVertically(ledgerNavigationTween()) { -it / 3 }
+            } else {
+                slideInVertically(ledgerNavigationTween()) { -it / 3 } togetherWith
+                    slideOutVertically(ledgerNavigationTween()) { it }
+            }
+            // Keep the detail page above its parent while returning or seeking back.
+            transform.apply { targetContentZIndex = if (forward) 1f else 0f }.using(null)
+        },
+        modifier = Modifier.weight(1f).fillMaxHeight()
+    ) { shownRoute ->
+    CompositionLocalProvider(LocalLedgerVisibilityScope provides this) {
+    pageState.SaveableStateProvider(shownRoute.toString()) {
+    Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    if (wide && shownRoute == LedgerRoute.Tabs) PocketNavigationRail(tab, pending, { tab = it }, { settings = true })
     Scaffold(
         modifier = Modifier.weight(1f),
         topBar = {
             PocketHeader(
-                title = when (val current = route) {
+                title = when (val current = shownRoute) {
                     LedgerRoute.Settings -> "Settings"
                     LedgerRoute.Tabs -> titles[tab]
                     is LedgerRoute.Transactions -> if (current.category != "ALL") current.category else if (current.type == "INCOME") "Income" else "Spent"
                 },
-                back = if (route != LedgerRoute.Tabs || (!wide && tab in listOf(2, 4, 5))) ({ if (settings) settings = false else if (details != null) details = null else tab = 6 }) else null,
+                back = if (shownRoute != LedgerRoute.Tabs || (!wide && tab in listOf(2, 4, 5))) ({ if (settings) settings = false else if (details != null) details = null else tab = 6 }) else null,
                 settings = { settings = true },
-                add = if (!settings && (tab <= 1 || details != null)) ({
+                add = if (shownRoute != LedgerRoute.Settings && (tab <= 1 || shownRoute is LedgerRoute.Transactions)) ({
                     accounts.firstOrNull()?.let {
-                        editor = Entry(UUID.randomUUID().toString(), it.id, type = details?.type ?: "EXPENSE", category = details?.category?.takeUnless { category -> category == "ALL" } ?: "Uncategorized", amount = 0, date = System.currentTimeMillis())
+                        editor = Entry(UUID.randomUUID().toString(), it.id, type = (shownRoute as? LedgerRoute.Transactions)?.type ?: "EXPENSE", category = (shownRoute as? LedgerRoute.Transactions)?.category?.takeUnless { category -> category == "ALL" } ?: "Uncategorized", amount = 0, date = System.currentTimeMillis())
                     }
                 }) else null
             )
         },
-        bottomBar = { if (!wide && route == LedgerRoute.Tabs) PocketTabBar(tab, pending) { tab = it } },
+        bottomBar = { if (!wide && shownRoute == LedgerRoute.Tabs) PocketTabBar(tab, pending) { tab = it } },
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snack) }
     ) { padding ->
@@ -214,27 +275,13 @@ private sealed interface LedgerRoute {
                     }
                 }
             }
-            navigation.AnimatedContent(transitionSpec = {
-                if (reducedMotion) {
-                    EnterTransition.None togetherWith ExitTransition.None
-                } else
-                if (targetState == LedgerRoute.Settings || initialState == LedgerRoute.Tabs) {
-                    (slideInHorizontally(fluidSpring()) { it } + fadeIn(fluidTween())) togetherWith
-                        slideOutHorizontally(fluidSpring()) { -it / 3 }
-                } else {
-                    slideInHorizontally(fluidSpring()) { -it / 3 } togetherWith
-                        (slideOutHorizontally(fluidSpring()) { it } + fadeOut(fluidTween()))
-                }
-            }, modifier = Modifier.fillMaxSize()) { shownRoute ->
-            CompositionLocalProvider(LocalLedgerVisibilityScope provides this) {
-            pageState.SaveableStateProvider(shownRoute.toString()) {
             if (shownRoute == LedgerRoute.Settings) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     SettingsDialog(capture, permission, senders, rules, { settings = false }, { passwordMode = "export" }, { chooseRestore.launch(arrayOf("*/*")) }, { work { dao.untrust(it.sender, it.bank) } }, { work { dao.removeRule(it.merchant) } }, { repo.context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${repo.context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
                 }
             } else if (shownRoute is LedgerRoute.Transactions) {
                 Column(Modifier.fillMaxSize()) {
-                    if (shownRoute.category == "ALL") MetricDetailHeader(shownRoute.type, month, entries)
+                    if (shownRoute.category == "ALL") MetricDetailHeader(shownRoute.type, month, overviewReport?.summary)
                     MonthPicker(month) { month = it }
                     Transactions(entries, accounts, month, shownRoute.type, shownRoute.category) { editor = it }
                 }
@@ -249,7 +296,7 @@ private sealed interface LedgerRoute {
                 Box(Modifier.widthIn(max = 840.dp).fillMaxSize()) {
                 when (page) {
                     6 -> MoreScreen(pending, { tab = it }, { settings = true })
-                    0 -> Overview(accounts, entries, messages, month, budgets, { tab = 2 }, { tab = 4 }, openTransactions) { editor = it }
+                    0 -> Overview(accounts, entries, messages, month, budgets, overviewReport, { tab = 2 }, { tab = 4 }, openTransactions) { editor = it }
                     1 -> Transactions(entries, accounts, month) { editor = it }
                     2 -> AccountsScreen(accounts, entries, messages, { accountEditor = it }, { accountEditor = Account(UUID.randomUUID().toString(), "", "CASH", "", openingDate = dayMillis(LocalDate.now(india).withDayOfMonth(1).toString())) })
                     3 -> BudgetScreen(budgets, entries, month) { budget, saved -> work { dao.budget(budget); withContext(Dispatchers.Main) { saved() } } }
@@ -277,7 +324,7 @@ private sealed interface LedgerRoute {
             }
         }
     }
-    } } } } } }
+    } } } } } } }
     if (expandedEditor && editor != null) {
         VerticalDivider(Modifier.fillMaxHeight())
         Box(Modifier.width(400.dp).fillMaxHeight().statusBarsPadding().navigationBarsPadding()) {

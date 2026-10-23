@@ -14,13 +14,14 @@ Ledger **1.7.0** is an offline Android expense manager built with Kotlin and Jet
 - Material 3 dynamic color, light/dark themes, high contrast and reduced motion; adaptive navigation, predictive back, native spring sheets and standard stretch scrolling.
 - Overview, Activity, Budgets, and More navigation on phones; a rail and optional transaction editor pane on wider windows. Inbox supports pull-to-check and swipe dismissal with Undo.
 - Local sender confirmation, duplicate detection, transfer matching, and encrypted backups.
+- Newly saved SMS transactions that need a category show an **Add a category** notification. Tapping opens the transaction editor; duplicates, matched transfers, and remembered categories do not produce reminders.
 
 ## Getting started
 
 1. In **More / Accounts**, map each bank's last four account digits. Set the opening date and balance immediately before that date. The opening date must cover transactions you intend to import.
 2. In **More / Inbox**, enable SMS access, choose a history range, and preview matching messages. The range filters receipt dates; transactions use dates extracted from alerts.
 3. Confirm sender IDs and review incomplete or conflicting messages before saving. Sender confirmation does not prove authenticity.
-4. Enable **Capture new bank alerts** for automatic capture. WorkManager and app resume reconcile missed alerts, subject to Android scheduling.
+4. Enable **Capture new bank alerts** for automatic capture. Allow notifications when prompted to receive category reminders. WorkManager and app resume reconcile missed alerts, subject to Android scheduling.
 5. Use **+** for manual entries and transfers. Tap transactions to edit, categorize, or delete them.
 6. In **Budgets**, set category limits once. The same limits apply to all months; changing a limit updates every month's comparison. Budget remaining measures spending in categories with active limits.
 7. Add widgets through **Settings → Home screen**, or long-press your launcher and choose **Widgets → Ledger**. Resize widgets to fit your home screen.
@@ -63,7 +64,7 @@ Gradle configuration and local build caches are enabled. Use `assembleDebug` for
 
 ## Development and validation
 
-See [AGENTS.md](AGENTS.md) for structure and contributor conventions. Commit Room schema JSON from `app/schemas/`. Generated packages, device captures, databases, signing material, and financial backups are ignored by Git. Store local release snapshots in `artifacts/`.
+See [AGENTS.md](AGENTS.md) for contributor conventions, [the architecture map](docs/architecture.md) for code ownership and data flow, and [the development guide](docs/development.md) for validation and installation. Commit Room schema JSON from `app/schemas/`. Generated packages, device captures, databases, signing material, and financial backups are ignored by Git. Store local release snapshots in `artifacts/`.
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest :app:lintDebug
@@ -81,3 +82,5 @@ Recurring transactions, receipt attachments, cloud synchronization, and Realbyte
 ## UI redesign and performance validation
 
 See [the implementation notes](docs/ui-redesign.md) for adaptive navigation, motion, accessibility, isolated device tests, Baseline/Startup Profile generation and frame-performance gates. Performance targets require physical-device traces; a successful debug build does not certify jank or startup budgets.
+
+Category reminder validation (23 October 2026): debug build, JVM tests, and lint passed; the personal APK was installed successfully through ADB. Notification delivery and tapping have not yet been verified on a device. Messages still awaiting sender/account review do not notify until saved as transactions. If notification permission is denied, enable it in Android app settings; capture continues without reminders.

@@ -6,6 +6,12 @@ Ledger is an offline Kotlin Android app targeting API 37. Sources are under `app
 
 `LedgerUiState.kt` loads snapshots and computes reports off-thread. `MetricTransition.kt` handles shared bounds; `DraftSavers.kt` preserves editor state; `FoldAwareWindow.kt` selects safe pane bounds. `DailySpendingChart.kt`, `MessageSwipe.kt`, and `IncomeAllocationPlan.kt` provide chart inspection, Inbox dismissal, and the separate 50/30/20 plan. See `docs/ui-redesign.md` for implementation details and limitations. The `benchmark/` test module and `app/src/benchmark/` contain isolated performance journeys and synthetic fixtures; `tools/` contains profile import and validation scripts.
 
+## Codebase Reference
+
+Read `docs/architecture.md` for ownership, data flow, entry points, and financial invariants. Read `docs/development.md` for validation, safe installation, and documentation maintenance. Keep these references synchronized with behavior changes; record evidence separately from intended behavior.
+
+`CategoryNotifications.kt` posts category reminders after committed SMS entries are saved. Keep notification side effects outside Room transactions, preserve duplicate suppression, and resolve notification entry IDs only after snapshots load. Do not put financial details in notification text. Android 13+ notification permission is requested when capture is enabled; denial must not block ingestion.
+
 ## Build, Test, and Development Commands
 
 Use JDK 21, SDK platform 37.0, and build tools 37.0.0. Set `ANDROID_HOME` or an ignored `local.properties`. Run from the repository root:

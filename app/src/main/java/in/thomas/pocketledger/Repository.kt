@@ -59,6 +59,7 @@ class Repository(val context: Context, val db: LedgerDatabase) {
     }
     suspend fun ingest(candidates: List<Candidate>, forceReview: Boolean = false, requireCapture: Boolean = false) = mutex.withLock {
         if (requireCapture && !prefs.getBoolean("enabled", false)) return@withLock
+        val previousIds = dao.allEntries().map { it.id }.toSet()
         db.withTransaction {
         val stored = dao.allMessages().filter { !it.key.contains(":conflict:") }
         val legacyBodies = stored.filter { !it.complete }.associateBy { SmsParser.bodyKey(it.sender, it.body, 0) }
@@ -91,7 +92,14 @@ class Repository(val context: Context, val db: LedgerDatabase) {
             if (reason.isEmpty() && account != null) saveParsed(record, account)
         }
         matchTransfers()
-    } }
+    }
+        notifyNewEntries(previousIds)
+    }
+    private suspend fun notifyNewEntries(previousIds: Set<String>) {
+        dao.allEntries().filter { it.id !in previousIds && needsCategoryNotification(it) }.forEach {
+            CategoryNotifications.show(context, it)
+        }
+    }
     private suspend fun saveParsed(m: SmsRecord, a: Account) {
         if (dao.entryForSms(m.key) != null) return
         val rule = dao.allRules().find { it.merchant == m.payee.uppercase() }
@@ -99,14 +107,18 @@ class Repository(val context: Context, val db: LedgerDatabase) {
         dao.message(m.copy(status = "SAVED", reason = ""))
     }
     suspend fun trust(sender: String, bank: String) { dao.sender(TrustedSender(normalizedSender(sender), bank)); processReview() }
-    suspend fun processReview() = mutex.withLock { db.withTransaction {
+    suspend fun processReview() = mutex.withLock {
+        val previousIds = dao.allEntries().map { it.id }.toSet()
+        db.withTransaction {
         val trusted = dao.allSenders(); val accounts = dao.allAccounts()
         dao.allMessages().filter { it.status == "REVIEW" && it.complete && !it.key.contains(":conflict:") && (it.date ?: Long.MAX_VALUE) <= it.received + 86_400_000L }.forEach { m ->
             val a = accounts.singleOrNull { it.bank == m.bank && it.suffix == m.suffix }
             if (a != null && m.date != null && m.date >= a.openingDate && trusted.any { it.bank == m.bank && it.sender == normalizedSender(m.sender) }) saveParsed(m, a)
         }
         matchTransfers()
-    } }
+        }
+        notifyNewEntries(previousIds)
+    }
     private suspend fun matchTransfers() {
         val messages = dao.allMessages().associateBy { it.key }
         val entries = dao.allEntries().filter { !it.deleted && it.type != "TRANSFER" && it.smsKey != null }
@@ -138,6 +150,7 @@ class Repository(val context: Context, val db: LedgerDatabase) {
             if (remember && entry.payee.isNotBlank() && entry.type != "TRANSFER") dao.rule(MerchantRule(entry.payee.trim().uppercase(), entry.category))
             entry.smsKey?.let { key -> dao.message(key)?.let { dao.message(it.copy(status = "SAVED", reason = "")) } }
         }
+        if (!needsCategoryNotification(entry)) CategoryNotifications.cancel(context, entry.id)
     }
     suspend fun delete(entry: Entry) = db.withTransaction {
         dao.entry(entry.copy(deleted = true))

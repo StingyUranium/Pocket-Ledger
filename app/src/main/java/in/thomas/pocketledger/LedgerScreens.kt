@@ -63,19 +63,14 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
     }
 }
 
-@Composable fun Overview(accounts: List<Account>, entries: List<Entry>, messages: List<SmsRecord>, month: YearMonth, budgets: List<Budget>, setup: () -> Unit, review: () -> Unit, openTransactions: (String, String) -> Unit, edit: (Entry) -> Unit) {
-    val report by backgroundCalculation(entries, budgets, month) {
-        val monthly = entries.filter { !it.deleted && inMonth(it, month) }
-        Triple(monthly, monthlySummary(entries, budgets, month), monthly.filter { it.type == "EXPENSE" }
-            .groupBy { it.category }.mapValues { it.value.sumOf { entry -> entry.amount } }.toList().sortedByDescending { it.second })
-    }
+@Composable fun Overview(accounts: List<Account>, entries: List<Entry>, messages: List<SmsRecord>, month: YearMonth, budgets: List<Budget>, report: OverviewReport?, setup: () -> Unit, review: () -> Unit, openTransactions: (String, String) -> Unit, edit: (Entry) -> Unit) {
     androidx.activity.compose.ReportDrawnWhen { report != null }
     val ready = report ?: run { LedgerSkeleton(); return }
-    val monthly = ready.first
-    val income = ready.second.income
-    val expense = ready.second.spent
+    val monthly = ready.monthly
+    val income = ready.summary.income
+    val expense = ready.summary.spent
     val pending = remember(messages) { messages.count { it.status == "REVIEW" } }
-    val totals = ready.third
+    val totals = ready.spendingByCategory
     FluidList(contentPadding = PaddingValues(22.dp, 10.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { BalanceCard(income - expense, accounts.size) }
         item {
@@ -87,11 +82,11 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
                 MoneyStat("Spent", expense, false, month, Modifier.weight(1f)) { openTransactions("EXPENSE", "ALL") }
             }
         }
-        if (ready.second.budgetLimit > 0) item {
+        if (ready.summary.budgetLimit > 0) item {
             CardBlock {
                 Text("Budget remaining", style = MaterialTheme.typography.titleMedium)
-                Text(money(ready.second.budgetRemaining), style = MaterialTheme.typography.headlineMedium,
-                    color = if (ready.second.budgetRemaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                Text(money(ready.summary.budgetRemaining), style = MaterialTheme.typography.headlineMedium,
+                    color = if (ready.summary.budgetRemaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
                 Text("Across categories with recurring limits", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

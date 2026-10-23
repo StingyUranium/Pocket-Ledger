@@ -15,6 +15,8 @@ local.properties
 # Signing material and local secrets
 *.jks
 *.keystore
+*.p12
+*.pfx
 *.pem
 *.key
 key.properties
@@ -34,14 +36,21 @@ keystore.properties
 *.db
 *.db-wal
 *.db-shm
+*.db-journal
 *.sqlite
 *.sqlite3
 *.sqlite-wal
 *.sqlite-shm
+*.sqlite-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
 *.plbackup
 /backups/
 /device-data/
 /captures/
+/traces/
+/benchmark-results/
 /screenshots/
 # Device captures sometimes land in the repository root; keep drawable assets trackable.
 /Screenshot_*.png
