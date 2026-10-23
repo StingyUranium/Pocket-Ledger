@@ -10,7 +10,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
-import java.time.LocalDate
 import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)

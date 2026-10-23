@@ -1,7 +1,6 @@
 package `in`.thomas.pocketledger
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.material3.*
@@ -55,10 +54,6 @@ fun Modifier.motionSurface(active: Boolean = false): Modifier = composed {
             }
         }
 }
-
-// Source compatibility for forms; the standard scrollable owns stretch and fling.
-@Suppress("UNUSED_PARAMETER")
-fun Modifier.elasticScroll(orientation: Orientation = Orientation.Vertical): Modifier = this
 
 @Composable fun FluidList(
     modifier: Modifier = Modifier,
