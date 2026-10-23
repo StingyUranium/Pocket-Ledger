@@ -336,6 +336,33 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LedgerSpace.medium), content = content)
 }
 
+/** Borderless text input for a grouped row: small label above the value, no filled container. */
+@Composable fun GroupedField(
+    label: String, value: String, change: (String) -> Unit, modifier: Modifier = Modifier, numeric: Boolean = false,
+    imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Next,
+    keyboardType: androidx.compose.ui.text.input.KeyboardType? = null,
+    visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
+    isError: Boolean = false, trailing: (@Composable () -> Unit)? = null
+) {
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    GroupedItem(modifier) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            androidx.compose.foundation.text.BasicTextField(value, change,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary), singleLine = true,
+                visualTransformation = visualTransformation,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = keyboardType ?: if (numeric) androidx.compose.ui.text.input.KeyboardType.Decimal else androidx.compose.ui.text.input.KeyboardType.Text,
+                    imeAction = imeAction),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onNext = { focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }, onDone = { focus.clearFocus() }),
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = label })
+        }
+        trailing?.invoke()
+    }
+}
+
 @Composable fun GroupedRow(
     title: String, modifier: Modifier = Modifier, subtitle: String? = null, leading: (@Composable () -> Unit)? = null,
     value: String? = null, trailing: (@Composable () -> Unit)? = null, chevron: Boolean = false,
@@ -435,6 +462,6 @@ val LocalInlineSheet = staticCompositionLocalOf { false }
         }
         }
     }
-    if (LocalInlineSheet.current) Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) { body(dismiss) }
+    if (LocalInlineSheet.current) Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { body(dismiss) }
     else FluidModalSheet(dismiss, body)
 }

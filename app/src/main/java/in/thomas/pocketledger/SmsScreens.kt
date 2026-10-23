@@ -9,6 +9,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -108,10 +110,11 @@ import androidx.compose.ui.unit.dp
     LedgerSheet("Preview alerts", dismiss, "Import (${selected.size})", { import(candidates.filterIndexed { index, _ -> index in selected }) }, scrollContent = false, actionEnabled = selected.isNotEmpty()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { IconTile("sms"); Column { Text("${candidates.size} bank alerts found", style = MaterialTheme.typography.titleMedium); Text("Choose what belongs in your ledger.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         Text("Existing and dismissed messages are skipped. Unconfirmed senders and incomplete details go to review.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FluidList(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        FluidList(Modifier.weight(1f).clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surface)) {
             if (candidates.isEmpty()) item { Empty("Try another date range or check your bank's alert settings.", "No supported alerts found", "search") }
             itemsIndexed(candidates, key = { index, _ -> index }) { index, c ->
-                CardBlock {
+                if (index > 0) GroupedDivider()
+                Column(Modifier.fillMaxWidth().padding(horizontal = LedgerSpace.margin, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(index in selected, enabled = c.key !in known, onCheckedChange = { if (it) selected = selected + index else selected = selected - index })
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text(c.parsed.amount?.let(::money) ?: "Check amount", style = MaterialTheme.typography.titleMedium); Text(c.parsed.payee.ifBlank { c.parsed.bank }, style = MaterialTheme.typography.bodyMedium, maxLines = 2); Text("${c.parsed.bank} · ${c.parsed.date?.let(::displayDate) ?: "Check date"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }

@@ -122,7 +122,7 @@ private val LocalSheetExited = staticCompositionLocalOf<() -> Unit> { {} }
         ) {
             Box(Modifier.fillMaxSize().statusBarsPadding(), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
                 Surface(Modifier.widthIn(max = 640.dp).fillMaxWidth().navigationBarsPadding(),
-                    shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surface) { content(dismiss) }
+                    shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.background) { content(dismiss) }
             }
         }
         return
@@ -147,7 +147,7 @@ private val LocalSheetExited = staticCompositionLocalOf<() -> Unit> { {} }
         sheetState = state,
         sheetMaxWidth = 640.dp,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.background,
         tonalElevation = 0.dp
     ) {
         content(close)

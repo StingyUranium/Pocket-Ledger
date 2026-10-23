@@ -1,6 +1,7 @@
 package `in`.thomas.pocketledger
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -48,9 +49,15 @@ import java.time.*
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun DateField(value: String, change: (String) -> Unit, label: String) {
+@Composable fun DateField(value: String, change: (String) -> Unit, label: String, grouped: Boolean = false) {
     var open by remember { mutableStateOf(false) }
-    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().ledgerClickable(role = Role.Button) { open = true }) {
+    if (grouped) GroupedItem(onClick = { open = true }) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(runCatching { displayDate(dayMillis(value)) }.getOrDefault(value), style = MaterialTheme.typography.bodyLarge)
+        }
+        AppIcon("calendar", Modifier.size(19.dp), MaterialTheme.colorScheme.primary)
+    } else Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().ledgerClickable(role = Role.Button) { open = true }) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -72,16 +79,15 @@ import java.time.*
 @Composable private fun ChoiceSheet(label: String, value: String, options: List<String>, display: (String) -> String, dismiss: () -> Unit, change: (String) -> Unit) {
     LedgerSheet(label, dismiss, closeLabel = "Cancel") {
         Column(Modifier.fillMaxWidth().padding(horizontal = LedgerSpace.margin).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            SectionTitle(label)
             FluidList(Modifier.heightIn(max = 440.dp).clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surface)) {
                 if (options.isEmpty()) item { Text("No options available", modifier = Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(options.distinct(), key = { it }) { option ->
                     Column(Modifier.fillMaxWidth().ledgerClickable { change(option); dismiss() }) {
-                        Row(Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = 17.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = LedgerSpace.margin, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(display(option), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), color = if (option == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             if (option == value) AppIcon("check", Modifier.size(19.dp), MaterialTheme.colorScheme.primary)
                         }
-                        if (option != options.lastOrNull()) HorizontalDivider(Modifier.padding(start = 17.dp), thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
+                        if (option != options.lastOrNull()) HorizontalDivider(Modifier.padding(start = LedgerSpace.margin), thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
             }
@@ -115,11 +121,37 @@ import java.time.*
     if (open) ChoiceSheet(label, value, options, display, { open = false }, change)
 }
 
+/** Compact centered alert: title and message, hairline, then side-by-side text buttons. */
 @Composable fun Confirm(title: String, text: String, dismiss: () -> Unit, confirm: () -> Unit) {
-    AlertDialog(onDismissRequest = dismiss, shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.surface,
-        title = { Text(title, style = MaterialTheme.typography.titleLarge) }, text = { Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-        confirmButton = { TextButton(onClick = confirm) { Text(if (title.startsWith("Delete")) "Delete" else "Confirm", color = if (title.startsWith("Delete")) rust else MaterialTheme.colorScheme.primary) } },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel", fontWeight = FontWeight.Normal) } })
+    val destructive = title.startsWith("Delete")
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    androidx.compose.ui.window.Dialog(onDismissRequest = dismiss) {
+        Surface(Modifier.widthIn(max = 300.dp).fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
+            Column {
+                Column(Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                }
+                HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.height(IntrinsicSize.Min)) {
+                    AlertButton("Cancel", MaterialTheme.colorScheme.primary, FontWeight.SemiBold, dismiss, Modifier.weight(1f))
+                    VerticalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
+                    AlertButton(if (destructive) "Delete" else "Confirm", if (destructive) rust else MaterialTheme.colorScheme.primary, FontWeight.Normal, {
+                        if (destructive) haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
+                        confirm()
+                    }, Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable private fun AlertButton(label: String, color: Color, weight: FontWeight, onClick: () -> Unit, modifier: Modifier) {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Box(modifier.heightIn(min = LedgerSpace.touch).premiumPressEffect(interaction, pressedScale = .97f)
+        .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = color, fontWeight = weight)
+    }
 }
 
 @Composable fun EntryEditor(initial: Entry, accounts: List<Account>, sms: SmsRecord?, dismiss: () -> Unit, save: (Entry, Boolean) -> Unit, delete: (() -> Unit)?) {
@@ -153,35 +185,47 @@ import java.time.*
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text("AMOUNT IN INR", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextField(amount, { amount = it; error = null }, placeholder = { Text("0.00", fontSize = 40.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .45f)) }, prefix = { Text("₹ ", fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true,
-                textStyle = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp, fontWeight = FontWeight.Medium), modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = fieldColors(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                textStyle = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp, fontWeight = FontWeight.Medium), modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = fieldColors().copy(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         }
         error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
-        SectionLabel("Details")
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Pick(if (type == "TRANSFER") "From account" else "Account", account, accounts.map { it.id }, { value -> accounts.find { it.id == value }?.name.orEmpty() }) {
+        GroupedSection("Details") {
+            Pick(if (type == "TRANSFER") "From account" else "Account", account, accounts.map { it.id }, { value -> accounts.find { it.id == value }?.name.orEmpty() }, grouped = true) {
                 account = it
                 if (target == it) target = accounts.firstOrNull { a -> a.id != it }?.id.orEmpty()
             }
-            if (type == "TRANSFER") Pick("To account", target, accounts.filter { it.id != account }.map { it.id }, { value -> accounts.find { it.id == value }?.name.orEmpty() }) { target = it }
-            Field(payee, { payee = it }, "Payee or description")
+            GroupedDivider()
+            if (type == "TRANSFER") {
+                Pick("To account", target, accounts.filter { it.id != account }.map { it.id }, { value -> accounts.find { it.id == value }?.name.orEmpty() }, grouped = true) { target = it }
+                GroupedDivider()
+            }
+            GroupedField("Payee or description", payee, { payee = it })
+            GroupedDivider()
             if (type != "TRANSFER") {
-                Pick("Category", category, (defaultCategories + category + "Add category…").distinct(), { it }) {
-                    if (it == "Add category…") customCategory = true else { category = it; customCategory = false }
+                Pick("Category", category, (defaultCategories + category + "Add category\u2026").distinct(), { it }, grouped = true) {
+                    if (it == "Add category\u2026") customCategory = true else { category = it; customCategory = false }
                 }
-                if (customCategory) Field(category, { category = it }, "Custom category")
+                GroupedDivider()
+                if (customCategory) { GroupedField("Custom category", category, { category = it }); GroupedDivider() }
             }
-            DateField(date, { date = it }, "Date")
-            Field(time, { time = it }, "Time · HH:MM:SS, optional (IST)")
-            Field(note, { note = it }, "Note, optional", imeAction = ImeAction.Done)
+            DateField(date, { date = it }, "Date", grouped = true)
+            GroupedDivider()
+            GroupedField("Time \u00b7 HH:MM:SS, optional (IST)", time, { time = it })
+            GroupedDivider()
+            GroupedField("Note, optional", note, { note = it }, imeAction = ImeAction.Done)
         }
-        if (type != "TRANSFER") CardBlock {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Column(Modifier.weight(1f)) { Text("Remember category", style = MaterialTheme.typography.bodyLarge); Text("Use this category for future alerts from this payee.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                PocketSwitch(rememberMerchant, "Remember category") { rememberMerchant = it }
+        if (type != "TRANSFER") GroupedSection(footer = "Use this category for future alerts from this payee.") {
+            GroupedRow("Remember category", trailing = { PocketSwitch(rememberMerchant, "Remember category") { rememberMerchant = it } })
+        }
+        sms?.let {
+            GroupedSection("Original bank message") {
+                GroupedItem { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { Text(it.sender, style = MaterialTheme.typography.titleSmall); Text(it.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             }
         }
-        sms?.let { SectionLabel("Original bank message"); CardBlock { Text(it.sender, style = MaterialTheme.typography.titleSmall); Text(it.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-        delete?.let { TextButton(onClick = it, modifier = Modifier.fillMaxWidth()) { Text("Delete transaction", color = rust) } }
+        delete?.let {
+            GroupedSection {
+                GroupedItem(onClick = it) { Text("Delete transaction", color = rust, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, modifier = Modifier.weight(1f)) }
+            }
+        }
     }
 }
 
@@ -200,15 +244,17 @@ import java.time.*
         } catch (e: Exception) { error = e.message }
     }) {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) { BankMark(bank); Column { Text(name.ifBlank { "A new account" }, style = MaterialTheme.typography.titleLarge); Text("A home for your everyday money", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-        SectionLabel("Account")
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Field(name, { name = it }, "Account name")
-            Pick("Bank", bank, listOf("SBM", "AXIS", "CASH"), { when (it) { "SBM" -> "SBM Bank India"; "AXIS" -> "Axis Bank"; else -> "Cash" } }) { bank = it }
-            if (bank != "CASH") Field(suffix, { suffix = it }, "Last four account digits")
+        GroupedSection("Account") {
+            GroupedField("Account name", name, { name = it })
+            GroupedDivider()
+            Pick("Bank", bank, listOf("SBM", "AXIS", "CASH"), { when (it) { "SBM" -> "SBM Bank India"; "AXIS" -> "Axis Bank"; else -> "Cash" } }, grouped = true) { bank = it }
+            if (bank != "CASH") { GroupedDivider(); GroupedField("Last four account digits", suffix, { suffix = it }) }
         }
-        SectionLabel("Starting point")
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Field(opening, { opening = it }, "Opening balance (INR)", true); DateField(date, { date = it }, "Opening date") }
-        Text("Use the balance just before this date. Choose an earlier opening date if you plan to import older transactions.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        GroupedSection("Starting point", footer = "Use the balance just before this date. Choose an earlier opening date if you plan to import older transactions.") {
+            GroupedField("Opening balance (INR)", opening, { opening = it }, numeric = true)
+            GroupedDivider()
+            DateField(date, { date = it }, "Opening date", grouped = true)
+        }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
@@ -227,12 +273,13 @@ import java.time.*
         IconTile("budgets", MaterialTheme.colorScheme.tertiary, 56)
         Text("A plan that carries forward.", style = MaterialTheme.typography.headlineMedium)
         Text("Choose a category and set its limit for every month.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Pick("Category", category, (defaultCategories + category).distinct(), { it }) { category = it }
-            Field(category, { category = it }, "Category name")
-            Field(amount, { amount = it }, "Monthly limit (INR)", true)
+        GroupedSection(footer = "Set the limit to 0 to remove this budget. Transfers are excluded from spending.") {
+            Pick("Category", category, (defaultCategories + category).distinct(), { it }, grouped = true) { category = it }
+            GroupedDivider()
+            GroupedField("Category name", category, { category = it })
+            GroupedDivider()
+            GroupedField("Monthly limit (INR)", amount, { amount = it }, numeric = true)
         }
-        Text("Set the limit to 0 to remove this budget. Transfers are excluded from spending.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
@@ -251,18 +298,17 @@ import java.time.*
         IconTile("lock", size = 56)
         Text(if (mode == "export") "Your money.\nYour peace of mind." else "Pick up where you left off.", style = MaterialTheme.typography.headlineMedium)
         Text(if (mode == "export") "Protect your backup with a password of at least 8 characters. Keep it somewhere safe; it cannot be recovered." else "Restoring replaces your current accounts, transactions, budgets, and import history. Automatic SMS capture will be switched off.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        TextField(password, { password = it; error = null }, label = { Text("Password") },
-            visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = { TextButton(onClick = { visible = !visible }) { Text(if (visible) "Hide" else "Show") } },
-            singleLine = true, shape = MaterialTheme.shapes.medium, colors = fieldColors(), modifier = Modifier.fillMaxWidth(),
-            isError = error != null,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = if (mode == "export") ImeAction.Next else ImeAction.Done),
-            keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }, onDone = { focus.clearFocus() }))
-        if (mode == "export") TextField(repeat, { repeat = it; error = null }, label = { Text("Repeat password") },
-            visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(), singleLine = true,
-            shape = MaterialTheme.shapes.medium, colors = fieldColors(), modifier = Modifier.fillMaxWidth(), isError = error != null,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }))
+        GroupedSection {
+            GroupedField("Password", password, { password = it; error = null },
+                imeAction = if (mode == "export") ImeAction.Next else ImeAction.Done, keyboardType = KeyboardType.Password,
+                visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(), isError = error != null,
+                trailing = { TextButton(onClick = { visible = !visible }) { Text(if (visible) "Hide" else "Show") } })
+            if (mode == "export") {
+                GroupedDivider()
+                GroupedField("Repeat password", repeat, { repeat = it; error = null }, imeAction = ImeAction.Done, keyboardType = KeyboardType.Password,
+                    visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(), isError = error != null)
+            }
+        }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
