@@ -18,3 +18,13 @@ fun monthlySummary(entries: List<Entry>, budgets: List<Budget>, month: YearMonth
         budgetSpent = monthly.filter { it.type == "EXPENSE" && it.category in categories }.sumOf { it.amount }
     )
 }
+
+/** Whole-paise targets; the final bucket keeps the rounding remainder. */
+data class IncomeAllocation(val needs: Long, val wants: Long, val savings: Long)
+
+fun incomeAllocation(income: Long): IncomeAllocation {
+    val base = income.coerceAtLeast(0)
+    val needs = base / 2
+    val wants = (base / 10) * 3 + (base % 10) * 3 / 10
+    return IncomeAllocation(needs, wants, base - needs - wants)
+}

@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,15 +24,29 @@ import java.time.Instant
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
+private data class GraphReport(
+    val total: Long, val categories: List<Pair<String, Long>>, val daily: Map<Int, Long>,
+    val history: List<Pair<YearMonth, MonthlySummary>>
+)
+
 @Composable fun GraphsScreen(entries: List<Entry>, month: YearMonth, changeMonth: (YearMonth) -> Unit, openTransactions: (String, String) -> Unit) {
     val locale = LocalConfiguration.current.locales[0]
-    val expenses = entries.filter { !it.deleted && it.type == "EXPENSE" && inMonth(it, month) }
-    val total = expenses.sumOf { it.amount }
-    val categories = expenses.groupBy { it.category }.mapValues { it.value.sumOf { entry -> entry.amount } }.toList().sortedByDescending { it.second }
-    val daily = expenses.groupBy { Instant.ofEpochMilli(it.date).atZone(india).dayOfMonth }.mapValues { it.value.sumOf { entry -> entry.amount } }
-    val peak = daily.maxByOrNull { it.value }
-    val history = (-5..0).map { month.plusMonths(it.toLong()) }.map { it to monthlySummary(entries, emptyList(), it) }
-    val scale = history.maxOf { maxOf(it.second.income, it.second.spent) }.coerceAtLeast(1)
+    val report by backgroundCalculation(entries, month) {
+        val expenses = entries.filter { !it.deleted && it.type == "EXPENSE" && inMonth(it, month) }
+        GraphReport(
+            expenses.sumOf { it.amount },
+            expenses.groupBy { it.category }.mapValues { it.value.sumOf { entry -> entry.amount } }.toList().sortedByDescending { it.second },
+            expenses.groupBy { Instant.ofEpochMilli(it.date).atZone(india).dayOfMonth }.mapValues { it.value.sumOf { entry -> entry.amount } },
+            (-5..0).map { month.plusMonths(it.toLong()) }.map { it to monthlySummary(entries, emptyList(), it) }
+        )
+    }
+    val ready = report ?: run { LedgerSkeleton(); return }
+    val total = ready.total
+    val categories = ready.categories
+    val daily = ready.daily
+    val peak = remember(daily) { daily.maxByOrNull { it.value } }
+    val history = ready.history
+    val scale = remember(history) { history.maxOf { maxOf(it.second.income, it.second.spent) }.coerceAtLeast(1) }
     val incomeColor = MaterialTheme.colorScheme.tertiary
     val expenseColor = rust
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -57,7 +71,7 @@ import java.time.format.DateTimeFormatter
                     }
                     Column(Modifier.width(154.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Total spent", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(money(total), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(money(total), style = MaterialTheme.typography.titleLarge)
                     }
                 }
                 categories.forEachIndexed { index, (category, amount) ->
@@ -76,15 +90,7 @@ import java.time.format.DateTimeFormatter
         item { CardBlock {
             SectionTitle("Day by day")
             Text(peak?.let { "Highest spending: ${money(it.value)} on ${it.key} ${month.format(DateTimeFormatter.ofPattern("MMM"))}" } ?: "No daily spending recorded", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Canvas(Modifier.fillMaxWidth().height(140.dp).semantics { contentDescription = "Daily spending for $month. ${daily.size} days with expenses. ${peak?.let { "Peak ${money(it.value)} on day ${it.key}." }.orEmpty()}" }) {
-                val maximum = (peak?.value ?: 1L).coerceAtLeast(1)
-                val step = size.width / month.lengthOfMonth()
-                drawLine(trackColor, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
-                (1..month.lengthOfMonth()).forEach { day ->
-                    val height = ((daily[day] ?: 0L).toDouble() / maximum * (size.height - 4.dp.toPx())).toFloat()
-                    if (height > 0f) drawRoundRect(primary, Offset((day - 1) * step + step * .15f, size.height - height), Size(step * .7f, height), CornerRadius(2.dp.toPx()))
-                }
-            }
+            DailySpendingChart(month, daily)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 listOf(1, month.lengthOfMonth() / 2, month.lengthOfMonth()).forEach { Text("$it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }

@@ -1,5 +1,10 @@
 package `in`.thomas.pocketledger
 
+import android.os.Build
+import android.provider.Settings
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -43,7 +48,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 val pine = Color(0xFF007AFF)
-val rust = Color(0xFFFF453A)
+val rust: Color
+    @Composable get() = MaterialTheme.colorScheme.error
 val cream = Color(0xFFF2F2F7)
 val positive = Color(0xFF248A3D)
 
@@ -51,9 +57,25 @@ val positive = Color(0xFF248A3D)
     val context = LocalContext.current
     val preferences = remember { context.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE) }
     var appearance by remember { mutableStateOf(preferences.getString("mode", "SYSTEM") ?: "SYSTEM") }
+    var dynamic by remember { mutableStateOf(preferences.getBoolean("dynamic", true)) }
+    var contrast by remember { mutableStateOf(preferences.getBoolean("contrast", false)) }
+    var reduceMotion by remember { mutableStateOf(preferences.getBoolean("reduceMotion", false)) }
+    var systemMotionDisabled by remember { mutableStateOf(Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f) }
+    DisposableEffect(context) {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                systemMotionDisabled = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+            }
+        }
+        context.contentResolver.registerContentObserver(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, observer)
+        onDispose { context.contentResolver.unregisterContentObserver(observer) }
+    }
     DisposableEffect(preferences) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { store, key ->
             if (key == "mode") appearance = store.getString("mode", "SYSTEM") ?: "SYSTEM"
+            dynamic = store.getBoolean("dynamic", true)
+            contrast = store.getBoolean("contrast", false)
+            reduceMotion = store.getBoolean("reduceMotion", false)
         }
         preferences.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -69,36 +91,49 @@ val positive = Color(0xFF248A3D)
             }
         }
     }
-    val scheme = if (dark) darkColorScheme(
+    val fallback = if (dark) darkColorScheme(
         primary = Color(0xFF64ADFF), onPrimary = Color(0xFF00244C), secondary = Color(0xFF64ADFF), tertiary = Color(0xFF30D158),
         background = Color(0xFF000000), surface = Color(0xFF1C1C1E), surfaceVariant = Color(0xFF2C2C2E),
         onBackground = Color(0xFFF5F5F7), onSurface = Color(0xFFF5F5F7), onSurfaceVariant = Color(0xFFAEAEB2),
         outlineVariant = Color(0xFF38383A), primaryContainer = Color(0xFF142A45), onPrimaryContainer = Color(0xFF9AC9FF)
     ) else lightColorScheme(
-        primary = pine, onPrimary = Color.White, secondary = pine, tertiary = positive,
+        primary = Color(0xFF005AC1), onPrimary = Color.White, secondary = pine, tertiary = positive,
         background = cream, surface = Color.White, surfaceVariant = Color(0xFFE9E9EF),
-        onBackground = Color(0xFF17171B), onSurface = Color(0xFF17171B), onSurfaceVariant = Color(0xFF75757D),
+        onBackground = Color(0xFF17171B), onSurface = Color(0xFF17171B), onSurfaceVariant = Color(0xFF44474F),
         outlineVariant = Color(0xFFE5E5EA), primaryContainer = Color(0xFFE8F2FF), onPrimaryContainer = Color(0xFF005BC1)
     )
+    val selected = remember(dark, dynamic, context) {
+        if (dynamic && Build.VERSION.SDK_INT >= 31) {
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        } else null
+    } ?: fallback
+    val scheme = if (contrast) selected.copy(
+        onSurface = if (dark) Color.White else Color.Black,
+        onBackground = if (dark) Color.White else Color.Black,
+        onSurfaceVariant = if (dark) Color.White else Color.Black,
+        outline = if (dark) Color.White else Color.Black
+    ) else selected
+    CompositionLocalProvider(LocalReducedMotion provides (reduceMotion || systemMotionDisabled)) {
     val base = TextStyle(fontFamily = FontFamily.SansSerif, letterSpacing = 0.sp)
     MaterialTheme(
         colorScheme = scheme,
         typography = Typography(
-            headlineLarge = base.copy(fontSize = 34.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp),
+            headlineLarge = base.copy(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp),
             headlineMedium = base.copy(fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.7).sp),
             titleLarge = base.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.4).sp),
             titleMedium = base.copy(fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.2).sp),
             titleSmall = base.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold),
-            bodyLarge = base.copy(fontSize = 16.sp, lineHeight = 23.sp),
+            bodyLarge = base.copy(fontSize = 16.sp, lineHeight = 24.sp),
             bodyMedium = base.copy(fontSize = 14.sp, lineHeight = 20.sp),
             bodySmall = base.copy(fontSize = 12.sp, lineHeight = 17.sp),
             labelLarge = base.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
             labelMedium = base.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
             labelSmall = base.copy(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium)
         ),
-        shapes = Shapes(extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(8.dp), medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(16.dp), extraLarge = RoundedCornerShape(16.dp)),
+        shapes = Shapes(extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(8.dp), medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(16.dp), extraLarge = RoundedCornerShape(28.dp)),
         content = content
     )
+    }
 }
 
 @Composable fun AppIcon(name: String, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onSurface) {
@@ -114,6 +149,7 @@ val positive = Color(0xFF248A3D)
                 "budgets", "chart" -> { drawArc(tint, -90f, 275f, false, Offset(3f, 3f), Size(18f, 18f), style = stroke); line(12f, 12f, 12f, 3f); line(12f, 12f, 20f, 15f) }
                 "sms" -> { box(3f, 4f, 18f, 14f, 4f); line(7f, 18f, 7f, 22f); line(7f, 22f, 12f, 18f); line(7f, 9f, 17f, 9f); line(7f, 13f, 13f, 13f) }
                 "settings" -> { drawCircle(tint, 7f, Offset(12f, 12f), style = stroke); drawCircle(tint, 2.5f, Offset(12f, 12f), style = stroke); repeat(8) { val angle = it * Math.PI / 4; line(12 + cos(angle).toFloat() * 7, 12 + sin(angle).toFloat() * 7, 12 + cos(angle).toFloat() * 9.5f, 12 + sin(angle).toFloat() * 9.5f) } }
+                "more" -> { repeat(3) { drawCircle(tint, 1.8f, Offset(5f + it * 7f, 12f)) } }
                 "plus" -> { line(12f, 5f, 12f, 19f); line(5f, 12f, 19f, 12f) }
                 "close" -> { line(6f, 6f, 18f, 18f); line(18f, 6f, 6f, 18f) }
                 "left" -> { line(15f, 5f, 8f, 12f); line(8f, 12f, 15f, 19f) }
@@ -137,55 +173,69 @@ val positive = Color(0xFF248A3D)
     Surface(
         onClick = onClick, shape = RoundedCornerShape(8.dp),
         color = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-        modifier = Modifier.size(44.dp).semantics { contentDescription = description }
+        modifier = Modifier.size(48.dp).semantics { contentDescription = description }
     ) { Box(contentAlignment = Alignment.Center) { AppIcon(icon, tint = if (filled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface) } }
 }
 
 @Composable fun PocketHeader(title: String, settings: () -> Unit, add: (() -> Unit)?, collapse: Float = 0f, back: (() -> Unit)? = null) {
-    val progress = collapse.coerceIn(0f, 1f)
-    Column(Modifier.statusBarsPadding().background(MaterialTheme.colorScheme.background.copy(alpha = .97f))) {
-        Box(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 12.dp)) {
-            if (back != null) TextButton(onClick = back, modifier = Modifier.align(Alignment.CenterStart)) {
-                AppIcon("left", Modifier.size(18.dp), MaterialTheme.colorScheme.primary)
-                Text("Back")
-            }
-            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Center).alpha(progress))
-            Row(Modifier.align(Alignment.CenterEnd), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (back == null) RoundIconButton("settings", "Settings", onClick = settings)
-                add?.let { RoundIconButton("plus", "Add transaction", true, it) }
-            }
+    Column(Modifier.statusBarsPadding().background(MaterialTheme.colorScheme.background)) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (back != null) IconButton(onClick = back) { AppIcon("left", Modifier.semantics { contentDescription = "Back" }) }
+            Text(title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+            if (back == null) RoundIconButton("settings", "Settings", onClick = settings)
+            add?.let { RoundIconButton("plus", "Add transaction", true, it) }
         }
-        Box(Modifier.fillMaxWidth().height(56.dp * (1f - progress)).clipToBounds().padding(horizontal = 22.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineLarge,
-                modifier = Modifier.alpha(1f - progress).graphicsLayer {
-                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                    scaleX = 1f - progress * .15f; scaleY = scaleX
-                })
-        }
-        HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = progress))
     }
 }
 
+internal val destinationLabels = listOf("Overview", "Activity", "Accounts", "Budgets", "Inbox", "Graphs", "More")
+internal val destinationIcons = listOf("home", "entries", "accounts", "budgets", "sms", "chart", "more")
+
 @Composable fun PocketTabBar(selected: Int, pending: Int, change: (Int) -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = .98f)) {
-        Column {
-            HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
-            Row(Modifier.navigationBarsPadding().padding(horizontal = 6.dp, vertical = 7.dp)) {
-                listOf("Home", "Entries", "Accounts", "Budgets", "SMS", "Graphs").forEachIndexed { index, label ->
-                    val color by animateColorAsState(if (selected == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, animationSpec = fluidSpring(), label = "tab tint")
-                    Column(
-                        Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).selectable(selected == index, onClick = { change(index) }, role = Role.Tab).padding(vertical = 7.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Box {
-                            AppIcon(listOf("home", "entries", "accounts", "budgets", "sms", "chart")[index], Modifier.size(23.dp), color)
-                            if (index == 4 && pending > 0) Badge(Modifier.align(Alignment.TopEnd).offset(x = 12.dp, y = (-5).dp)) { Text(if (pending > 99) "99+" else "$pending") }
-                        }
-                        Text(label, style = MaterialTheme.typography.labelSmall, color = color)
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+        listOf(0, 1, 3, 6).forEach { index ->
+            NavigationBarItem(
+                selected = selected == index || (index == 6 && selected in listOf(2, 4, 5)),
+                onClick = { change(index) },
+                icon = {
+                    BadgedBox(badge = { if (index == 6 && pending > 0) Badge { Text(if (pending > 99) "99+" else "$pending") } }) {
+                        AppIcon(destinationIcons[index])
                     }
-                }
+                },
+                label = { Text(destinationLabels[index]) }
+            )
+        }
+    }
+}
+
+@Composable fun PocketNavigationRail(selected: Int, pending: Int, change: (Int) -> Unit, settings: () -> Unit) {
+    NavigationRail(Modifier.fillMaxHeight(), containerColor = MaterialTheme.colorScheme.surface) {
+        Spacer(Modifier.height(16.dp))
+        listOf(0, 1, 2, 3, 4, 5).forEach { index ->
+            NavigationRailItem(selected = selected == index, onClick = { change(index) },
+                icon = { BadgedBox(badge = { if (index == 4 && pending > 0) Badge { Text("$pending") } }) { AppIcon(destinationIcons[index]) } },
+                label = { Text(destinationLabels[index]) })
+        }
+        Spacer(Modifier.weight(1f))
+        NavigationRailItem(selected = false, onClick = settings,
+            icon = { AppIcon("settings") }, label = { Text("Settings") })
+    }
+}
+
+@Composable fun MoreScreen(pending: Int, open: (Int) -> Unit, settings: () -> Unit) {
+    FluidList(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { Text("Your ledger, at a glance", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        items(3, key = { listOf(2, 4, 5)[it] }, contentType = { "destination" }) { position ->
+            val index = listOf(2, 4, 5)[position]
+            Surface(onClick = { open(index) }, shape = MaterialTheme.shapes.large) {
+                ListItem(headlineContent = { Text(destinationLabels[index]) },
+                    supportingContent = { Text(when (index) { 2 -> "Balances and opening amounts"; 4 -> if (pending > 0) "$pending alerts need review" else "Capture and review bank alerts"; else -> "Understand your spending patterns" }) },
+                    leadingContent = { IconTile(destinationIcons[index]) }, trailingContent = { AppIcon("right") })
             }
         }
+        item { OutlinedButton(onClick = settings, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("Settings and backups") } }
+        item { Text("Everything stays on this device.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
@@ -221,7 +271,7 @@ val positive = Color(0xFF248A3D)
         values.forEach { (value, title) ->
             val active = selected == value
             Box(
-                Modifier.weight(1f).then(if (active) Modifier.shadow(2.dp, RoundedCornerShape(8.dp)) else Modifier).clip(RoundedCornerShape(8.dp))
+                Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(8.dp))
                     .background(if (active) MaterialTheme.colorScheme.surface else Color.Transparent)
                     .selectable(active, onClick = { change(value) }, role = Role.Tab).padding(vertical = 9.dp, horizontal = 4.dp),
                 contentAlignment = Alignment.Center
@@ -231,27 +281,32 @@ val positive = Color(0xFF248A3D)
 }
 
 @Composable fun PocketSwitch(checked: Boolean, description: String, change: (Boolean) -> Unit) {
-    val color by animateColorAsState(if (checked) Color(0xFF34C759) else MaterialTheme.colorScheme.outlineVariant, animationSpec = fluidSpring(), label = "switch track")
-    val x by animateDpAsState(if (checked) 22.dp else 2.dp, animationSpec = fluidSpring(), label = "switch thumb")
-    Box(Modifier.size(54.dp, 48.dp).semantics { contentDescription = description }.toggleable(checked, role = Role.Switch, onValueChange = change), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(52.dp, 32.dp).clip(CircleShape).background(color)) {
-            Box(Modifier.offset { IntOffset(x.roundToPx(), 2.dp.roundToPx()) }.size(28.dp).shadow(2.dp, CircleShape).background(Color.White, CircleShape))
-        }
-    }
+    Switch(checked = checked, onCheckedChange = change, modifier = Modifier.semantics { contentDescription = description })
 }
+
+val LocalInlineSheet = staticCompositionLocalOf { false }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun LedgerSheet(title: String, dismiss: () -> Unit, actionLabel: String = "Done", action: () -> Unit = dismiss, closeLabel: String = "Cancel", scrollContent: Boolean = true, actionEnabled: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
-    FluidModalSheet(dismiss) { close ->
+    val clearError = LocalLedgerClearError.current
+    LaunchedEffect(Unit) { clearError() }
+    val body: @Composable (() -> Unit) -> Unit = { close ->
+        CompositionLocalProvider(LocalInlineSheet provides false) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(.94f).imePadding()) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = close) { Text(closeLabel, fontWeight = FontWeight.Normal) }
                 Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2)
-                TextButton(onClick = action, enabled = actionEnabled) { Text(actionLabel) }
+                TextButton(onClick = action, enabled = actionEnabled && !LocalLedgerBusy.current) { Text(actionLabel) }
             }
             HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
-            val contentModifier = Modifier.weight(1f).then(if (scrollContent) Modifier.elasticScroll().verticalScroll(rememberScrollState(), overscrollEffect = null) else Modifier).padding(20.dp).padding(bottom = 24.dp)
+            LocalLedgerOperationError.current?.let { error ->
+                Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+            }
+            val contentModifier = Modifier.weight(1f).then(if (scrollContent) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(20.dp).padding(bottom = 24.dp)
             Column(contentModifier, verticalArrangement = Arrangement.spacedBy(18.dp), content = content)
         }
+        }
     }
+    if (LocalInlineSheet.current) Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) { body(dismiss) }
+    else FluidModalSheet(dismiss, body)
 }

@@ -144,6 +144,12 @@ class Repository(val context: Context, val db: LedgerDatabase) {
         entry.smsKey?.let { key -> dao.message(key)?.let { dao.message(it.copy(status = "DISMISSED")) } }
     }
     suspend fun dismiss(m: SmsRecord) { dao.message(m.copy(status = "DISMISSED")) }
+    suspend fun undoDismiss(m: SmsRecord) = mutex.withLock {
+        val current = dao.message(m.key)
+        if (m.status == "REVIEW" && current?.status == "DISMISSED") {
+            dao.message(current.copy(status = "REVIEW", reason = m.reason))
+        }
+    }
     suspend fun refreshStoredReviews() {
         val candidates = dao.allMessages().filter { it.status == "REVIEW" }.mapNotNull { message ->
             SmsParser.parseSelected(message.body)?.let { Candidate(message.sender, message.body, message.received, it) }

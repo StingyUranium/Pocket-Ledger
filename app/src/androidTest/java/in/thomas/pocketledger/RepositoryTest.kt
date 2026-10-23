@@ -44,6 +44,17 @@ class RepositoryTest {
         repo.trust("VM-AXISBK", "AXIS"); repo.ingest(listOf(candidate())); repo.ingest(listOf(candidate(sms.replace("5000.00", "6000.00"))))
         repo.processReview(); assertEquals(1, db.dao().allEntries().size); assertEquals(1, db.dao().allMessages().count { it.status == "REVIEW" })
     }
+    @Test fun undoDismissRestoresReviewWithoutOverwritingSavedStatus() = runBlocking {
+        repo.ingest(listOf(candidate()))
+        val original = db.dao().allMessages().single()
+        repo.dismiss(original)
+        repo.undoDismiss(original)
+        assertEquals("REVIEW", db.dao().message(original.key)?.status)
+        repo.dismiss(original)
+        db.dao().message(original.key)!!.let { db.dao().message(it.copy(status = "SAVED")) }
+        repo.undoDismiss(original)
+        assertEquals("SAVED", db.dao().message(original.key)?.status)
+    }
     @Test fun unmatchedAccountDoesNotAutoSave() = runBlocking {
         repo.trust("VM-AXISBK", "AXIS"); repo.ingest(listOf(candidate(sms.replace("0424", "9999"))))
         assertTrue(db.dao().allEntries().isEmpty()); assertEquals("REVIEW", db.dao().allMessages().single().status)

@@ -43,9 +43,22 @@ keystore.properties
 /device-data/
 /captures/
 /screenshots/
+# Device captures sometimes land in the repository root; keep drawable assets trackable.
+/Screenshot_*.png
+/Screenshot_*.jpg
+/Screenshot_*.jpeg
+*.perfetto-trace
+*.systrace
+*.trace
+*.trace.gz
+*-benchmarkData.json
 *.log
 
 # Operating system metadata
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Python tooling cache
+__pycache__/
+*.pyc

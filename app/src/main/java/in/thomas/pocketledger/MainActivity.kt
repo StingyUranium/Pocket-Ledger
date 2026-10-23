@@ -12,7 +12,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.*
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import kotlinx.coroutines.flow.collect
 import androidx.compose.animation.*
 import androidx.compose.ui.input.nestedscroll.*
 import androidx.compose.ui.geometry.Offset
@@ -40,17 +44,31 @@ fun dayMillis(v: String) = LocalDate.parse(v.trim()).atStartOfDay(india).toInsta
 fun inMonth(e: Entry, m: YearMonth) = YearMonth.from(Instant.ofEpochMilli(e.date).atZone(india)) == m
 
 class MainActivity : ComponentActivity() {
+    private var frameTracker: LedgerFrameTracker? = null
     private var launchRequest by mutableStateOf<Intent?>(null)
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         launchRequest = intent
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT), navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT))
         setContent {
             PocketTheme {
-                Ledger((application as LedgerApp).repo, launchRequest)
+                FoldAwareWindow { Ledger((application as LedgerApp).repo, launchRequest) }
             }
         }
     }
+    override fun onResume() {
+        super.onResume()
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            window.decorView.post {
+                if (!isFinishing && !isDestroyed) {
+                    if (frameTracker == null) frameTracker = LedgerFrameTracker(window)
+                    frameTracker?.resume()
+                }
+            }
+        }
+    }
+    override fun onPause() { frameTracker?.pause(); super.onPause() }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -67,22 +85,33 @@ private sealed interface LedgerRoute {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun Ledger(repo: Repository, launchRequest: Intent? = null) {
     val dao = repo.dao
-    val accounts by remember { dao.accounts() }.collectAsStateWithLifecycle(emptyList())
-    val allEntries by remember { dao.entries() }.collectAsStateWithLifecycle(emptyList())
-    val messages by remember { dao.messages() }.collectAsStateWithLifecycle(emptyList())
-    val budgets by remember { dao.budgets() }.collectAsStateWithLifecycle(emptyList())
-    val senders by remember { dao.senders() }.collectAsStateWithLifecycle(emptyList())
-    val rules by remember { dao.rules() }.collectAsStateWithLifecycle(emptyList())
-    val entries = allEntries.filter { !it.deleted }
+    var readAttempt by remember { mutableIntStateOf(0) }
+    val readState by remember(dao, readAttempt) { ledgerSnapshots(dao) }.collectAsStateWithLifecycle(LedgerReadState())
+    androidx.activity.compose.ReportDrawnWhen { readState.data != null }
+    val snapshot = readState.data
+    val accounts = snapshot?.accounts.orEmpty()
+    val allEntries = snapshot?.allEntries.orEmpty()
+    val entries = snapshot?.entries.orEmpty()
+    val messages = snapshot?.messages.orEmpty()
+    val budgets = snapshot?.budgets.orEmpty()
+    val senders = snapshot?.senders.orEmpty()
+    val rules = snapshot?.rules.orEmpty()
     val scope = rememberCoroutineScope(); val snack = remember { SnackbarHostState() }
-    var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }; var month by remember { mutableStateOf(YearMonth.now(india)) }
-    var editor by remember { mutableStateOf<Entry?>(null) }; var accountEditor by remember { mutableStateOf<Account?>(null) }
-    var settings by remember { mutableStateOf(false) }; var disclosure by remember { mutableStateOf(false) }
-    var details by remember { mutableStateOf<LedgerRoute.Transactions?>(null) }
+    var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }; var month by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = androidx.compose.runtime.saveable.Saver<YearMonth, String>(save = { it.toString() }, restore = { YearMonth.parse(it) })) { mutableStateOf(YearMonth.now(india)) }
+    var editor by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = EntryDraftSaver) { mutableStateOf<Entry?>(null) }; var accountEditor by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = AccountDraftSaver) { mutableStateOf<Account?>(null) }
+    var settings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }; var disclosure by remember { mutableStateOf(false) }
+    var details by androidx.compose.runtime.saveable.rememberSaveable(
+        stateSaver = androidx.compose.runtime.saveable.Saver<LedgerRoute.Transactions?, ArrayList<String>>(
+            save = { it?.let { route -> arrayListOf(route.type, route.category) } ?: arrayListOf() },
+            restore = { if (it.isEmpty()) null else LedgerRoute.Transactions(it[0], it[1]) }
+        )
+    ) { mutableStateOf<LedgerRoute.Transactions?>(null) }
     val openTransactions: (String, String) -> Unit = { type, category -> details = LedgerRoute.Transactions(type, category) }
     var capture by remember { mutableStateOf(repo.prefs.getBoolean("enabled", false)) }
     var permission by remember { mutableStateOf(repo.hasSmsPermission()) }
-    var busy by remember { mutableStateOf(false) }
+    var activeWork by remember { mutableIntStateOf(0) }
+    val busy = activeWork > 0
+    var operationError by remember { mutableStateOf<String?>(null) }
     var preview by remember { mutableStateOf<List<Candidate>?>(null) }
     var from by remember { mutableStateOf(LocalDate.now(india).withDayOfMonth(1).toString()) }
     var to by remember { mutableStateOf(LocalDate.now(india).toString()) }
@@ -91,7 +120,7 @@ private sealed interface LedgerRoute {
     var trustCandidate by remember { mutableStateOf<TrustedSender?>(null) }
     var deleteCandidate by remember { mutableStateOf<Entry?>(null) }
     var transferCandidate by remember { mutableStateOf<Pair<Entry, Entry>?>(null) }
-    fun work(block: suspend () -> Unit) { scope.launch { busy = true; try { withContext(Dispatchers.IO) { block() } } catch (e: Exception) { if (e is CancellationException) throw e; snack.showSnackbar(e.message ?: "Could not complete this action") } finally { busy = false } } }
+    fun work(block: suspend () -> Unit) { scope.launch { activeWork++; operationError = null; try { withContext(Dispatchers.IO) { block() } } catch (e: Exception) { if (e is CancellationException) throw e; operationError = e.message ?: "Could not complete this action"; snack.showSnackbar(operationError!!) } finally { activeWork-- } } }
     val requestSms = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permission = repo.hasSmsPermission() }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val pass = secret; secret = null
@@ -104,10 +133,15 @@ private sealed interface LedgerRoute {
         } else pass?.fill('\u0000')
     }
     val chooseRestore = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) { restoreUri = uri; passwordMode = "restore" } }
-    LaunchedEffect(Unit) { work { repo.initialize(); repo.refreshStoredReviews(); repo.reconcile() } }
+    LaunchedEffect(Unit) {
+        // Let the usable shell render before starting reconciliation.
+        withFrameNanos { }
+        work { repo.initialize(); repo.refreshStoredReviews(); repo.reconcile() }
+    }
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { permission = repo.hasSmsPermission(); capture = repo.prefs.getBoolean("enabled", false); work { repo.reconcile() } } }
+        var firstResume = true
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { permission = repo.hasSmsPermission(); capture = repo.prefs.getBoolean("enabled", false); if (firstResume) firstResume = false else work { repo.reconcile() } } }
         owner.lifecycle.addObserver(observer); onDispose { owner.lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(launchRequest) {
@@ -121,21 +155,36 @@ private sealed interface LedgerRoute {
         }
     }
     val route: LedgerRoute = if (settings) LedgerRoute.Settings else details ?: LedgerRoute.Tabs
-    BackHandler(route != LedgerRoute.Tabs) { if (settings) settings = false else details = null }
-    val density = LocalDensity.current
-    val collapseRange = with(density) { 56.dp.toPx() }
-    val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
-    val titleOffsets = remember { mutableStateMapOf<String, Float>() }
-    val routeKey = if (route == LedgerRoute.Tabs) "tab-$tab" else route.toString()
-    val collapseOffset = titleOffsets[routeKey] ?: 0f
-    val titleScroll = remember(routeKey, collapseRange) { object : NestedScrollConnection {
-        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-            titleOffsets[routeKey] = ((titleOffsets[routeKey] ?: 0f) - consumed.y).coerceIn(0f, collapseRange)
-            return Offset.Zero
+    val reducedMotion = LocalReducedMotion.current
+    val seekState = remember { SeekableTransitionState<LedgerRoute>(route) }
+    val navigation = rememberTransition(seekState, label = "ledger navigation")
+    LaunchedEffect(route) { seekState.animateTo(route) }
+    val backTarget: LedgerRoute = if (settings) details ?: LedgerRoute.Tabs else LedgerRoute.Tabs
+    PredictiveBackHandler(enabled = route != LedgerRoute.Tabs) { events ->
+        try {
+            events.collect { event -> seekState.seekTo(event.progress, backTarget) }
+            seekState.animateTo(backTarget)
+            if (settings) settings = false else details = null
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) { seekState.animateTo(route) }
+            throw cancelled
         }
-    } }
-    val titles = listOf("Overview", "Activity", "Accounts", "Budgets", "Inbox", "Graphs")
+    }
+    val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+    val titles = destinationLabels
+    val pending = remember(messages) { messages.count { it.status == "REVIEW" } }
+    val expandedEditor = LocalLedgerWindowWidth.current >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.3f
+    val editorContent by rememberUpdatedState<@Composable (Entry) -> Unit> { current -> EntryEditor(current, accounts, messages.find { it.key == current.smsKey }, { editor = null }, { entry, remember -> work { repo.save(entry, remember); withContext(Dispatchers.Main) { editor = null } } }, if (allEntries.any { it.id == current.id }) { { deleteCandidate = current } } else null) }
+    val presentEntry = remember { movableContentOf<Entry> { current -> key(current.id) { editorContent(current) } } }
+    CompositionLocalProvider(LocalLedgerBusy provides busy, LocalLedgerOperationError provides operationError, LocalLedgerClearError provides { operationError = null }) {
+    SharedTransitionLayout {
+    CompositionLocalProvider(LocalLedgerSharedScope provides this) {
+    BoxWithConstraints(Modifier.fillMaxSize().motionSurface(active = navigation.isRunning)) {
+    val wide = maxWidth >= 600.dp
+    Row(Modifier.fillMaxSize()) {
+    if (wide && route == LedgerRoute.Tabs) PocketNavigationRail(tab, pending, { tab = it }, { settings = true })
     Scaffold(
+        modifier = Modifier.weight(1f),
         topBar = {
             PocketHeader(
                 title = when (val current = route) {
@@ -143,8 +192,7 @@ private sealed interface LedgerRoute {
                     LedgerRoute.Tabs -> titles[tab]
                     is LedgerRoute.Transactions -> if (current.category != "ALL") current.category else if (current.type == "INCOME") "Income" else "Spent"
                 },
-                collapse = collapseOffset / collapseRange,
-                back = if (route != LedgerRoute.Tabs) ({ if (settings) settings = false else details = null }) else null,
+                back = if (route != LedgerRoute.Tabs || (!wide && tab in listOf(2, 4, 5))) ({ if (settings) settings = false else if (details != null) details = null else tab = 6 }) else null,
                 settings = { settings = true },
                 add = if (!settings && (tab <= 1 || details != null)) ({
                     accounts.firstOrNull()?.let {
@@ -153,12 +201,23 @@ private sealed interface LedgerRoute {
                 }) else null
             )
         },
-        bottomBar = { if (route == LedgerRoute.Tabs) PocketTabBar(tab, messages.count { it.status == "REVIEW" }) { tab = it } },
+        bottomBar = { if (!wide && route == LedgerRoute.Tabs) PocketTabBar(tab, pending) { tab = it } },
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snack) }
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().nestedScroll(titleScroll)) {
-            AnimatedContent(targetState = route, transitionSpec = {
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            readState.error?.let { error ->
+                Surface(color = MaterialTheme.colorScheme.errorContainer) {
+                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text(error, Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
+                        TextButton(onClick = { readAttempt++ }) { Text("Retry") }
+                    }
+                }
+            }
+            navigation.AnimatedContent(transitionSpec = {
+                if (reducedMotion) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else
                 if (targetState == LedgerRoute.Settings || initialState == LedgerRoute.Tabs) {
                     (slideInHorizontally(fluidSpring()) { it } + fadeIn(fluidTween())) togetherWith
                         slideOutHorizontally(fluidSpring()) { -it / 3 }
@@ -166,7 +225,8 @@ private sealed interface LedgerRoute {
                     slideInHorizontally(fluidSpring()) { -it / 3 } togetherWith
                         (slideOutHorizontally(fluidSpring()) { it } + fadeOut(fluidTween()))
                 }
-            }, label = "navigation stack", modifier = Modifier.fillMaxSize()) { shownRoute ->
+            }, modifier = Modifier.fillMaxSize()) { shownRoute ->
+            CompositionLocalProvider(LocalLedgerVisibilityScope provides this) {
             pageState.SaveableStateProvider(shownRoute.toString()) {
             if (shownRoute == LedgerRoute.Settings) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -174,20 +234,25 @@ private sealed interface LedgerRoute {
                 }
             } else if (shownRoute is LedgerRoute.Transactions) {
                 Column(Modifier.fillMaxSize()) {
+                    if (shownRoute.category == "ALL") MetricDetailHeader(shownRoute.type, month, entries)
                     MonthPicker(month) { month = it }
                     Transactions(entries, accounts, month, shownRoute.type, shownRoute.category) { editor = it }
                 }
+            } else if (snapshot == null) {
+                if (readState.error == null) LedgerSkeleton()
             } else Column(Modifier.fillMaxSize()) {
-            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (busy) Text("Updating ledger...", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
             if (tab in listOf(0, 1, 3, 5)) MonthPicker(month) { month = it }
-            Box(Modifier.weight(1f)) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
                 val page = tab
                 pageState.SaveableStateProvider("tab-$page") {
+                Box(Modifier.widthIn(max = 840.dp).fillMaxSize()) {
                 when (page) {
+                    6 -> MoreScreen(pending, { tab = it }, { settings = true })
                     0 -> Overview(accounts, entries, messages, month, budgets, { tab = 2 }, { tab = 4 }, openTransactions) { editor = it }
                     1 -> Transactions(entries, accounts, month) { editor = it }
                     2 -> AccountsScreen(accounts, entries, messages, { accountEditor = it }, { accountEditor = Account(UUID.randomUUID().toString(), "", "CASH", "", openingDate = dayMillis(LocalDate.now(india).withDayOfMonth(1).toString())) })
-                    3 -> BudgetScreen(budgets, entries, month) { work { dao.budget(it) } }
+                    3 -> BudgetScreen(budgets, entries, month) { budget, saved -> work { dao.budget(budget); withContext(Dispatchers.Main) { saved() } } }
                     5 -> GraphsScreen(entries, month, { month = it }, openTransactions)
                     4 -> SmsScreen(messages, entries, accounts, senders, permission, capture, from, to, { from = it }, { to = it },
                         { disclosure = true }, { enabled ->
@@ -198,13 +263,29 @@ private sealed interface LedgerRoute {
                         { trustCandidate = it }, { record ->
                             val a = accounts.firstOrNull { it.bank == record.bank && it.suffix == record.suffix } ?: accounts.firstOrNull()
                             a?.let { editor = Entry(UUID.randomUUID().toString(), it.id, type = record.direction ?: "EXPENSE", amount = record.amount ?: 0, date = record.date ?: record.received, dateOnly = record.dateOnly, payee = record.payee, smsKey = record.key) }
-                        }, { work { repo.dismiss(it) } }, { transferCandidate = it })
+                        }, { message -> scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) { repo.dismiss(message) }
+                                val undo = snack.showSnackbar("Alert dismissed", actionLabel = "Undo", duration = SnackbarDuration.Long)
+                                if (undo == SnackbarResult.ActionPerformed) withContext(Dispatchers.IO) { repo.undoDismiss(message) }
+                            } catch (e: Exception) {
+                                if (e is CancellationException) throw e
+                                snack.showSnackbar(e.message ?: "Could not dismiss alert")
+                            }
+                        } }, { transferCandidate = it }, refreshing = busy, refresh = { work { repo.refreshStoredReviews(); repo.reconcile() } })
                 }
             }
         }
     }
+    } } } } } }
+    if (expandedEditor && editor != null) {
+        VerticalDivider(Modifier.fillMaxHeight())
+        Box(Modifier.width(400.dp).fillMaxHeight().statusBarsPadding().navigationBarsPadding()) {
+            CompositionLocalProvider(LocalInlineSheet provides true) { editor?.let { presentEntry(it) } }
+        }
+    }
     } } } }
-    FluidPresentation(editor) { current -> EntryEditor(current, accounts, messages.find { it.key == current.smsKey }, { editor = null }, { entry, remember -> work { repo.save(entry, remember); withContext(Dispatchers.Main) { editor = null } } }, if (allEntries.any { it.id == current.id }) { { deleteCandidate = current } } else null) }
+    if (!expandedEditor) FluidPresentation(editor) { presentEntry(it) }
     FluidPresentation(accountEditor) { a -> AccountEditor(a, { accountEditor = null }) { edited -> work {
         require(edited.name.isNotBlank()) { "Name is required" }; require(edited.bank == "CASH" || edited.suffix.matches(Regex("\\d{4}"))) { "Enter the account's last four digits" }
         require(accounts.none { it.id != edited.id && it.bank == edited.bank && it.suffix == edited.suffix && edited.bank != "CASH" }) { "This account is already mapped" }
@@ -239,5 +320,6 @@ private sealed interface LedgerRoute {
             } finally { pass.fill('\u0000') } }
         }
     } }
+    }
 }
 

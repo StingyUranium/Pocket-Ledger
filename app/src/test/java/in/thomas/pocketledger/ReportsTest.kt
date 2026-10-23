@@ -29,4 +29,13 @@ class ReportsTest {
         assertEquals(1_800_000L, result.balance)
         assertEquals(0L, result.budgetRemaining)
     }
+    @Test fun allocationSplitsIncomeAndPreservesEveryPaise() {
+        assertEquals(IncomeAllocation(50_000, 30_000, 20_000), incomeAllocation(100_000))
+        val odd = incomeAllocation(10_001)
+        assertEquals(5_000L, odd.needs)
+        assertEquals(3_000L, odd.wants)
+        assertEquals(2_001L, odd.savings)
+        assertEquals(10_001L, odd.needs + odd.wants + odd.savings)
+        assertEquals(IncomeAllocation(0, 0, 0), incomeAllocation(0))
+    }
 }

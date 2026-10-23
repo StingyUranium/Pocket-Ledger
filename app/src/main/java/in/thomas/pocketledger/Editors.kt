@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -114,18 +115,18 @@ import java.time.*
 }
 
 @Composable fun EntryEditor(initial: Entry, accounts: List<Account>, sms: SmsRecord?, dismiss: () -> Unit, save: (Entry, Boolean) -> Unit, delete: (() -> Unit)?) {
-    var type by remember { mutableStateOf(initial.type) }
-    var account by remember { mutableStateOf(initial.accountId) }
-    var target by remember { mutableStateOf(initial.destinationId ?: accounts.firstOrNull { it.id != account }?.id.orEmpty()) }
-    var amount by remember { mutableStateOf(if (initial.amount > 0) amountText(initial.amount) else "") }
-    var date by remember { mutableStateOf(dayText(initial.date)) }
-    var time by remember { mutableStateOf(if (initial.dateOnly) "" else Instant.ofEpochMilli(initial.date).atZone(india).toLocalTime().withNano(0).toString()) }
-    var payee by remember { mutableStateOf(initial.payee) }
-    var category by remember { mutableStateOf(initial.category) }
-    var note by remember { mutableStateOf(initial.note) }
-    var rememberMerchant by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var customCategory by remember { mutableStateOf(initial.category !in defaultCategories) }
+    var type by rememberSaveable { mutableStateOf(initial.type) }
+    var account by rememberSaveable { mutableStateOf(initial.accountId) }
+    var target by rememberSaveable { mutableStateOf(initial.destinationId ?: accounts.firstOrNull { it.id != account }?.id.orEmpty()) }
+    var amount by rememberSaveable { mutableStateOf(if (initial.amount > 0) amountText(initial.amount) else "") }
+    var date by rememberSaveable { mutableStateOf(dayText(initial.date)) }
+    var time by rememberSaveable { mutableStateOf(if (initial.dateOnly) "" else Instant.ofEpochMilli(initial.date).atZone(india).toLocalTime().withNano(0).toString()) }
+    var payee by rememberSaveable { mutableStateOf(initial.payee) }
+    var category by rememberSaveable { mutableStateOf(initial.category) }
+    var note by rememberSaveable { mutableStateOf(initial.note) }
+    var rememberMerchant by rememberSaveable { mutableStateOf(false) }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var customCategory by rememberSaveable { mutableStateOf(initial.category !in defaultCategories) }
     fun submit() {
         try {
             val p = paise(amount)
@@ -177,12 +178,12 @@ import java.time.*
 }
 
 @Composable fun AccountEditor(a: Account, dismiss: () -> Unit, save: (Account) -> Unit) {
-    var name by remember { mutableStateOf(a.name) }
-    var bank by remember { mutableStateOf(a.bank) }
-    var suffix by remember { mutableStateOf(a.suffix) }
-    var opening by remember { mutableStateOf(amountText(a.opening)) }
-    var date by remember { mutableStateOf(dayText(a.openingDate)) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var name by rememberSaveable { mutableStateOf(a.name) }
+    var bank by rememberSaveable { mutableStateOf(a.bank) }
+    var suffix by rememberSaveable { mutableStateOf(a.suffix) }
+    var opening by rememberSaveable { mutableStateOf(amountText(a.opening)) }
+    var date by rememberSaveable { mutableStateOf(dayText(a.openingDate)) }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
     LedgerSheet("Account details", dismiss, "Save", {
         try {
             require(name.isNotBlank()) { "Enter an account name" }
@@ -205,9 +206,9 @@ import java.time.*
 }
 
 @Composable fun BudgetEditor(b: Budget, dismiss: () -> Unit, save: (Budget) -> Unit) {
-    var category by remember { mutableStateOf(b.category) }
-    var amount by remember { mutableStateOf(if (b.amount > 0) amountText(b.amount) else "") }
-    var error by remember { mutableStateOf<String?>(null) }
+    var category by rememberSaveable { mutableStateOf(b.category) }
+    var amount by rememberSaveable { mutableStateOf(if (b.amount > 0) amountText(b.amount) else "") }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
     LedgerSheet("Category budget", dismiss, "Save", {
         try {
             val p = paise(amount)

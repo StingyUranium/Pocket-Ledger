@@ -1,7 +1,9 @@
 <resources>
     <string name="widget_monthly_name">Ledger · Monthly summary</string>
     <string name="widget_budget_name">Ledger · Budget</string>
-    <string name="widget_monthly_description">This month’s income, spending, and balance. Tap a total to see transactions.</string>
+    <string name="widget_expenses_label">Expenses</string>
+    <string name="widget_this_month">This Month</string>
+    <string name="widget_monthly_description">Monthly income or expenses. Tap a tab to switch; tap the total to see transactions.</string>
     <string name="widget_budget_description">Recurring budget remaining this month, including overspending.</string>
     <string name="widget_month_preview">This month · Ledger</string>
     <string name="widget_open">Open ›</string>
