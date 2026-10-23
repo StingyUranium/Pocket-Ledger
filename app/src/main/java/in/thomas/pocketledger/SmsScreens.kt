@@ -141,12 +141,12 @@ import androidx.compose.ui.unit.dp
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) { IconTile("shield", MaterialTheme.colorScheme.tertiary, 50); Column { Text("A little more private.", style = MaterialTheme.typography.titleMedium); Text("Your money stays with you.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             Text("Your finances are processed and stored on this device.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        SectionLabel("Appearance")
-        Pick("Theme", appearance, listOf("SYSTEM", "LIGHT", "DARK"), { when (it) { "LIGHT" -> "Light"; "DARK" -> "Dark"; else -> "Follow system" } }) {
-            appearance = it
-            preferences.edit().putString("mode", it).apply()
-        }
-        GroupedSection(footer = "System animation settings are also respected.") {
+        GroupedSection("Appearance", footer = "System animation settings are also respected.") {
+            Pick("Theme", appearance, listOf("SYSTEM", "LIGHT", "DARK"), { when (it) { "LIGHT" -> "Light"; "DARK" -> "Dark"; else -> "Follow system" } }, grouped = true) {
+                appearance = it
+                preferences.edit().putString("mode", it).apply()
+            }
+            GroupedDivider()
             GroupedRow("Dynamic color", trailing = { PocketSwitch(dynamic, "Dynamic color") { dynamic = it; preferences.edit().putBoolean("dynamic", it).apply() } })
             GroupedDivider()
             GroupedRow("High contrast", trailing = { PocketSwitch(contrast, "High contrast") { contrast = it; preferences.edit().putBoolean("contrast", it).apply() } })

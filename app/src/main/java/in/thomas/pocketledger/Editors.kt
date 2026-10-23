@@ -89,9 +89,13 @@ import java.time.*
     }
 }
 
-@Composable fun Pick(label: String, value: String, options: List<String>, display: (String) -> String = { it.lowercase().replaceFirstChar(Char::titlecase) }, change: (String) -> Unit) {
+@Composable fun Pick(label: String, value: String, options: List<String>, display: (String) -> String = { it.lowercase().replaceFirstChar(Char::titlecase) }, grouped: Boolean = false, change: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().ledgerClickable { open = true }) {
+    if (grouped) GroupedItem(onClick = { open = true }) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(display(value).ifBlank { "Choose" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        AppIcon("down", Modifier.size(13.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+    } else Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().ledgerClickable { open = true }) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp).heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Text(display(value).ifBlank { "Choose" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis)
