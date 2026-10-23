@@ -242,9 +242,23 @@ private sealed interface LedgerRoute {
     pageState.SaveableStateProvider(shownRoute.toString()) {
     Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
     if (wide && shownRoute == LedgerRoute.Tabs) PocketNavigationRail(tab, pending, { tab = it }, { settings = true })
+    val headerState = rememberTopAppBarState()
+    val headerPinned = rememberHeaderPinned()
+    val headerCanScroll by rememberUpdatedState(!headerPinned && !navigation.isRunning && editor == null && accountEditor == null)
+    val headerScroll = TopAppBarDefaults.enterAlwaysScrollBehavior(
+        state = headerState,
+        canScroll = { headerCanScroll },
+        snapAnimationSpec = LedgerMotion.gentle()
+    )
+    LaunchedEffect(tab, headerPinned) {
+        // Reveal actions on destination changes without altering that destination's list position.
+        headerState.heightOffset = 0f
+        headerState.contentOffset = 0f
+    }
     Scaffold(
-        modifier = Modifier.weight(1f),
+        modifier = Modifier.weight(1f).nestedScroll(headerScroll.nestedScrollConnection),
         topBar = {
+            ScrollingLedgerHeader(headerState, pinned = headerPinned) {
             PocketHeader(
                 title = when (val current = shownRoute) {
                     LedgerRoute.Settings -> "Settings"
@@ -259,6 +273,10 @@ private sealed interface LedgerRoute {
                     }
                 }) else null
             )
+            if (shownRoute is LedgerRoute.Transactions || (shownRoute == LedgerRoute.Tabs && tab in listOf(0, 1, 3, 5))) {
+                MonthPicker(month) { month = it }
+            }
+            }
         },
         bottomBar = { if (!wide && shownRoute == LedgerRoute.Tabs) PocketTabBar(tab, pending) { tab = it } },
         containerColor = MaterialTheme.colorScheme.background,
@@ -280,14 +298,12 @@ private sealed interface LedgerRoute {
             } else if (shownRoute is LedgerRoute.Transactions) {
                 Column(Modifier.fillMaxSize()) {
                     if (shownRoute.category == "ALL") MetricDetailHeader(shownRoute.type, month, overviewReport?.summary)
-                    MonthPicker(month) { month = it }
                     Transactions(entries, accounts, month, shownRoute.type, shownRoute.category) { editor = it }
                 }
             } else if (snapshot == null) {
                 if (readState.error == null) LedgerSkeleton()
             } else Column(Modifier.fillMaxSize()) {
             if (busy) Text("Updating ledger...", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
-            if (tab in listOf(0, 1, 3, 5)) MonthPicker(month) { month = it }
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
                 val page = tab
                 pageState.SaveableStateProvider("tab-$page") {

@@ -10,7 +10,7 @@ All Kotlin filenames below are relative to `app/src/main/java/in/thomas/pocketle
 | Activity, routes, permissions, launch intents | `MainActivity.kt` |
 | Snapshot reads and background calculations | `LedgerUiState.kt`, `Reports.kt` |
 | Screens and editors | `LedgerScreens.kt`, `SmsScreens.kt`, `Editors.kt`, `GraphsScreen.kt` |
-| Theme, motion, adaptive layout | `DesignSystem.kt`, `Interaction.kt`, `FluidMotion.kt`, `MetricTransition.kt`, `FoldAwareWindow.kt` |
+| Theme, motion, adaptive layout | `DesignSystem.kt`, `Interaction.kt`, `ScrollingHeader.kt`, `FluidMotion.kt`, `MetricTransition.kt`, `FoldAwareWindow.kt` |
 | Draft persistence | `DraftSavers.kt` |
 | SMS recognition and delivery | `SmsParser.kt`, `SmsCapture.kt` |
 | Category reminders | `CategoryNotifications.kt` |
@@ -33,6 +33,10 @@ Notifications use a dedicated channel and an explicit, immutable pending intent 
 Compact root destinations are Overview, Activity, Budgets, and More. More exposes Accounts, Inbox, and Graphs. Transaction detail and Settings routes animate separately from root tabs. Keep the selected month, drafts, and saved page state intact across navigation and resizing.
 
 Overview and metric details share a background-computed `OverviewReport`. Navigation settling and predictive back must share one transition owner so cancellation does not leave pages overlapping. Shared metric cards and route motion use the same duration. See [UI implementation notes](ui-redesign.md) before changing these transitions.
+
+The title/actions and month picker share `ScrollingLedgerHeader`, driven by Material enter-always
+nested scrolling. Status-bar padding stays fixed. Destination changes reveal controls without
+resetting lists; reduced motion and touch exploration pin the header.
 
 Room flows feed `ledgerSnapshots`; calculations and I/O belong off the main thread. `LedgerApp` observes entries and budgets to refresh installed widgets.
 

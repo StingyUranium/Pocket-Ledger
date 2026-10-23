@@ -182,7 +182,7 @@ val positive = Color(0xFF248A3D)
 }
 
 @Composable fun PocketHeader(title: String, settings: () -> Unit, add: (() -> Unit)?, back: (() -> Unit)? = null) {
-    Column(Modifier.statusBarsPadding().background(MaterialTheme.colorScheme.background)) {
+    Column(Modifier.background(MaterialTheme.colorScheme.background)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (back != null) IconButton(onClick = back) { AppIcon("left", Modifier.semantics { contentDescription = "Back" }) }

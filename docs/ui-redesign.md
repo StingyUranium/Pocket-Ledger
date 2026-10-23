@@ -111,3 +111,32 @@ passed. The personal APK was rebuilt without the validation property; output met
 The temporary validation installation was removed. After the user requested installation, the
 verified personal APK was installed successfully with `adb install -r`, preserving existing data.
 Installation is not additional evidence of visual correctness or frame-time performance.
+
+## Scroll-away page controls
+
+The title/actions and month picker now form a single clipped header region, using the installed
+Material 3 enter-always nested-scroll behavior for gesture consumption, fling and spring settling.
+Scrolling down tucks it above the content; scrolling up reveals it immediately. Every root screen,
+Settings and transaction drill-down uses the same owner. The status-bar inset remains fixed and
+bottom navigation remains available. Month controls were moved into the shared header, including
+transaction drill-down; financial filters and metric content retain their existing behavior.
+
+The wrapper updates its visible height during scroll, while its child is measured with unchanged
+constraints. Header height limits update only when the actual content size changes, including font
+scaling or resizing. No per-pointer coroutine or header content remeasurement is introduced.
+Changing a root destination reveals its controls without resetting list/filter/draft state.
+Reduced motion and Android touch exploration pin the controls. Modal editors retain their own
+native sheet scrolling and do not drive the page header.
+
+This supersedes the earlier static-header choice. Visual review remains omitted at the user's
+request; validation evidence follows after the build and focused gesture regressions.
+
+Scroll-header device validation (23 October 2026): all 10 isolated UI journeys passed, including
+new gesture regressions for hiding/revealing Overview title/actions/month together and doing the
+same on Settings before returning. Existing predictive-back cancellation/completion, shared metric
+navigation, draft recreation, root navigation and segmented/search journeys also passed. These are
+functional checks; no visual matrix, refresh-rate matrix or frame-time benchmark was run.
+
+The scroll-header debug build, all 52 JVM tests and lint passed. The personal package ID was
+verified and `artifacts/Ledger-scrolling-header.apk` was installed successfully with `adb install -r`.
+Existing app data was preserved. Lint reports zero errors; device tests used only the validation package.
