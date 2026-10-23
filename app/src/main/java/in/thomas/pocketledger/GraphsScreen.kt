@@ -2,7 +2,6 @@ package `in`.thomas.pocketledger
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,7 +72,7 @@ private data class GraphReport(
                     }
                 }
                 categories.forEachIndexed { index, (category, amount) ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClickLabel = "View $category transactions") { openTransactions("EXPENSE", category) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).ledgerClickable(onClickLabel = "View $category transactions") { openTransactions("EXPENSE", category) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(Modifier.size(9.dp).background(categoryColor(index), CircleShape))
                         Column(Modifier.weight(1f)) {
                             Text(category, style = MaterialTheme.typography.titleSmall)
@@ -101,7 +100,7 @@ private data class GraphReport(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Box(Modifier.size(8.dp).background(expenseColor, CircleShape)); Text("Spent", style = MaterialTheme.typography.bodySmall) }
             }
             history.forEach { (period, summary) ->
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClickLabel = "View ${period.format(DateTimeFormatter.ofPattern("MMMM yyyy"))}") { changeMonth(period) }.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).ledgerClickable(onClickLabel = "View ${period.format(DateTimeFormatter.ofPattern("MMMM yyyy"))}") { changeMonth(period) }.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(period.format(DateTimeFormatter.ofPattern("MMM yyyy")), style = MaterialTheme.typography.titleSmall)
                     LinearProgressIndicator(progress = { (summary.income.toDouble() / scale).toFloat() }, modifier = Modifier.fillMaxWidth().height(7.dp).clip(CircleShape), color = incomeColor, trackColor = trackColor, drawStopIndicator = {})
                     LinearProgressIndicator(progress = { (summary.spent.toDouble() / scale).toFloat() }, modifier = Modifier.fillMaxWidth().height(7.dp).clip(CircleShape), color = expenseColor, trackColor = trackColor, drawStopIndicator = {})

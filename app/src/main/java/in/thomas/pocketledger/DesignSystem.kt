@@ -10,7 +10,11 @@ import androidx.compose.animation.core.*
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -28,6 +32,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -86,12 +91,16 @@ val positive = Color(0xFF248A3D)
     }
     val fallback = if (dark) darkColorScheme(
         primary = Color(0xFF64ADFF), onPrimary = Color(0xFF00244C), secondary = Color(0xFF64ADFF), tertiary = Color(0xFF30D158),
-        background = Color(0xFF000000), surface = Color(0xFF1C1C1E), surfaceVariant = Color(0xFF2C2C2E),
+        background = Color(0xFF101216), surface = Color(0xFF1B1E23), surfaceVariant = Color(0xFF292D34),
+        surfaceContainerLowest = Color(0xFF14171B), surfaceContainerLow = Color(0xFF1B1E23),
+        surfaceContainer = Color(0xFF20242A), surfaceContainerHigh = Color(0xFF292D34), surfaceContainerHighest = Color(0xFF343942),
         onBackground = Color(0xFFF5F5F7), onSurface = Color(0xFFF5F5F7), onSurfaceVariant = Color(0xFFAEAEB2),
         outlineVariant = Color(0xFF38383A), primaryContainer = Color(0xFF142A45), onPrimaryContainer = Color(0xFF9AC9FF)
     ) else lightColorScheme(
         primary = Color(0xFF005AC1), onPrimary = Color.White, secondary = pine, tertiary = positive,
-        background = cream, surface = Color.White, surfaceVariant = Color(0xFFE9E9EF),
+        background = Color(0xFFF4F5F8), surface = Color.White, surfaceVariant = Color(0xFFE8EBF0),
+        surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFF8F9FC),
+        surfaceContainer = Color(0xFFF0F2F6), surfaceContainerHigh = Color(0xFFE8EBF0), surfaceContainerHighest = Color(0xFFE0E4EB),
         onBackground = Color(0xFF17171B), onSurface = Color(0xFF17171B), onSurfaceVariant = Color(0xFF44474F),
         outlineVariant = Color(0xFFE5E5EA), primaryContainer = Color(0xFFE8F2FF), onPrimaryContainer = Color(0xFF005BC1)
     )
@@ -111,8 +120,9 @@ val positive = Color(0xFF248A3D)
     MaterialTheme(
         colorScheme = scheme,
         typography = Typography(
-            headlineLarge = base.copy(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp),
-            headlineMedium = base.copy(fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.7).sp),
+            headlineLarge = base.copy(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.8).sp),
+            headlineMedium = base.copy(fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.5).sp),
+            headlineSmall = base.copy(fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Medium, letterSpacing = (-.3).sp),
             titleLarge = base.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.4).sp),
             titleMedium = base.copy(fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.2).sp),
             titleSmall = base.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold),
@@ -163,10 +173,11 @@ val positive = Color(0xFF248A3D)
 }
 
 @Composable fun RoundIconButton(icon: String, description: String, filled: Boolean = false, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
     Surface(
-        onClick = onClick, shape = RoundedCornerShape(8.dp),
+        onClick = onClick, interactionSource = interaction, shape = MaterialTheme.shapes.medium,
         color = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-        modifier = Modifier.size(48.dp).semantics { contentDescription = description }
+        modifier = Modifier.size(LedgerSpace.touch).premiumPressEffect(interaction, pressedScale = .95f).semantics { contentDescription = description }
     ) { Box(contentAlignment = Alignment.Center) { AppIcon(icon, tint = if (filled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface) } }
 }
 
@@ -175,7 +186,7 @@ val positive = Color(0xFF248A3D)
         Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (back != null) IconButton(onClick = back) { AppIcon("left", Modifier.semantics { contentDescription = "Back" }) }
-            Text(title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+            Text(title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f).semantics { heading() })
             if (back == null) RoundIconButton("settings", "Settings", onClick = settings)
             add?.let { RoundIconButton("plus", "Add transaction", true, it) }
         }
@@ -186,18 +197,31 @@ internal val destinationLabels = listOf("Overview", "Activity", "Accounts", "Bud
 internal val destinationIcons = listOf("home", "entries", "accounts", "budgets", "sms", "chart", "more")
 
 @Composable fun PocketTabBar(selected: Int, pending: Int, change: (Int) -> Unit) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-        listOf(0, 1, 3, 6).forEach { index ->
-            NavigationBarItem(
-                selected = selected == index || (index == 6 && selected in listOf(2, 4, 5)),
-                onClick = { change(index) },
-                icon = {
-                    BadgedBox(badge = { if (index == 6 && pending > 0) Badge { Text(if (pending > 99) "99+" else "$pending") } }) {
-                        AppIcon(destinationIcons[index])
+    val haptic = LocalHapticFeedback.current
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+        Column {
+            HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
+            Row(Modifier.fillMaxWidth().navigationBarsPadding().selectableGroup().padding(horizontal = LedgerSpace.small, vertical = LedgerSpace.xs)) {
+                listOf(0, 1, 3, 6).forEach { index ->
+                    val active = selected == index || (index == 6 && selected in listOf(2, 4, 5))
+                    val interaction = remember { MutableInteractionSource() }
+                    val color by androidx.compose.animation.animateColorAsState(
+                        if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        if (LocalReducedMotion.current) snap() else tween(LedgerMotion.fast), label = "tab color")
+                    Column(Modifier.weight(1f).premiumPressEffect(interaction, pressedScale = .96f)
+                        .clip(MaterialTheme.shapes.medium)
+                        .selectable(active, interactionSource = interaction, indication = LocalIndication.current, role = Role.Tab, onClick = {
+                            if (selected != index) { haptic.performHapticFeedback(HapticFeedbackType.SegmentTick); change(index) }
+                        }).heightIn(min = 56.dp).padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        BadgedBox(badge = { if (index == 6 && pending > 0) Badge { Text(if (pending > 99) "99+" else "$pending") } }) {
+                            AppIcon(destinationIcons[index], tint = color)
+                        }
+                        Text(destinationLabels[index], style = MaterialTheme.typography.labelMedium, color = color,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium)
                     }
-                },
-                label = { Text(destinationLabels[index]) }
-            )
+                }
+            }
         }
     }
 }
@@ -217,14 +241,24 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
 }
 
 @Composable fun MoreScreen(pending: Int, open: (Int) -> Unit, settings: () -> Unit) {
-    FluidList(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    FluidList(contentPadding = PaddingValues(LedgerSpace.content), verticalArrangement = Arrangement.spacedBy(LedgerSpace.section)) {
         item { Text("Your ledger, at a glance", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        items(3, key = { listOf(2, 4, 5)[it] }, contentType = { "destination" }) { position ->
-            val index = listOf(2, 4, 5)[position]
-            Surface(onClick = { open(index) }, shape = MaterialTheme.shapes.large) {
-                ListItem(headlineContent = { Text(destinationLabels[index]) },
-                    supportingContent = { Text(when (index) { 2 -> "Balances and opening amounts"; 4 -> if (pending > 0) "$pending alerts need review" else "Capture and review bank alerts"; else -> "Understand your spending patterns" }) },
-                    leadingContent = { IconTile(destinationIcons[index]) }, trailingContent = { AppIcon("right") })
+        item {
+            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+                Column {
+                    listOf(2, 4, 5).forEachIndexed { position, index ->
+                        val interaction = remember { MutableInteractionSource() }
+                        Surface(onClick = { open(index) }, interactionSource = interaction,
+                            modifier = Modifier.premiumPressEffect(interaction, pressedScale = .993f)) {
+                            ListItem(headlineContent = { Text(destinationLabels[index]) },
+                                supportingContent = { Text(when (index) { 2 -> "Balances and opening amounts"; 4 -> if (pending > 0) "$pending alerts need review" else "Capture and review bank alerts"; else -> "Understand your spending patterns" }) },
+                                leadingContent = { IconTile(destinationIcons[index]) },
+                                trailingContent = { AppIcon("right", tint = MaterialTheme.colorScheme.onSurfaceVariant) })
+                        }
+                        if (position < 2) HorizontalDivider(Modifier.padding(start = 76.dp),
+                            thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                }
             }
         }
         item { OutlinedButton(onClick = settings, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("Settings and backups") } }
@@ -233,13 +267,13 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
 }
 
 @Composable fun CardBlock(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.padding(LedgerSpace.section), verticalArrangement = Arrangement.spacedBy(LedgerSpace.medium), content = content)
     }
 }
 
-@Composable fun SectionTitle(text: String) { Text(text, style = MaterialTheme.typography.titleLarge) }
-@Composable fun SectionLabel(text: String) { Text(text.uppercase(), style = MaterialTheme.typography.labelMedium, letterSpacing = .8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, top = 4.dp)) }
+@Composable fun SectionTitle(text: String) { Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() }) }
+@Composable fun SectionLabel(text: String) { Text(text.uppercase(), style = MaterialTheme.typography.labelMedium, letterSpacing = .8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, top = 4.dp).semantics { heading() }) }
 
 @Composable fun StatusPill(text: String, color: Color = MaterialTheme.colorScheme.primary) {
     Text(text, color = color, style = MaterialTheme.typography.labelMedium, modifier = Modifier.clip(CircleShape).background(color.copy(alpha = .1f)).padding(horizontal = 10.dp, vertical = 5.dp))
@@ -250,8 +284,8 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
 }
 
 @Composable fun Empty(text: String, title: String = "A little space for what's next", icon: String = "receipt") {
-    CardBlock {
-        Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Box(Modifier.fillMaxWidth().padding(horizontal = LedgerSpace.content, vertical = LedgerSpace.generous)) {
+        Column(Modifier.fillMaxWidth().padding(vertical = LedgerSpace.content), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             IconTile(icon, size = 56)
             Text(title, style = MaterialTheme.typography.titleMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.widthIn(max = 290.dp))
@@ -260,21 +294,43 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
 }
 
 @Composable fun Segments(values: List<Pair<String, String>>, selected: String, change: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(3.dp)) {
-        values.forEach { (value, title) ->
-            val active = selected == value
-            Box(
-                Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(8.dp))
-                    .background(if (active) MaterialTheme.colorScheme.surface else Color.Transparent)
-                    .selectable(active, onClick = { change(value) }, role = Role.Tab).padding(vertical = 9.dp, horizontal = 4.dp),
-                contentAlignment = Alignment.Center
-            ) { Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal) }
+    if (values.isEmpty()) return
+    val reduced = LocalReducedMotion.current
+    val haptic = LocalHapticFeedback.current
+    val position by animateFloatAsState(values.indexOfFirst { it.first == selected }.coerceAtLeast(0).toFloat(),
+        if (reduced) snap() else LedgerMotion.gentle(), label = "segment position")
+    // The indicator is drawn behind the row, so multiline labels determine the height together.
+    BoxWithConstraints(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
+        .background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(3.dp).selectableGroup()) {
+        val segmentWidth = maxWidth / values.size
+        Box(Modifier.matchParentSize().offset { androidx.compose.ui.unit.IntOffset((segmentWidth.toPx() * position).toInt(), 0) }) {
+            Box(Modifier.width(segmentWidth).fillMaxHeight().clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.surface))
+        }
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            values.forEach { (value, title) ->
+                val active = selected == value
+                val color by androidx.compose.animation.animateColorAsState(
+                    if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    if (reduced) snap() else tween(LedgerMotion.fast), label = "segment text")
+                Box(Modifier.weight(1f).fillMaxHeight().heightIn(min = LedgerSpace.touch).clip(MaterialTheme.shapes.small)
+                    .selectable(active, onClick = {
+                        if (!active) { haptic.performHapticFeedback(HapticFeedbackType.SegmentTick); change(value) }
+                    }, role = Role.Tab).padding(vertical = 10.dp, horizontal = 4.dp), contentAlignment = Alignment.Center) {
+                    Text(title, style = MaterialTheme.typography.bodyMedium, color = color,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
+                }
+            }
         }
     }
 }
 
 @Composable fun PocketSwitch(checked: Boolean, description: String, change: (Boolean) -> Unit) {
-    Switch(checked = checked, onCheckedChange = change, modifier = Modifier.semantics { contentDescription = description })
+    val haptic = LocalHapticFeedback.current
+    Switch(checked = checked, onCheckedChange = {
+        haptic.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
+        change(it)
+    }, modifier = Modifier.semantics { contentDescription = description })
 }
 
 val LocalInlineSheet = staticCompositionLocalOf { false }

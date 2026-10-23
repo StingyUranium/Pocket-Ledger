@@ -54,3 +54,60 @@ The subsequent navigation overlap fix passes the debug build, all 50 JVM tests, 
 The slide-up follow-up passes the debug build, lint, and both isolated device regression journeys (repeated Spent/Income navigation and predictive back cancellation/completion) on the Motorola Edge 70. The personal APK was rebuilt without the validation property and installed as an update. These functional checks do not measure frame deadlines.
 
 The subsequent card-to-header refinement passes lint and all six isolated UI journeys on the Motorola Edge 70, including an assertion that Overview's position stays fixed during predictive back previews. Income/Spent navigation uses the shared card movement and a stationary page reveal; other routes retain the vertical slide.
+
+## Interaction refinement ? 23 October 2026
+
+Audit: the existing snapshot/repository architecture, Room schema, SMS pipeline, encrypted backups,
+root state holders, draft savers, shared metric transitions and Material sheet gestures remain the
+foundation. There is no network/authentication stack or dependency injection framework to replace.
+The installed toolchain is AGP 9.4.1, Kotlin Compose plugin 2.4.21, Compose BOM 2026.09.00 and
+Activity Compose 1.13.0; this refinement adds no dependencies.
+
+Changes:
+
+- `Interaction.kt` centralizes the spacing rhythm and responsive/gentle motion families. Press effects
+  observe the clickable control's own interaction source, preserving native cancellation, scrolling,
+  accessibility and immediate business events. Icon controls, metric cards, transaction rows and More
+  destinations use different, restrained travel. Reduced motion removes scaling and animated tone.
+- Compact navigation uses a lighter intrinsic-height row with native selectable tab semantics,
+  safe bottom insets, animated color, press feedback and selection-only haptics. Multiline labels
+  can grow with text scaling. Root destinations still own independent saved state.
+- Segmented controls move one background behind all options, use shared multiline height and
+  animate position in layout rather than reading each animation frame in composition. Budgets uses
+  the same control as Inbox and transaction type. Toggle haptics only follow user events.
+- Static fallback themes use layered neutral surfaces, including explicit Material surface container
+  roles; dynamic color and high contrast remain available. Headline weights are quieter. More groups
+  its related destinations in one surface and empty states no longer introduce nested cards.
+- Search has a persistent accessible label and clear action. Form focus gets a visible accent,
+  Next traversal and a Done action for the final transaction note. Backup password fields have
+  Show/Hide, contextual IME actions and inline error semantics; secrets remain ephemeral.
+- Non-metric push/pop routes now use reversible fades and restrained vertical travel (1/12 of a
+  page entering, 1/24 for the parent) rather than full-screen travel. Shared metric geometry and its
+  single predictive-back settling owner remain intact. Transaction list changes use native item
+  placement animation unless motion is reduced. Activity groups transactions into date sections with
+  inset dividers instead of one card per entry. Page and section titles expose heading semantics.
+  Custom account, budget, chart, picker and settings rows share the same native-cancellable press
+  abstraction; Material buttons retain their native feedback.
+
+The stable page header remains static: no per-scroll measurement or new nested-scroll owner is
+introduced. Native Material sheet physics, IME padding, swipe dismissal with Undo, chart inspection,
+loading/read-error presentation and adaptive editor placement remain in place.
+
+Validation evidence for this refinement is recorded below separately from these design decisions.
+The exhaustive light/dark, font-scale, foldable, keyboard and physical frame-deadline matrix remains
+acceptance work; functional tests must not be read as performance certification.
+
+Device evidence for the refinement (23 October 2026): all 26 isolated device tests passed
+(18 repository tests and 8 UI journeys). After correcting More-tab reselection from a child
+screen, the final 8 UI journeys passed again. Added coverage exercises segmented selection,
+selection retention across root destinations, search clearing, and returning to More by tapping
+the selected More tab from Accounts. The startup helper now tolerates the brief absence of a
+Compose root while the activity launches. Visual review was stopped at the user's request;
+there is no claim of completing the full visual matrix or measuring frame deadlines.
+
+Final host checks for this refinement: `:app:assembleDebug`, all 52 JVM tests and `:app:lintDebug`
+passed. The personal APK was rebuilt without the validation property; output metadata confirms
+`in.thomas.pocketledger`. A local delivery is in ignored `artifacts/Ledger-ui-refinement.apk`.
+The temporary validation installation was removed. After the user requested installation, the
+verified personal APK was installed successfully with `adb install -r`, preserving existing data.
+Installation is not additional evidence of visual correctness or frame-time performance.

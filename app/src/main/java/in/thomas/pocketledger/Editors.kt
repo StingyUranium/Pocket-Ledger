@@ -1,12 +1,15 @@
 package `in`.thomas.pocketledger
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -17,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,23 +32,25 @@ import java.time.*
     focusedContainerColor = MaterialTheme.colorScheme.surface,
     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
     disabledContainerColor = MaterialTheme.colorScheme.surface,
-    focusedIndicatorColor = Color.Transparent,
+    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
     unfocusedIndicatorColor = Color.Transparent,
     disabledIndicatorColor = Color.Transparent,
     focusedLabelColor = MaterialTheme.colorScheme.primary,
     unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
 )
 
-@Composable fun Field(value: String, change: (String) -> Unit, label: String, numeric: Boolean = false) {
+@Composable fun Field(value: String, change: (String) -> Unit, label: String, numeric: Boolean = false, imeAction: ImeAction = ImeAction.Next) {
+    val focus = LocalFocusManager.current
     TextField(value, change, label = { Text(label, style = MaterialTheme.typography.bodySmall) }, modifier = Modifier.fillMaxWidth(),
         singleLine = true, shape = RoundedCornerShape(14.dp), colors = fieldColors(), textStyle = MaterialTheme.typography.bodyLarge,
-        keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Decimal else KeyboardType.Text))
+        keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Decimal else KeyboardType.Text, imeAction = imeAction),
+        keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }, onDone = { focus.clearFocus() }))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun DateField(value: String, change: (String) -> Unit, label: String) {
     var open by remember { mutableStateOf(false) }
-    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { open = true }) {
+    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().ledgerClickable(role = Role.Button) { open = true }) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -70,7 +76,7 @@ import java.time.*
             FluidList(Modifier.heightIn(max = 440.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface)) {
                 if (options.isEmpty()) item { Text("No options available", modifier = Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(options.distinct(), key = { it }) { option ->
-                    Column(Modifier.fillMaxWidth().clickable { change(option); dismiss() }) {
+                    Column(Modifier.fillMaxWidth().ledgerClickable { change(option); dismiss() }) {
                         Row(Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = 17.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(display(option), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), color = if (option == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             if (option == value) AppIcon("check", Modifier.size(19.dp), MaterialTheme.colorScheme.primary)
@@ -85,7 +91,7 @@ import java.time.*
 
 @Composable fun Pick(label: String, value: String, options: List<String>, display: (String) -> String = { it.lowercase().replaceFirstChar(Char::titlecase) }, change: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().clickable { open = true }) {
+    Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().ledgerClickable { open = true }) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp).heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Text(display(value).ifBlank { "Choose" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -98,7 +104,7 @@ import java.time.*
 @Composable fun ChoiceChip(label: String, value: String, options: List<String>, display: (String) -> String, change: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val active = value != "ALL"
-    Row(Modifier.clip(CircleShape).background(if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface).clickable { open = true }.padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.heightIn(min = LedgerSpace.touch).clip(MaterialTheme.shapes.medium).background(if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface).ledgerClickable { open = true }.padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(display(value), style = MaterialTheme.typography.bodyMedium, color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
         AppIcon("down", Modifier.size(11.dp), if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -108,7 +114,7 @@ import java.time.*
 @Composable fun Confirm(title: String, text: String, dismiss: () -> Unit, confirm: () -> Unit) {
     AlertDialog(onDismissRequest = dismiss, shape = RoundedCornerShape(26.dp), containerColor = MaterialTheme.colorScheme.surface,
         title = { Text(title, style = MaterialTheme.typography.titleLarge) }, text = { Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-        confirmButton = { TextButton(onClick = confirm) { Text("Confirm", color = if (title.startsWith("Delete")) rust else MaterialTheme.colorScheme.primary) } },
+        confirmButton = { TextButton(onClick = confirm) { Text(if (title.startsWith("Delete")) "Delete" else "Confirm", color = if (title.startsWith("Delete")) rust else MaterialTheme.colorScheme.primary) } },
         dismissButton = { TextButton(onClick = dismiss) { Text("Cancel", fontWeight = FontWeight.Normal) } })
 }
 
@@ -162,7 +168,7 @@ import java.time.*
             }
             DateField(date, { date = it }, "Date")
             Field(time, { time = it }, "Time · HH:MM:SS, optional (IST)")
-            Field(note, { note = it }, "Note, optional")
+            Field(note, { note = it }, "Note, optional", imeAction = ImeAction.Done)
         }
         if (type != "TRANSFER") CardBlock {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -230,6 +236,8 @@ import java.time.*
 @Composable fun PasswordDialog(mode: String, dismiss: () -> Unit, confirm: (CharArray) -> Unit) {
     var password by remember { mutableStateOf("") }
     var repeat by remember { mutableStateOf("") }
+    var visible by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
     var error by remember { mutableStateOf<String?>(null) }
     LedgerSheet(if (mode == "export") "Save a backup" else "Restore a backup", dismiss, if (mode == "export") "Save" else "Restore", {
         if (password.length < 8) error = "Use at least 8 characters"
@@ -239,8 +247,18 @@ import java.time.*
         IconTile("lock", size = 56)
         Text(if (mode == "export") "Your money.\nYour peace of mind." else "Pick up where you left off.", style = MaterialTheme.typography.headlineMedium)
         Text(if (mode == "export") "Protect your backup with a password of at least 8 characters. Keep it somewhere safe; it cannot be recovered." else "Restoring replaces your current accounts, transactions, budgets, and import history. Automatic SMS capture will be switched off.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        TextField(password, { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, shape = RoundedCornerShape(14.dp), colors = fieldColors(), modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
-        if (mode == "export") TextField(repeat, { repeat = it }, label = { Text("Repeat password") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, shape = RoundedCornerShape(14.dp), colors = fieldColors(), modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+        TextField(password, { password = it; error = null }, label = { Text("Password") },
+            visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = { TextButton(onClick = { visible = !visible }) { Text(if (visible) "Hide" else "Show") } },
+            singleLine = true, shape = MaterialTheme.shapes.medium, colors = fieldColors(), modifier = Modifier.fillMaxWidth(),
+            isError = error != null,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = if (mode == "export") ImeAction.Next else ImeAction.Done),
+            keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }, onDone = { focus.clearFocus() }))
+        if (mode == "export") TextField(repeat, { repeat = it; error = null }, label = { Text("Repeat password") },
+            visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(), singleLine = true,
+            shape = MaterialTheme.shapes.medium, colors = fieldColors(), modifier = Modifier.fillMaxWidth(), isError = error != null,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }))
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }

@@ -1,7 +1,6 @@
 package `in`.thomas.pocketledger
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -93,7 +92,7 @@ import androidx.compose.ui.unit.dp
                 }
                 Text("${m.direction?.lowercase()?.replaceFirstChar(Char::titlecase) ?: "Check type"} · ${m.date?.let(::displayDate) ?: "Check date"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (m.status == "REVIEW") Text(m.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { Text(if (expanded) "Hide original message" else "View original message", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f)); AppIcon("down", Modifier.size(12.dp), MaterialTheme.colorScheme.primary) }
+                Row(Modifier.fillMaxWidth().heightIn(min = LedgerSpace.touch).ledgerClickable { expanded = !expanded }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { Text(if (expanded) "Hide original message" else "View original message", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f)); AppIcon("down", Modifier.size(12.dp), MaterialTheme.colorScheme.primary) }
                 AnimatedVisibility(expanded, enter = if (reducedMotion) androidx.compose.animation.EnterTransition.None else androidx.compose.animation.expandVertically(animationSpec = fluidSpring()) + androidx.compose.animation.fadeIn(animationSpec = fluidTween()), exit = if (reducedMotion) androidx.compose.animation.ExitTransition.None else androidx.compose.animation.shrinkVertically(animationSpec = fluidSpring()) + androidx.compose.animation.fadeOut(animationSpec = fluidTween())) { Text("${m.sender}\n\n${m.body}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (m.status == "REVIEW") Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = { review(m) }, modifier = Modifier.weight(1f)) { Text("Edit & save") }; TextButton(onClick = { dismiss(m) }) { Text("Dismiss", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             }
@@ -128,7 +127,7 @@ import androidx.compose.ui.unit.dp
 }
 
 @Composable private fun SettingsRow(icon: String, title: String, subtitle: String? = null, tint: Color = MaterialTheme.colorScheme.primary, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().heightIn(min = LedgerSpace.touch).ledgerClickable(onClick = onClick).padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         IconTile(icon, tint, 36)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) { Text(title, style = MaterialTheme.typography.bodyLarge); subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant)

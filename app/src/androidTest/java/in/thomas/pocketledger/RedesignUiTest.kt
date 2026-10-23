@@ -29,7 +29,7 @@ class RedesignUiTest {
     private fun ready() {
         check(ui.activity.packageName == "in.thomas.pocketledger.validation")
         ui.waitForIdle()
-        ui.waitUntil(15_000) { ui.onAllNodesWithText("Monthly balance").fetchSemanticsNodes().isNotEmpty() }
+        ui.waitUntil(15_000) { ui.onAllNodesWithText("Monthly balance").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
         InstrumentationRegistry.getArguments().getString("ledger.expectedHz")?.toFloat()?.let { expected ->
             ui.waitUntil(10_000) { kotlin.math.abs(ui.activity.window.decorView.display.refreshRate - expected) < 1f }
         }
@@ -41,6 +41,8 @@ class RedesignUiTest {
         ui.onNodeWithText("Accounts").performClick()
         ui.onNodeWithText("Add account").assertExists()
         ui.onNodeWithContentDescription("Back").performClick()
+        ui.onNodeWithText("Accounts").performClick()
+        ui.onNodeWithText("More").performClick()
         ui.onNodeWithText("Inbox").performClick()
         ui.onNodeWithText("Automatic capture").assertExists()
         ui.onNodeWithContentDescription("Back").performClick()
@@ -129,5 +131,29 @@ class RedesignUiTest {
         ui.onNodeWithText("New transaction").assertExists()
         ui.onNodeWithText("123.45").assertExists()
         ui.onNodeWithText("Cancel").performClick()
+    }
+    @Test fun budgetSegmentsSettleAndRetainSelectionAcrossTabs() {
+        ready()
+        ui.onNodeWithText("Budgets").performClick()
+        ui.waitUntil(10_000) { ui.onAllNodesWithText("Category budgets").fetchSemanticsNodes().isNotEmpty() }
+        repeat(3) {
+            ui.onNode(hasText("50 / 30 / 20") and hasClickAction()).performClick()
+            ui.onAllNodesWithText("50 / 30 / 20").filter(isSelected()).assertCountEquals(1)
+            ui.onNodeWithText("Category budgets").performClick().assertIsSelected()
+        }
+        ui.onNodeWithText("Overview").performClick()
+        ui.onNodeWithText("Budgets").performClick()
+        ui.onNodeWithText("Category budgets").assertIsSelected()
+        ui.onNodeWithText("Set a budget").assertIsDisplayed()
+    }
+
+    @Test fun searchCanBeClearedWithoutLosingTheActivityDestination() {
+        ready()
+        ui.onNodeWithText("Activity").performClick()
+        ui.onNode(hasSetTextAction()).performTextInput("no-matching-payee")
+        ui.onNodeWithContentDescription("Clear search").performClick()
+        ui.onNodeWithContentDescription("Clear search").assertDoesNotExist()
+        ui.onNode(hasSetTextAction()).assertTextContains("")
+        ui.onNode(hasText("Activity") and isSelected()).assertIsSelected()
     }
 }

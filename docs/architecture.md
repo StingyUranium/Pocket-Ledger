@@ -10,7 +10,7 @@ All Kotlin filenames below are relative to `app/src/main/java/in/thomas/pocketle
 | Activity, routes, permissions, launch intents | `MainActivity.kt` |
 | Snapshot reads and background calculations | `LedgerUiState.kt`, `Reports.kt` |
 | Screens and editors | `LedgerScreens.kt`, `SmsScreens.kt`, `Editors.kt`, `GraphsScreen.kt` |
-| Theme, motion, adaptive layout | `DesignSystem.kt`, `FluidMotion.kt`, `MetricTransition.kt`, `FoldAwareWindow.kt` |
+| Theme, motion, adaptive layout | `DesignSystem.kt`, `Interaction.kt`, `FluidMotion.kt`, `MetricTransition.kt`, `FoldAwareWindow.kt` |
 | Draft persistence | `DraftSavers.kt` |
 | SMS recognition and delivery | `SmsParser.kt`, `SmsCapture.kt` |
 | Category reminders | `CategoryNotifications.kt` |

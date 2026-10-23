@@ -227,11 +227,11 @@ private sealed interface LedgerRoute {
                 if (forward) fadeIn(ledgerNavigationTween()) togetherWith ExitTransition.None
                 else EnterTransition.None togetherWith fadeOut(ledgerNavigationTween())
             } else if (forward) {
-                slideInVertically(ledgerNavigationTween()) { it } togetherWith
-                    slideOutVertically(ledgerNavigationTween()) { -it / 3 }
+                (fadeIn(ledgerNavigationTween()) + slideInVertically(ledgerNavigationTween()) { it / 12 }) togetherWith
+                    (fadeOut(ledgerNavigationTween()) + slideOutVertically(ledgerNavigationTween()) { -it / 24 })
             } else {
-                slideInVertically(ledgerNavigationTween()) { -it / 3 } togetherWith
-                    slideOutVertically(ledgerNavigationTween()) { it }
+                (fadeIn(ledgerNavigationTween()) + slideInVertically(ledgerNavigationTween()) { -it / 24 }) togetherWith
+                    (fadeOut(ledgerNavigationTween()) + slideOutVertically(ledgerNavigationTween()) { it / 12 })
             }
             // Keep the detail page above its parent while returning or seeking back.
             transform.apply { targetContentZIndex = if (forward) 1f else 0f }.using(null)

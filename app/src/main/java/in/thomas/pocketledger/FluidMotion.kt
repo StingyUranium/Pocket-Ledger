@@ -20,8 +20,8 @@ import kotlinx.coroutines.flow.*
 val FluidEasing = CubicBezierEasing(.25f, 1f, .5f, 1f)
 const val LedgerNavigationDurationMillis = 280
 fun <T> ledgerNavigationTween(): TweenSpec<T> = tween(LedgerNavigationDurationMillis, easing = FluidEasing)
-fun <T> fluidSpring(): SpringSpec<T> = spring(dampingRatio = 1f, stiffness = 400f)
-fun <T> fluidTween(): TweenSpec<T> = tween(120, easing = LinearEasing)
+fun <T> fluidSpring(): SpringSpec<T> = LedgerMotion.gentle()
+fun <T> fluidTween(): TweenSpec<T> = tween(LedgerMotion.fast, easing = LinearEasing)
 val LocalReducedMotion = staticCompositionLocalOf { false }
 
 /** One vote per window. Input observation never consumes gesture events. */

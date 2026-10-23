@@ -1,9 +1,11 @@
 package `in`.thomas.pocketledger
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -49,7 +51,8 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
 }
 
 @Composable private fun MoneyStat(label: String, amount: Long, income: Boolean, month: YearMonth, modifier: Modifier = Modifier, open: () -> Unit) {
-    Surface(onClick = open, modifier = modifier.metricBounds("${if (income) "INCOME" else "EXPENSE"}:$month"), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
+    val interaction = remember { MutableInteractionSource() }
+    Surface(onClick = open, interactionSource = interaction, modifier = modifier.premiumPressEffect(interaction).metricBounds("${if (income) "INCOME" else "EXPENSE"}:$month"), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 AppIcon(if (income) "income" else "expense", Modifier.size(16.dp), if (income) MaterialTheme.colorScheme.tertiary else rust)
@@ -116,7 +119,7 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
             CardBlock {
                 totals.forEachIndexed { index, (category, amount) ->
                     val color = categoryColor(index)
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClickLabel = "View $category transactions") { openTransactions("EXPENSE", category) }.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).ledgerClickable(onClickLabel = "View $category transactions") { openTransactions("EXPENSE", category) }.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                             Box(Modifier.size(8.dp).background(color, CircleShape))
                             Text(category, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -155,7 +158,8 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     val amount = remember(e.type, e.amount) { (if (e.type == "INCOME") "+" else if (e.type == "EXPENSE") "\u2212" else "") + money(e.amount) }
     val date = remember(e.date) { Instant.ofEpochMilli(e.date).atZone(india).format(DateTimeFormatter.ofPattern("d MMM")) }
     val largeText = LocalDensity.current.fontScale > 1.3f
-    Column(Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(onClickLabel = "Edit transaction", onClick = click)) {
+    val interaction = remember { MutableInteractionSource() }
+    Column(Modifier.fillMaxWidth().heightIn(min = 72.dp).premiumPressEffect(interaction, pressedScale = .993f).clickable(interactionSource = interaction, indication = androidx.compose.foundation.LocalIndication.current, onClickLabel = "Edit transaction", onClick = click)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             IconTile(when (e.type) { "INCOME" -> "income"; "TRANSFER" -> "transfer"; else -> "receipt" })
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -191,28 +195,32 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     val categoryOptions = remember(entries) { (defaultCategories + entries.map { it.category }).distinct() }
     Column {
         Box(Modifier.padding(horizontal = 22.dp, vertical = 6.dp)) {
-            TextField(search, { search = it }, placeholder = { Text("Search transactions", color = MaterialTheme.colorScheme.onSurfaceVariant) }, leadingIcon = { AppIcon("search", Modifier.size(19.dp), MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = fieldColors())
+            TextField(search, { search = it }, label = { Text("Search transactions") }, placeholder = { Text("Payee, category or note", color = MaterialTheme.colorScheme.onSurfaceVariant) }, leadingIcon = { AppIcon("search", Modifier.size(19.dp), MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true, trailingIcon = { if (search.isNotEmpty()) IconButton(onClick = { search = "" }) { AppIcon("close", Modifier.semantics { contentDescription = "Clear search" }) } }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = fieldColors())
         }
         FluidRow(contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             item { ChoiceChip("Type", type, listOf("ALL", "EXPENSE", "INCOME", "TRANSFER"), { if (it == "ALL") "All types" else it.lowercase().replaceFirstChar(Char::titlecase) }) { type = it } }
             item { ChoiceChip("Account", account, listOf("ALL") + accounts.map { it.id }, { value -> accounts.find { it.id == value }?.name ?: "All accounts" }) { account = it } }
             item { ChoiceChip("Category", category, listOf("ALL") + categoryOptions, { if (it == "ALL") "All categories" else it }) { category = it } }
         }
-        FluidList(contentPadding = PaddingValues(22.dp, 8.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        FluidList(contentPadding = PaddingValues(22.dp, 8.dp, 22.dp, 28.dp)) {
             if (result == null) item(key = "loading", contentType = "loading") { Text("Filtering transactions...", style = MaterialTheme.typography.bodyMedium) }
             else if (groups.isEmpty()) item(key = "empty", contentType = "empty") {
                 Empty("Try another month or clear the filters. Add an entry with +, or review bank alerts in Inbox.", "No matching transactions", "receipt")
                 if (search.isNotEmpty() || type != "ALL" || category != "ALL" || account != "ALL") TextButton(onClick = { search = ""; type = "ALL"; category = "ALL"; account = "ALL" }) { Text("Clear filters") }
             }
             groups.forEach { (date, group) ->
-                item(key = "date-$date", contentType = "heading") { SectionLabel(displayDate(dayMillis(date))) }
-                items(group, key = { it.id }, contentType = { "entry" }) { entry ->
-                    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
-                        EntryRow(entry, accounts) { edit(entry) }
+                item(key = "date-$date", contentType = "heading") { Box(Modifier.padding(top = LedgerSpace.section, bottom = LedgerSpace.small)) { SectionLabel(displayDate(dayMillis(date))) } }
+                itemsIndexed(group, key = { _, entry -> entry.id }, contentType = { _, _ -> "entry" }) { index, entry ->
+                    val top = if (index == 0) 16.dp else 0.dp
+                    val bottom = if (index == group.lastIndex) 16.dp else 0.dp
+                    Surface(modifier = if (LocalReducedMotion.current) Modifier else Modifier.animateItem(),
+                        shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom),
+                        color = MaterialTheme.colorScheme.surface) {
+                        EntryRow(entry, accounts, divider = index < group.lastIndex) { edit(entry) }
                     }
                 }
             }
-            if (groups.isNotEmpty()) item(key = "count", contentType = "footer") { Text("${groups.values.sumOf { it.size }} transactions", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (groups.isNotEmpty()) item(key = "count", contentType = "footer") { Text("${groups.values.sumOf { it.size }} transactions", modifier = Modifier.padding(top = LedgerSpace.content), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }
@@ -232,7 +240,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     FluidList(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Text("Everything, in one place.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         items(accounts, key = { it.id }, contentType = { "account" }) { a ->
-            CardBlock(Modifier.clickable { edit(a) }) {
+            CardBlock(Modifier.ledgerClickable { edit(a) }) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     BankMark(a.bank)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -268,10 +276,8 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     val spent = current.sumOf { spentByCategory[it.category] ?: 0L }
     FluidList(contentPadding = PaddingValues(22.dp, 10.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilterChip(selected = allocationView, onClick = { allocationView = true }, label = { Text("50 / 30 / 20") })
-                FilterChip(selected = !allocationView, onClick = { allocationView = false }, label = { Text("Category budgets") })
-            }
+            Segments(listOf("PLAN" to "50 / 30 / 20", "BUDGETS" to "Category budgets"),
+                if (allocationView) "PLAN" else "BUDGETS") { allocationView = it == "PLAN" }
         }
         if (allocationView) {
             item { IncomeAllocationPlan(entries, month) }
@@ -292,7 +298,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
             items(current, key = { it.category }, contentType = { "budget" }) { b ->
                 val amount = spentByCategory[b.category] ?: 0L
                 val over = amount > b.amount
-                CardBlock(Modifier.clickable { edit = b }) {
+                CardBlock(Modifier.ledgerClickable { edit = b }) {
                     Row(verticalAlignment = Alignment.CenterVertically) { Text(b.category, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f)); StatusPill(if (over) "Over budget" else "${((amount.toDouble() / b.amount) * 100).toInt()}% used", if (over) rust else MaterialTheme.colorScheme.primary) }
                     Row(verticalAlignment = Alignment.Bottom) { Text(money(amount), style = MaterialTheme.typography.titleLarge); Text(" / ${money(b.amount)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     LinearProgressIndicator(progress = { (amount.toDouble() / b.amount).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape), color = if (over) rust else MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
