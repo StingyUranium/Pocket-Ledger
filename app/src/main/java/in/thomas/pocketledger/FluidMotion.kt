@@ -146,6 +146,7 @@ private val LocalSheetExited = staticCompositionLocalOf<() -> Unit> { {} }
         modifier = Modifier.motionSurface(active = state.isAnimationRunning),
         sheetState = state,
         sheetMaxWidth = 640.dp,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp
     ) {

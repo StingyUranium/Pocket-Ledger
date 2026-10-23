@@ -22,10 +22,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -91,18 +94,18 @@ val positive = Color(0xFF248A3D)
     }
     val fallback = if (dark) darkColorScheme(
         primary = Color(0xFF64ADFF), onPrimary = Color(0xFF00244C), secondary = Color(0xFF64ADFF), tertiary = Color(0xFF30D158),
-        background = Color(0xFF101216), surface = Color(0xFF1B1E23), surfaceVariant = Color(0xFF292D34),
-        surfaceContainerLowest = Color(0xFF14171B), surfaceContainerLow = Color(0xFF1B1E23),
-        surfaceContainer = Color(0xFF20242A), surfaceContainerHigh = Color(0xFF292D34), surfaceContainerHighest = Color(0xFF343942),
-        onBackground = Color(0xFFF5F5F7), onSurface = Color(0xFFF5F5F7), onSurfaceVariant = Color(0xFFAEAEB2),
+        background = Color(0xFF000000), surface = Color(0xFF1C1C1E), surfaceVariant = Color(0xFF2C2C2E),
+        surfaceContainerLowest = Color(0xFF000000), surfaceContainerLow = Color(0xFF1C1C1E),
+        surfaceContainer = Color(0xFF1C1C1E), surfaceContainerHigh = Color(0xFF2C2C2E), surfaceContainerHighest = Color(0xFF3A3A3C),
+        onBackground = Color(0xFFFFFFFF), onSurface = Color(0xFFFFFFFF), onSurfaceVariant = Color(0xFF9A9AA0),
         outlineVariant = Color(0xFF38383A), primaryContainer = Color(0xFF142A45), onPrimaryContainer = Color(0xFF9AC9FF)
     ) else lightColorScheme(
         primary = Color(0xFF005AC1), onPrimary = Color.White, secondary = pine, tertiary = positive,
-        background = Color(0xFFF4F5F8), surface = Color.White, surfaceVariant = Color(0xFFE8EBF0),
+        background = cream, surface = Color.White, surfaceVariant = Color(0xFFE8EBF0),
         surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFF8F9FC),
         surfaceContainer = Color(0xFFF0F2F6), surfaceContainerHigh = Color(0xFFE8EBF0), surfaceContainerHighest = Color(0xFFE0E4EB),
         onBackground = Color(0xFF17171B), onSurface = Color(0xFF17171B), onSurfaceVariant = Color(0xFF44474F),
-        outlineVariant = Color(0xFFE5E5EA), primaryContainer = Color(0xFFE8F2FF), onPrimaryContainer = Color(0xFF005BC1)
+        outlineVariant = Color(0xFFD8D8DC), primaryContainer = Color(0xFFE8F2FF), onPrimaryContainer = Color(0xFF005BC1)
     )
     val selected = remember(dark, dynamic, context) {
         if (dynamic && Build.VERSION.SDK_INT >= 31) {
@@ -120,20 +123,22 @@ val positive = Color(0xFF248A3D)
     MaterialTheme(
         colorScheme = scheme,
         typography = Typography(
-            headlineLarge = base.copy(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.8).sp),
-            headlineMedium = base.copy(fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.5).sp),
+            // iOS-like scale: Large Title 34, Title 22, Headline 17, Body 17, Callout 16, Subhead 15, Footnote 13, Caption 12.
+            headlineLarge = base.copy(fontSize = 34.sp, lineHeight = 41.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.6).sp),
+            headlineMedium = base.copy(fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.4).sp),
             headlineSmall = base.copy(fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Medium, letterSpacing = (-.3).sp),
-            titleLarge = base.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.4).sp),
-            titleMedium = base.copy(fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.2).sp),
-            titleSmall = base.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold),
-            bodyLarge = base.copy(fontSize = 16.sp, lineHeight = 24.sp),
-            bodyMedium = base.copy(fontSize = 14.sp, lineHeight = 20.sp),
-            bodySmall = base.copy(fontSize = 12.sp, lineHeight = 17.sp),
-            labelLarge = base.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+            titleLarge = base.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.3).sp),
+            titleMedium = base.copy(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.2).sp),
+            titleSmall = base.copy(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
+            bodyLarge = base.copy(fontSize = 17.sp, lineHeight = 22.sp),
+            bodyMedium = base.copy(fontSize = 15.sp, lineHeight = 20.sp),
+            bodySmall = base.copy(fontSize = 13.sp, lineHeight = 18.sp),
+            labelLarge = base.copy(fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium),
             labelMedium = base.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
-            labelSmall = base.copy(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium)
+            labelSmall = base.copy(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium)
         ),
-        shapes = Shapes(extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(8.dp), medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(16.dp), extraLarge = RoundedCornerShape(28.dp)),
+        // Radius scale: 8 controls, 12 grouped containers and fields, 20 sheets.
+        shapes = Shapes(extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(8.dp), medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(12.dp), extraLarge = RoundedCornerShape(20.dp)),
         content = content
     )
     }
@@ -172,25 +177,50 @@ val positive = Color(0xFF248A3D)
     }
 }
 
-@Composable fun RoundIconButton(icon: String, description: String, filled: Boolean = false, onClick: () -> Unit) {
+/** Plain 48dp toolbar icon; feedback comes from the shared press effect rather than a ripple. */
+@Composable fun BarIconButton(icon: String, description: String, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    Surface(
-        onClick = onClick, interactionSource = interaction, shape = MaterialTheme.shapes.medium,
-        color = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-        modifier = Modifier.size(LedgerSpace.touch).premiumPressEffect(interaction, pressedScale = .95f).semantics { contentDescription = description }
-    ) { Box(contentAlignment = Alignment.Center) { AppIcon(icon, tint = if (filled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface) } }
+    Box(Modifier.size(LedgerSpace.touch).premiumPressEffect(interaction, pressedScale = .92f)
+        .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+        .semantics { contentDescription = description }, contentAlignment = Alignment.Center) {
+        AppIcon(icon, tint = MaterialTheme.colorScheme.primary)
+    }
 }
 
-@Composable fun PocketHeader(title: String, settings: () -> Unit, add: (() -> Unit)?, back: (() -> Unit)? = null) {
-    Column(Modifier.background(MaterialTheme.colorScheme.background)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (back != null) IconButton(onClick = back) { AppIcon("left", Modifier.semantics { contentDescription = "Back" }) }
-            Text(title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f).semantics { heading() })
-            if (back == null) RoundIconButton("settings", "Settings", onClick = settings)
-            add?.let { RoundIconButton("plus", "Add transaction", true, it) }
+/**
+ * Pinned compact bar. The inline title fades in as the large title collapses, so the bar never
+ * remeasures while scrolling; only alpha is read at draw time.
+ */
+@Composable fun PocketNavigationBar(
+    title: String, collapsed: () -> Float, back: (() -> Unit)?, backLabel: String,
+    settings: (() -> Unit)?, add: (() -> Unit)?
+) {
+    Box(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.align(Alignment.Center).padding(horizontal = 104.dp)
+                .graphicsLayer { alpha = ((collapsed() - .55f) / .35f).coerceIn(0f, 1f) }
+                .clearAndSetSemantics { })
+        if (back != null) {
+            val interaction = remember { MutableInteractionSource() }
+            Row(Modifier.align(Alignment.CenterStart).heightIn(min = LedgerSpace.touch).premiumPressEffect(interaction)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = back)
+                .semantics(mergeDescendants = true) { contentDescription = "Back" }.padding(start = 4.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                AppIcon("left", tint = MaterialTheme.colorScheme.primary)
+                Text(backLabel, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 120.dp))
+            }
+        }
+        Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
+            add?.let { BarIconButton("plus", "Add transaction", it) }
+            settings?.let { BarIconButton("settings", "Settings", it) }
         }
     }
+}
+
+@Composable fun PocketLargeTitle(title: String) {
+    Text(title, style = MaterialTheme.typography.headlineLarge, maxLines = 2,
+        modifier = Modifier.fillMaxWidth().padding(start = LedgerSpace.margin, end = LedgerSpace.margin, top = 0.dp, bottom = LedgerSpace.small).semantics { heading() })
 }
 
 internal val destinationLabels = listOf("Overview", "Activity", "Accounts", "Budgets", "Inbox", "Graphs", "More")
@@ -198,7 +228,7 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
 
 @Composable fun PocketTabBar(selected: Int, pending: Int, change: (Int) -> Unit) {
     val haptic = LocalHapticFeedback.current
-    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+    Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = .94f), tonalElevation = 0.dp) {
         Column {
             HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.fillMaxWidth().navigationBarsPadding().selectableGroup().padding(horizontal = LedgerSpace.small, vertical = LedgerSpace.xs)) {
@@ -210,7 +240,7 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
                         if (LocalReducedMotion.current) snap() else tween(LedgerMotion.fast), label = "tab color")
                     Column(Modifier.weight(1f).premiumPressEffect(interaction, pressedScale = .96f)
                         .clip(MaterialTheme.shapes.medium)
-                        .selectable(active, interactionSource = interaction, indication = LocalIndication.current, role = Role.Tab, onClick = {
+                        .selectable(active, interactionSource = interaction, indication = null, role = Role.Tab, onClick = {
                             if (selected != index) { haptic.performHapticFeedback(HapticFeedbackType.SegmentTick); change(index) }
                         }).heightIn(min = 56.dp).padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -302,9 +332,10 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
     // The indicator is drawn behind the row, so multiline labels determine the height together.
     BoxWithConstraints(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
         .background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(3.dp).selectableGroup()) {
+        val thumb = if (MaterialTheme.colorScheme.background.luminance() < .5f) Color(0xFF636366) else MaterialTheme.colorScheme.surface
         val segmentWidth = maxWidth / values.size
         Box(Modifier.matchParentSize().offset { androidx.compose.ui.unit.IntOffset((segmentWidth.toPx() * position).toInt(), 0) }) {
-            Box(Modifier.width(segmentWidth).fillMaxHeight().clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.surface))
+            Box(Modifier.width(segmentWidth).fillMaxHeight().clip(MaterialTheme.shapes.small).background(thumb))
         }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             values.forEach { (value, title) ->

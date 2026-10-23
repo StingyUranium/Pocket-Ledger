@@ -49,7 +49,7 @@ private data class GraphReport(
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val primary = MaterialTheme.colorScheme.primary
 
-    FluidList(contentPadding = PaddingValues(22.dp, 10.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 10.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { CardBlock {
             SectionTitle("Where it goes")
             Text("Spending by category", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

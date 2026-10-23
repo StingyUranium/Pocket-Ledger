@@ -39,10 +39,11 @@ class RedesignUiTest {
         ready()
         ui.onNodeWithText("More").performClick()
         ui.onNodeWithText("Accounts").performClick()
+        ui.onNode(hasScrollAction()).performScrollToNode(hasText("Add account"))
         ui.onNodeWithText("Add account").assertExists()
         ui.onNodeWithContentDescription("Back").performClick()
         ui.onNodeWithText("Accounts").performClick()
-        ui.onNodeWithText("More").performClick()
+        ui.onNode(hasText("More") and !hasContentDescription("Back")).performClick()
         ui.onNodeWithText("Inbox").performClick()
         ui.onNodeWithText("Automatic capture").assertExists()
         ui.onNodeWithContentDescription("Back").performClick()
@@ -126,6 +127,7 @@ class RedesignUiTest {
     @Test fun transactionDraftSurvivesActivityRecreation() {
         ready()
         ui.onNodeWithContentDescription("Add transaction").performClick()
+        ui.waitUntil(10_000) { ui.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
         ui.onAllNodes(hasSetTextAction())[0].performTextInput("123.45")
         ui.activityRule.scenario.recreate()
         ui.onNodeWithText("New transaction").assertExists()
@@ -156,27 +158,27 @@ class RedesignUiTest {
         ui.onNode(hasSetTextAction()).assertTextContains("")
         ui.onNode(hasText("Activity") and isSelected()).assertIsSelected()
     }
-    @Test fun overviewHeaderAndMonthTuckAwayAndReturnTogether() {
+    @Test fun overviewLargeTitleAndMonthCollapseWhilePinnedControlsRemain() {
         ready()
         ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
         ui.onNodeWithContentDescription("Previous month").assertIsDisplayed()
         ui.onNode(hasScrollAction()).performTouchInput { swipeUp() }
-        ui.onNodeWithContentDescription("Settings").assertIsNotDisplayed()
-        ui.onNodeWithContentDescription("Add transaction").assertIsNotDisplayed()
         ui.onNodeWithContentDescription("Previous month").assertIsNotDisplayed()
-        ui.onNode(hasText("Overview") and isSelected()).assertIsDisplayed()
-        ui.onNode(hasScrollAction()).performTouchInput { swipeDown() }
         ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
         ui.onNodeWithContentDescription("Add transaction").assertIsDisplayed()
+        ui.onNode(hasText("Overview") and isSelected()).assertIsDisplayed()
+        ui.onNode(hasScrollAction()).performTouchInput { swipeDown() }
+        ui.onNode(hasScrollAction()).performTouchInput { swipeDown() }
         ui.onNodeWithContentDescription("Previous month").assertIsDisplayed()
+        ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
     }
 
-    @Test fun settingsHeaderUsesTheSameScrollBehaviorAndBackStillReturns() {
+    @Test fun settingsKeepsBackPinnedWhileTitleCollapsesAndBackStillReturns() {
         ready()
         ui.onNodeWithContentDescription("Settings").performClick()
         ui.onNodeWithContentDescription("Back").assertIsDisplayed()
         ui.onNode(hasScrollAction()).performTouchInput { swipeUp() }
-        ui.onNodeWithContentDescription("Back").assertIsNotDisplayed()
+        ui.onNodeWithContentDescription("Back").assertIsDisplayed()
         ui.onNode(hasScrollAction()).performTouchInput { swipeDown() }
         ui.onNodeWithContentDescription("Back").assertIsDisplayed().performClick()
         ui.onNodeWithContentDescription("Settings").assertIsDisplayed()

@@ -30,14 +30,14 @@ import androidx.compose.ui.unit.dp
     val headerInset = LocalLedgerHeaderInset.current
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = refresh, state = refreshState, modifier = Modifier.fillMaxSize(),
         indicator = { androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(state = refreshState, isRefreshing = refreshing, modifier = Modifier.align(Alignment.TopCenter).padding(top = headerInset)) }) {
-    FluidList(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 12.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { CardBlock {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 IconTile("shield", MaterialTheme.colorScheme.tertiary, 48)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text("Less typing. More living.", style = MaterialTheme.typography.titleMedium); Text("SBM Bank India & Axis Bank", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             Text("Turn bank alerts into everyday clarity. Processed privately on your phone.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (!permission) Button(onClick = request, modifier = Modifier.fillMaxWidth().height(48.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) { Text("Enable SMS access") }
+            if (!permission) Button(onClick = request, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { Text("Enable SMS access") }
             HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text("Automatic capture", style = MaterialTheme.typography.bodyLarge); Text(if (capture && permission) "Ready for your next bank alert" else "Capture new bank transactions", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.dp
                 Box(Modifier.weight(1f)) { DateField(from, setFrom, "From") }
                 Box(Modifier.weight(1f)) { DateField(to, setTo, "Through") }
             }
-            Button(onClick = scan, enabled = permission, modifier = Modifier.fillMaxWidth().height(48.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) { AppIcon("search", Modifier.size(17.dp), if (permission) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(8.dp)); Text("Preview bank SMS") }
+            Button(onClick = scan, enabled = permission, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { AppIcon("search", Modifier.size(17.dp), if (permission) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(8.dp)); Text("Preview bank SMS") }
             Text("Check account opening dates and balances before importing older alerts.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } }
         val candidates = senderCandidates
@@ -145,7 +145,7 @@ import androidx.compose.ui.unit.dp
     var dynamic by remember { mutableStateOf(preferences.getBoolean("dynamic", true)) }
     var contrast by remember { mutableStateOf(preferences.getBoolean("contrast", false)) }
     var reduceMotion by remember { mutableStateOf(preferences.getBoolean("reduceMotion", false)) }
-    FluidList(contentPadding = PaddingValues(22.dp, 16.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) { item {
+    FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 16.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) { item {
         Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         CardBlock {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) { IconTile("shield", MaterialTheme.colorScheme.tertiary, 50); Column { Text("A little more private.", style = MaterialTheme.typography.titleMedium); Text("Your money stays with you.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } }

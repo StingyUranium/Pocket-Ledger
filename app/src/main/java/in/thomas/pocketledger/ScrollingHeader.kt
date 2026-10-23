@@ -7,6 +7,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -33,10 +35,12 @@ internal fun rememberHeaderPinned(): Boolean {
 val LocalLedgerHeaderInset = compositionLocalOf { 0.dp }
 
 /**
- * Material owns drag consumption, fling settling and interruption. The header is an overlay: only
- * its own visible height changes during scrolling, so the list below keeps a constant viewport and
- * never re-clamps its scroll position at the end. Pages reserve [LocalLedgerHeaderInset] instead.
- * The status-bar inset stays outside the clipped region so content never enters its safe area.
+ * Large-title header. A compact bar stays pinned (back, inline title, actions) while the large
+ * title and any controls below it collapse under Material's exit-until-collapsed behavior, which
+ * owns drag consumption, fling settling and interruption. The header is an overlay: its own
+ * visible height changes during scrolling, so the list keeps a constant viewport and never
+ * re-clamps its scroll position at the end. Pages reserve [LocalLedgerHeaderInset] instead.
+ * Only alpha and the hairline are read at draw time; the bar itself is never remeasured.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,12 +49,27 @@ internal fun ScrollingLedgerHeader(
     pinned: Boolean,
     modifier: Modifier = Modifier,
     onInset: (Dp) -> Unit,
+    bar: @Composable (collapsed: () -> Float) -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.getTop(density)
     val reportInset by rememberUpdatedState(onInset)
-    Column(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
+    var barPx by remember { mutableIntStateOf(0) }
+    var fullPx by remember { mutableIntStateOf(0) }
+    val background = MaterialTheme.colorScheme.background.copy(alpha = .94f)
+    val hairline = MaterialTheme.colorScheme.outlineVariant
+    val collapsed: () -> Float = { if (pinned) 0f else state.collapsedFraction }
+    fun report() = reportInset(with(density) { (statusTop + barPx + fullPx).toDp() })
+    Column(
+        modifier.fillMaxWidth().background(background).drawWithContent {
+            drawContent()
+            // The hairline appears only once content scrolls beneath the compact bar.
+            val alpha = ((collapsed() - .9f) * 10f).coerceIn(0f, 1f)
+            if (alpha > 0f) drawLine(hairline.copy(alpha = alpha), Offset(0f, size.height), Offset(size.width, size.height), 1f)
+        }.statusBarsPadding()
+    ) {
+        Box(Modifier.fillMaxWidth().onSizeChanged { size -> barPx = size.height; report() }) { bar(collapsed) }
         Layout(
             modifier = Modifier.fillMaxWidth().clipToBounds(),
             content = {
@@ -58,7 +77,7 @@ internal fun ScrollingLedgerHeader(
                     val fraction = state.collapsedFraction
                     state.heightOffsetLimit = -size.height.toFloat()
                     state.heightOffset = state.heightOffsetLimit * fraction
-                    reportInset(with(density) { (size.height + statusTop).toDp() })
+                    fullPx = size.height; report()
                 }, content = content)
             }
         ) { measurables, constraints ->

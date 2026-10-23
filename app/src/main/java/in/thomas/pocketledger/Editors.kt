@@ -42,7 +42,7 @@ import java.time.*
 @Composable fun Field(value: String, change: (String) -> Unit, label: String, numeric: Boolean = false, imeAction: ImeAction = ImeAction.Next) {
     val focus = LocalFocusManager.current
     TextField(value, change, label = { Text(label, style = MaterialTheme.typography.bodySmall) }, modifier = Modifier.fillMaxWidth(),
-        singleLine = true, shape = RoundedCornerShape(14.dp), colors = fieldColors(), textStyle = MaterialTheme.typography.bodyLarge,
+        singleLine = true, shape = MaterialTheme.shapes.medium, colors = fieldColors(), textStyle = MaterialTheme.typography.bodyLarge,
         keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Decimal else KeyboardType.Text, imeAction = imeAction),
         keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }, onDone = { focus.clearFocus() }))
 }
@@ -50,7 +50,7 @@ import java.time.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun DateField(value: String, change: (String) -> Unit, label: String) {
     var open by remember { mutableStateOf(false) }
-    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().ledgerClickable(role = Role.Button) { open = true }) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().ledgerClickable(role = Role.Button) { open = true }) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -71,9 +71,9 @@ import java.time.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun ChoiceSheet(label: String, value: String, options: List<String>, display: (String) -> String, dismiss: () -> Unit, change: (String) -> Unit) {
     LedgerSheet(label, dismiss, closeLabel = "Cancel") {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = LedgerSpace.margin).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             SectionTitle(label)
-            FluidList(Modifier.heightIn(max = 440.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface)) {
+            FluidList(Modifier.heightIn(max = 440.dp).clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surface)) {
                 if (options.isEmpty()) item { Text("No options available", modifier = Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(options.distinct(), key = { it }) { option ->
                     Column(Modifier.fillMaxWidth().ledgerClickable { change(option); dismiss() }) {
@@ -112,7 +112,7 @@ import java.time.*
 }
 
 @Composable fun Confirm(title: String, text: String, dismiss: () -> Unit, confirm: () -> Unit) {
-    AlertDialog(onDismissRequest = dismiss, shape = RoundedCornerShape(26.dp), containerColor = MaterialTheme.colorScheme.surface,
+    AlertDialog(onDismissRequest = dismiss, shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.surface,
         title = { Text(title, style = MaterialTheme.typography.titleLarge) }, text = { Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         confirmButton = { TextButton(onClick = confirm) { Text(if (title.startsWith("Delete")) "Delete" else "Confirm", color = if (title.startsWith("Delete")) rust else MaterialTheme.colorScheme.primary) } },
         dismissButton = { TextButton(onClick = dismiss) { Text("Cancel", fontWeight = FontWeight.Normal) } })
@@ -149,7 +149,7 @@ import java.time.*
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text("AMOUNT IN INR", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextField(amount, { amount = it; error = null }, placeholder = { Text("0.00", fontSize = 40.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .45f)) }, prefix = { Text("₹ ", fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true,
-                textStyle = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp, fontWeight = FontWeight.Medium), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = fieldColors(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                textStyle = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp, fontWeight = FontWeight.Medium), modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = fieldColors(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         }
         error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
         SectionLabel("Details")

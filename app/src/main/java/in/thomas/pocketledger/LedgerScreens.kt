@@ -58,7 +58,7 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
 
 @Composable private fun MoneyStat(label: String, amount: Long, income: Boolean, month: YearMonth, modifier: Modifier = Modifier, open: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    Surface(onClick = open, interactionSource = interaction, modifier = modifier.premiumPressEffect(interaction).metricBounds("${if (income) "INCOME" else "EXPENSE"}:$month"), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
+    Surface(onClick = open, interactionSource = interaction, modifier = modifier.premiumPressEffect(interaction).metricBounds("${if (income) "INCOME" else "EXPENSE"}:$month"), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 AppIcon(if (income) "income" else "expense", Modifier.size(16.dp), if (income) MaterialTheme.colorScheme.tertiary else rust)
@@ -78,7 +78,7 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
     val expense = ready.summary.spent
     val pending = remember(messages) { messages.count { it.status == "REVIEW" } }
     val totals = ready.spendingByCategory
-    FluidList(contentPadding = PaddingValues(22.dp, 10.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 10.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { BalanceCard(income - expense, accounts.size) }
         item {
             if (LocalDensity.current.fontScale > 1.3f) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -98,7 +98,7 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
             }
         }
         if (pending > 0) item {
-            Surface(onClick = review, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+            Surface(onClick = review, shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer) {
                 Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
                     AppIcon("sms", tint = MaterialTheme.colorScheme.primary)
                     Column(Modifier.weight(1f)) { Text("A quick review", style = MaterialTheme.typography.titleSmall); Text("$pending bank ${if (pending == 1) "message needs" else "messages need"} your attention", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -114,8 +114,8 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
                 }
                 Text("Set your opening balances, then bring in your bank transactions.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(onClick = setup, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)) { Text("Set up accounts", style = MaterialTheme.typography.labelMedium) }
-                    OutlinedButton(onClick = review, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)) { Text("Import SMS", style = MaterialTheme.typography.labelMedium) }
+                    Button(onClick = setup, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.medium, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)) { Text("Set up accounts", style = MaterialTheme.typography.labelMedium) }
+                    OutlinedButton(onClick = review, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.medium, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)) { Text("Import SMS", style = MaterialTheme.typography.labelMedium) }
                 }
             }
         }
@@ -143,7 +143,7 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
         }
         if (monthly.isNotEmpty()) {
             item { SectionTitle("Recent activity") }
-            item { Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
+            item { Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
                 Column { monthly.take(5).forEachIndexed { index, entry -> EntryRow(entry, accounts, divider = index < minOf(monthly.size, 5) - 1) { edit(entry) } } }
             } }
         }
@@ -165,7 +165,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     val date = remember(e.date) { Instant.ofEpochMilli(e.date).atZone(india).format(dayMonthFormat) }
     val largeText = LocalDensity.current.fontScale > 1.3f
     val interaction = remember { MutableInteractionSource() }
-    Column(Modifier.fillMaxWidth().heightIn(min = 72.dp).premiumPressEffect(interaction, pressedScale = .993f).clickable(interactionSource = interaction, indication = androidx.compose.foundation.LocalIndication.current, onClickLabel = "Edit transaction", onClick = click)) {
+    Column(Modifier.fillMaxWidth().heightIn(min = 72.dp).premiumPressEffect(interaction, pressedScale = .993f).clickable(interactionSource = interaction, indication = null, onClickLabel = "Edit transaction", onClick = click)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             IconTile(when (e.type) { "INCOME" -> "income"; "TRANSFER" -> "transfer"; else -> "receipt" })
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -202,33 +202,33 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     // Search and filters live in the list so the overlaid page header never leaves a gap above them.
     FluidList(contentPadding = PaddingValues(bottom = 28.dp)) {
         leading?.let { header -> item(key = "leading", contentType = "leading") { header() } }
-        item(key = "search", contentType = "search") { Box(Modifier.padding(horizontal = 22.dp, vertical = 6.dp)) {
+        item(key = "search", contentType = "search") { Box(Modifier.padding(horizontal = LedgerSpace.margin, vertical = 6.dp)) {
             TextField(search, { search = it }, label = { Text("Search transactions") }, placeholder = { Text("Payee, category or note", color = MaterialTheme.colorScheme.onSurfaceVariant) }, leadingIcon = { AppIcon("search", Modifier.size(19.dp), MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true, trailingIcon = { if (search.isNotEmpty()) IconButton(onClick = { search = "" }) { AppIcon("close", Modifier.semantics { contentDescription = "Clear search" }) } }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = fieldColors())
         } }
-        item(key = "filters", contentType = "filters") { FluidRow(contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item(key = "filters", contentType = "filters") { FluidRow(contentPadding = PaddingValues(horizontal = LedgerSpace.margin, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             item { ChoiceChip("Type", type, listOf("ALL", "EXPENSE", "INCOME", "TRANSFER"), { if (it == "ALL") "All types" else it.lowercase().replaceFirstChar(Char::titlecase) }) { type = it } }
             item { ChoiceChip("Account", account, listOf("ALL") + accounts.map { it.id }, { value -> accounts.find { it.id == value }?.name ?: "All accounts" }) { account = it } }
             item { ChoiceChip("Category", category, listOf("ALL") + categoryOptions, { if (it == "ALL") "All categories" else it }) { category = it } }
         } }
         run {
-            if (result == null) item(key = "loading", contentType = "loading") { Text("Filtering transactions...", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) }
-            else if (groups.isEmpty()) item(key = "empty", contentType = "empty") { Column(Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) {
+            if (result == null) item(key = "loading", contentType = "loading") { Text("Filtering transactions...", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = LedgerSpace.margin, vertical = 8.dp)) }
+            else if (groups.isEmpty()) item(key = "empty", contentType = "empty") { Column(Modifier.padding(horizontal = LedgerSpace.margin, vertical = 8.dp)) {
                 Empty("Try another month or clear the filters. Add an entry with +, or review bank alerts in Inbox.", "No matching transactions", "receipt")
                 if (search.isNotEmpty() || type != "ALL" || category != "ALL" || account != "ALL") TextButton(onClick = { search = ""; type = "ALL"; category = "ALL"; account = "ALL" }) { Text("Clear filters") }
             } }
             groups.forEach { (date, group) ->
-                item(key = "date-$date", contentType = "heading") { Box(Modifier.padding(start = 22.dp, end = 22.dp, top = LedgerSpace.section, bottom = LedgerSpace.small)) { SectionLabel(displayDate(dayMillis(date))) } }
+                item(key = "date-$date", contentType = "heading") { Box(Modifier.padding(start = LedgerSpace.margin, end = LedgerSpace.margin, top = LedgerSpace.section, bottom = LedgerSpace.small)) { SectionLabel(displayDate(dayMillis(date))) } }
                 itemsIndexed(group, key = { _, entry -> entry.id }, contentType = { _, _ -> "entry" }) { index, entry ->
-                    val top = if (index == 0) 16.dp else 0.dp
-                    val bottom = if (index == group.lastIndex) 16.dp else 0.dp
-                    Surface(modifier = (if (LocalReducedMotion.current) Modifier else Modifier.animateItem()).padding(horizontal = 22.dp),
+                    val top = if (index == 0) 12.dp else 0.dp
+                    val bottom = if (index == group.lastIndex) 12.dp else 0.dp
+                    Surface(modifier = (if (LocalReducedMotion.current) Modifier else Modifier.animateItem()).padding(horizontal = LedgerSpace.margin),
                         shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom),
                         color = MaterialTheme.colorScheme.surface) {
                         EntryRow(entry, accounts, divider = index < group.lastIndex) { edit(entry) }
                     }
                 }
             }
-            if (groups.isNotEmpty()) item(key = "count", contentType = "footer") { Text("${groups.values.sumOf { it.size }} transactions", modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = LedgerSpace.content), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (groups.isNotEmpty()) item(key = "count", contentType = "footer") { Text("${groups.values.sumOf { it.size }} transactions", modifier = Modifier.padding(start = LedgerSpace.margin, end = LedgerSpace.margin, top = LedgerSpace.content), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }
@@ -245,7 +245,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     val balances = calculatedBalances ?: run { LedgerSkeleton(); return }
     val bankBalances = remember(messages) { messages.filter { it.balance != null && it.status in listOf("SAVED", "LINKED") }
         .groupBy { it.bank to it.suffix }.mapValues { (_, records) -> records.maxByOrNull { it.date ?: it.received } } }
-    FluidList(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+    FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 12.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Text("Everything, in one place.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         items(accounts, key = { it.id }, contentType = { "account" }) { a ->
             CardBlock(Modifier.ledgerClickable { edit(a) }) {
@@ -269,7 +269,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
                 }
             }
         }
-        item { Button(onClick = add, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(8.dp)) { AppIcon("plus", Modifier.size(18.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(8.dp)); Text("Add account") } }
+        item { Button(onClick = add, modifier = Modifier.fillMaxWidth().height(52.dp), shape = MaterialTheme.shapes.medium) { AppIcon("plus", Modifier.size(18.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(8.dp)); Text("Add account") } }
         item { Text("Opening balances represent your money just before the chosen date. Bank-reported balances are shown separately.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp)) }
     }
 }
@@ -282,7 +282,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     val spentByCategory = spending ?: run { LedgerSkeleton(); return }
     val planned = current.sumOf { it.amount }
     val spent = current.sumOf { spentByCategory[it.category] ?: 0L }
-    FluidList(contentPadding = PaddingValues(22.dp, 10.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 10.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
             Segments(listOf("PLAN" to "50 / 30 / 20", "BUDGETS" to "Category budgets"),
                 if (allocationView) "PLAN" else "BUDGETS") { allocationView = it == "PLAN" }
@@ -299,7 +299,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
                 Text(if (planned > 0) money(planned - spent) else "Make a little room", style = MaterialTheme.typography.headlineMedium, color = if (spent > planned) rust else MaterialTheme.colorScheme.onSurface)
                 Text(if (planned > 0) "Left across your budgeted categories" else "Set a limit. Give every category a little direction.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (planned > 0) LinearProgressIndicator(progress = { (spent.toDouble() / planned).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = if (spent > planned) rust else MaterialTheme.colorScheme.tertiary, trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
-                Button(onClick = { edit = Budget("Food", 0) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(8.dp)) { AppIcon("plus", Modifier.size(17.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(7.dp)); Text("Set a budget") }
+                Button(onClick = { edit = Budget("Food", 0) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { AppIcon("plus", Modifier.size(17.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(7.dp)); Text("Set a budget") }
             } }
             item { SectionTitle("Your categories") }
             if (current.isEmpty()) item { Empty("Create your first category budget to track spending as the month unfolds.", "Good things start with a plan", "budgets") }

@@ -251,7 +251,7 @@ private sealed interface LedgerRoute {
     val headerState = rememberTopAppBarState()
     val headerPinned = rememberHeaderPinned()
     val headerCanScroll by rememberUpdatedState(!headerPinned && !navigation.isRunning && editor == null && accountEditor == null)
-    val headerScroll = TopAppBarDefaults.enterAlwaysScrollBehavior(
+    val headerScroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         state = headerState,
         canScroll = { headerCanScroll },
         snapAnimationSpec = LedgerMotion.gentle()
@@ -263,6 +263,11 @@ private sealed interface LedgerRoute {
     }
     // The header overlays the page; pages reserve its full height so scrolling never resizes a list.
     var headerInset by remember { mutableStateOf(lastHeaderInset[0].dp) }
+    val headerTitle = when (val current = shownRoute) {
+        LedgerRoute.Settings -> "Settings"
+        LedgerRoute.Tabs -> titles[tab]
+        is LedgerRoute.Transactions -> if (current.category != "ALL") current.category else if (current.type == "INCOME") "Income" else "Spent"
+    }
     Scaffold(
         modifier = Modifier.weight(1f).nestedScroll(headerScroll.nestedScrollConnection),
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets.exclude(WindowInsets.statusBars),
@@ -272,21 +277,21 @@ private sealed interface LedgerRoute {
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             ScrollingLedgerHeader(headerState, pinned = headerPinned, modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).zIndex(1f),
-                onInset = { inset -> if (inset != headerInset) { headerInset = inset; lastHeaderInset[0] = inset.value } }) {
-            PocketHeader(
-                title = when (val current = shownRoute) {
-                    LedgerRoute.Settings -> "Settings"
-                    LedgerRoute.Tabs -> titles[tab]
-                    is LedgerRoute.Transactions -> if (current.category != "ALL") current.category else if (current.type == "INCOME") "Income" else "Spent"
-                },
-                back = if (shownRoute != LedgerRoute.Tabs || (!wide && tab in listOf(2, 4, 5))) ({ if (settings) settings = false else if (details != null) details = null else tab = 6 }) else null,
-                settings = { settings = true },
-                add = if (shownRoute != LedgerRoute.Settings && (tab <= 1 || shownRoute is LedgerRoute.Transactions)) ({
-                    accounts.firstOrNull()?.let {
-                        editor = Entry(UUID.randomUUID().toString(), it.id, type = (shownRoute as? LedgerRoute.Transactions)?.type ?: "EXPENSE", category = (shownRoute as? LedgerRoute.Transactions)?.category?.takeUnless { category -> category == "ALL" } ?: "Uncategorized", amount = 0, date = System.currentTimeMillis())
-                    }
-                }) else null
-            )
+                onInset = { inset -> if (inset != headerInset) { headerInset = inset; lastHeaderInset[0] = inset.value } },
+                bar = { collapsed ->
+                    PocketNavigationBar(
+                        title = headerTitle, collapsed = collapsed,
+                        back = if (shownRoute != LedgerRoute.Tabs || (!wide && tab in listOf(2, 4, 5))) ({ if (settings) settings = false else if (details != null) details = null else tab = 6 }) else null,
+                        backLabel = if (shownRoute == LedgerRoute.Tabs) titles[6] else titles[tab],
+                        settings = if (shownRoute == LedgerRoute.Tabs && !(!wide && tab in listOf(2, 4, 5))) ({ settings = true }) else null,
+                        add = if (shownRoute != LedgerRoute.Settings && (tab <= 1 || shownRoute is LedgerRoute.Transactions)) ({
+                            accounts.firstOrNull()?.let {
+                                editor = Entry(UUID.randomUUID().toString(), it.id, type = (shownRoute as? LedgerRoute.Transactions)?.type ?: "EXPENSE", category = (shownRoute as? LedgerRoute.Transactions)?.category?.takeUnless { category -> category == "ALL" } ?: "Uncategorized", amount = 0, date = System.currentTimeMillis())
+                            }
+                        }) else null
+                    )
+                }) {
+            PocketLargeTitle(headerTitle)
             if (shownRoute is LedgerRoute.Transactions || (shownRoute == LedgerRoute.Tabs && tab in listOf(0, 1, 3, 5))) {
                 MonthPicker(month) { month = it }
             }

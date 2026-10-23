@@ -22,6 +22,8 @@ object LedgerSpace {
     val generous = 24.dp
     val large = 32.dp
     val touch = 48.dp
+    /** Standard horizontal screen margin. */
+    val margin = 16.dp
 }
 
 object LedgerMotion {
@@ -40,7 +42,7 @@ fun Modifier.ledgerClickable(
 ): Modifier = composed {
     val interaction = remember { MutableInteractionSource() }
     premiumPressEffect(interaction, enabled, pressedScale = .993f)
-        .clickable(interactionSource = interaction, indication = LocalIndication.current,
+        .clickable(interactionSource = interaction, indication = null,
             enabled = enabled, onClickLabel = onClickLabel, role = role, onClick = onClick)
 }
 
