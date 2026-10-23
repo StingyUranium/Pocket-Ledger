@@ -98,12 +98,9 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
             }
         }
         if (pending > 0) item {
-            Surface(onClick = review, shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer) {
-                Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                    AppIcon("sms", tint = MaterialTheme.colorScheme.primary)
-                    Column(Modifier.weight(1f)) { Text("A quick review", style = MaterialTheme.typography.titleSmall); Text("$pending bank ${if (pending == 1) "message needs" else "messages need"} your attention", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    AppIcon("right", Modifier.size(16.dp), MaterialTheme.colorScheme.primary)
-                }
+            GroupedSection {
+                GroupedRow("A quick review", subtitle = "$pending bank ${if (pending == 1) "message needs" else "messages need"} your attention",
+                    leading = { AppIcon("sms", tint = MaterialTheme.colorScheme.primary) }, chevron = true, onClick = review)
             }
         }
         if (entries.isEmpty()) item {
@@ -119,33 +116,35 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
                 }
             }
         }
-        item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { SectionTitle("Spending breakdown"); Spacer(Modifier.weight(1f)); Text("${totals.size} categories", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-        if (totals.isEmpty()) item { Empty("Add an expense to see where your money goes.", "Every little detail, in focus", "chart") }
-        else item {
-            CardBlock {
+        if (totals.isEmpty()) {
+            item { GroupedSection("Spending breakdown") {} }
+            item { Empty("Add an expense to see where your money goes.", "Every little detail, in focus", "chart") }
+        } else item {
+            GroupedSection("Spending breakdown", footer = "${totals.size} ${if (totals.size == 1) "category" else "categories"}") {
                 totals.forEachIndexed { index, (category, amount) ->
+                    if (index > 0) GroupedDivider()
                     val color = categoryColor(index)
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).ledgerClickable(onClickLabel = "View $category transactions") { openTransactions("EXPENSE", category) }.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                            Box(Modifier.size(8.dp).background(color, CircleShape))
-                            Text(category, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                            Text(money(amount), style = MaterialTheme.typography.titleSmall)
-                            AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        LinearProgressIndicator(progress = { if (expense == 0L) 0f else (amount.toDouble() / expense).toFloat() }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape), color = color, trackColor = color.copy(alpha = .1f), drawStopIndicator = {})
-                        budgets.find { it.category == category && it.amount > 0 }?.let {
-                            Text("${money(it.amount - amount)} left of ${money(it.amount)}", style = MaterialTheme.typography.bodySmall, color = if (amount > it.amount) rust else MaterialTheme.colorScheme.onSurfaceVariant)
+                    GroupedItem(onClick = { openTransactions("EXPENSE", category) }, onClickLabel = "View $category transactions") {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                                Box(Modifier.size(8.dp).background(color, CircleShape))
+                                Text(category, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                                Text(money(amount), style = MaterialTheme.typography.titleSmall)
+                                AppIcon("right", Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            LinearProgressIndicator(progress = { if (expense == 0L) 0f else (amount.toDouble() / expense).toFloat() }, modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape), color = color, trackColor = color.copy(alpha = .12f), drawStopIndicator = {})
+                            budgets.find { it.category == category && it.amount > 0 }?.let {
+                                Text("${money(it.amount - amount)} left of ${money(it.amount)}", style = MaterialTheme.typography.bodySmall, color = if (amount > it.amount) rust else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
-                    if (index != totals.lastIndex) Spacer(Modifier.height(5.dp))
                 }
             }
         }
-        if (monthly.isNotEmpty()) {
-            item { SectionTitle("Recent activity") }
-            item { Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
-                Column { monthly.take(5).forEachIndexed { index, entry -> EntryRow(entry, accounts, divider = index < minOf(monthly.size, 5) - 1) { edit(entry) } } }
-            } }
+        if (monthly.isNotEmpty()) item {
+            GroupedSection("Recent activity") {
+                monthly.take(5).forEachIndexed { index, entry -> EntryRow(entry, accounts, divider = index < minOf(monthly.size, 5) - 1) { edit(entry) } }
+            }
         }
         item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { AppIcon("lock", Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(6.dp)); Text("Your finances stay on this device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
     }
@@ -247,30 +246,27 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
         .groupBy { it.bank to it.suffix }.mapValues { (_, records) -> records.maxByOrNull { it.date ?: it.received } } }
     FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 12.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Text("Everything, in one place.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        items(accounts, key = { it.id }, contentType = { "account" }) { a ->
-            CardBlock(Modifier.ledgerClickable { edit(a) }) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    BankMark(a.bank)
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(a.name, style = MaterialTheme.typography.titleMedium)
-                        Text(if (a.bank == "CASH") "Cash account" else "Account •••• ${a.suffix}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (accounts.isNotEmpty()) item(key = "accounts", contentType = "accounts") {
+            GroupedSection(footer = "Opening balances represent your money just before the chosen date. Bank-reported balances are shown separately.") {
+                accounts.forEachIndexed { index, a ->
+                    if (index > 0) GroupedDivider(inset = 72.dp)
+                    GroupedItem(onClick = { edit(a) }, onClickLabel = "Edit ${a.name}") {
+                        BankMark(a.bank)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(a.name, style = MaterialTheme.typography.titleMedium)
+                            Text(if (a.bank == "CASH") "Cash account" else "Account \u2022\u2022\u2022\u2022 ${a.suffix}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Opening ${money(a.opening)} \u00b7 from ${displayDate(a.openingDate)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            bankBalances[a.bank to a.suffix]?.let {
+                                Text("Bank reported ${money(it.balance!!)} \u00b7 ${displayDate(it.date ?: it.received)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        Text(money(balances[a.id] ?: a.opening), style = MaterialTheme.typography.titleMedium)
+                        AppIcon("right", Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    AppIcon("right", Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text(money(balances[a.id] ?: a.opening), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 5.dp))
-                HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Opening balance", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(money(a.opening), style = MaterialTheme.typography.labelMedium)
-                }
-                Text("From ${displayDate(a.openingDate)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                bankBalances[a.bank to a.suffix]?.let {
-                    Text("Bank reported ${money(it.balance!!)} · ${displayDate(it.date ?: it.received)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
         item { Button(onClick = add, modifier = Modifier.fillMaxWidth().height(52.dp), shape = MaterialTheme.shapes.medium) { AppIcon("plus", Modifier.size(18.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(8.dp)); Text("Add account") } }
-        item { Text("Opening balances represent your money just before the chosen date. Bank-reported balances are shown separately.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp)) }
     }
 }
 
@@ -301,16 +297,27 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
                 if (planned > 0) LinearProgressIndicator(progress = { (spent.toDouble() / planned).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = if (spent > planned) rust else MaterialTheme.colorScheme.tertiary, trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
                 Button(onClick = { edit = Budget("Food", 0) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { AppIcon("plus", Modifier.size(17.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(7.dp)); Text("Set a budget") }
             } }
-            item { SectionTitle("Your categories") }
-            if (current.isEmpty()) item { Empty("Create your first category budget to track spending as the month unfolds.", "Good things start with a plan", "budgets") }
-            items(current, key = { it.category }, contentType = { "budget" }) { b ->
-                val amount = spentByCategory[b.category] ?: 0L
-                val over = amount > b.amount
-                CardBlock(Modifier.ledgerClickable { edit = b }) {
-                    Row(verticalAlignment = Alignment.CenterVertically) { Text(b.category, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f)); StatusPill(if (over) "Over budget" else "${((amount.toDouble() / b.amount) * 100).toInt()}% used", if (over) rust else MaterialTheme.colorScheme.primary) }
-                    Row(verticalAlignment = Alignment.Bottom) { Text(money(amount), style = MaterialTheme.typography.titleLarge); Text(" / ${money(b.amount)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    LinearProgressIndicator(progress = { (amount.toDouble() / b.amount).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape), color = if (over) rust else MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
-                    Text("${money(b.amount - amount)} remaining", style = MaterialTheme.typography.bodySmall, color = if (over) rust else MaterialTheme.colorScheme.onSurfaceVariant)
+            if (current.isEmpty()) {
+                item { GroupedSection("Your categories") {} }
+                item { Empty("Create your first category budget to track spending as the month unfolds.", "Good things start with a plan", "budgets") }
+            } else item(key = "budgets", contentType = "budgets") {
+                GroupedSection("Your categories") {
+                    current.forEachIndexed { index, b ->
+                        if (index > 0) GroupedDivider()
+                        val amount = spentByCategory[b.category] ?: 0L
+                        val over = amount > b.amount
+                        GroupedItem(onClick = { edit = b }, onClickLabel = "Edit ${b.category} budget") {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(b.category, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                                    StatusPill(if (over) "Over budget" else "${((amount.toDouble() / b.amount) * 100).toInt()}% used", if (over) rust else MaterialTheme.colorScheme.primary)
+                                }
+                                Row(verticalAlignment = Alignment.Bottom) { Text(money(amount), style = MaterialTheme.typography.titleMedium); Text(" / ${money(b.amount)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                LinearProgressIndicator(progress = { (amount.toDouble() / b.amount).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape), color = if (over) rust else MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
+                                Text("${money(b.amount - amount)} remaining", style = MaterialTheme.typography.bodySmall, color = if (over) rust else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -71,19 +71,18 @@ private data class GraphReport(
                         Text(money(total), style = MaterialTheme.typography.titleLarge)
                     }
                 }
-                categories.forEachIndexed { index, (category, amount) ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).ledgerClickable(onClickLabel = "View $category transactions") { openTransactions("EXPENSE", category) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(Modifier.size(9.dp).background(categoryColor(index), CircleShape))
-                        Column(Modifier.weight(1f)) {
-                            Text(category, style = MaterialTheme.typography.titleSmall)
-                            Text(String.format(locale, "%.1f%%", amount.toDouble() / total * 100), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Text(money(amount), style = MaterialTheme.typography.titleSmall)
-                        AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
             }
         } }
+        if (total != 0L) item(key = "categories", contentType = "categories") {
+            GroupedSection("Categories") {
+                categories.forEachIndexed { index, (category, amount) ->
+                    if (index > 0) GroupedDivider(inset = 36.dp)
+                    GroupedRow(category, subtitle = String.format(locale, "%.1f%%", amount.toDouble() / total * 100),
+                        leading = { Box(Modifier.size(9.dp).background(categoryColor(index), CircleShape)) },
+                        value = money(amount), chevron = true, onClickLabel = "View $category transactions", onClick = { openTransactions("EXPENSE", category) })
+                }
+            }
+        }
         item { CardBlock {
             SectionTitle("Day by day")
             Text(peak?.let { "Highest spending: ${money(it.value)} on ${it.key} ${month.format(DateTimeFormatter.ofPattern("MMM"))}" } ?: "No daily spending recorded", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -93,18 +92,20 @@ private data class GraphReport(
             }
             TextButton(onClick = { openTransactions("EXPENSE", "ALL") }, modifier = Modifier.align(Alignment.End)) { Text("View spending"); AppIcon("right", Modifier.size(12.dp), primary) }
         } }
-        item { CardBlock {
-            SectionTitle("Six-month view")
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+        item { GroupedSection("Six-month view", footer = "Tap a month to open it.") {
+            Row(Modifier.padding(horizontal = LedgerSpace.margin, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Box(Modifier.size(8.dp).background(incomeColor, CircleShape)); Text("Income", style = MaterialTheme.typography.bodySmall) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Box(Modifier.size(8.dp).background(expenseColor, CircleShape)); Text("Spent", style = MaterialTheme.typography.bodySmall) }
             }
             history.forEach { (period, summary) ->
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).ledgerClickable(onClickLabel = "View ${period.format(monthYearFormat)}") { changeMonth(period) }.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(period.format(shortMonthYearFormat), style = MaterialTheme.typography.titleSmall)
-                    LinearProgressIndicator(progress = { (summary.income.toDouble() / scale).toFloat() }, modifier = Modifier.fillMaxWidth().height(7.dp).clip(CircleShape), color = incomeColor, trackColor = trackColor, drawStopIndicator = {})
-                    LinearProgressIndicator(progress = { (summary.spent.toDouble() / scale).toFloat() }, modifier = Modifier.fillMaxWidth().height(7.dp).clip(CircleShape), color = expenseColor, trackColor = trackColor, drawStopIndicator = {})
-                    Text("Income ${money(summary.income)}  ·  Spent ${money(summary.spent)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                GroupedDivider()
+                GroupedItem(onClick = { changeMonth(period) }, onClickLabel = "View ${period.format(monthYearFormat)}") {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(period.format(shortMonthYearFormat), style = MaterialTheme.typography.titleSmall)
+                        LinearProgressIndicator(progress = { (summary.income.toDouble() / scale).toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = incomeColor, trackColor = trackColor, drawStopIndicator = {})
+                        LinearProgressIndicator(progress = { (summary.spent.toDouble() / scale).toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = expenseColor, trackColor = trackColor, drawStopIndicator = {})
+                        Text("Income ${money(summary.income)}  \u00b7  Spent ${money(summary.spent)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         } }

@@ -38,12 +38,10 @@ import androidx.compose.ui.unit.dp
             }
             Text("Turn bank alerts into everyday clarity. Processed privately on your phone.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (!permission) Button(onClick = request, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { Text("Enable SMS access") }
-            HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text("Automatic capture", style = MaterialTheme.typography.bodyLarge); Text(if (capture && permission) "Ready for your next bank alert" else "Capture new bank transactions", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                PocketSwitch(capture && permission, "Automatic capture", toggle)
-            }
-            if (capture && !permission) Text("Grant SMS access in Settings to resume capture.", style = MaterialTheme.typography.bodySmall, color = rust)
+        } }
+        item { GroupedSection(footer = if (capture && !permission) "Grant SMS access in Settings to resume capture." else null) {
+            GroupedRow("Automatic capture", subtitle = if (capture && permission) "Ready for your next bank alert" else "Capture new bank transactions",
+                trailing = { PocketSwitch(capture && permission, "Automatic capture", toggle) })
         } }
         item { SectionLabel("Bring in your history") }
         item { CardBlock {
@@ -129,14 +127,6 @@ import androidx.compose.ui.unit.dp
     }
 }
 
-@Composable private fun SettingsRow(icon: String, title: String, subtitle: String? = null, tint: Color = MaterialTheme.colorScheme.primary, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = LedgerSpace.touch).ledgerClickable(onClick = onClick).padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        IconTile(icon, tint, 36)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) { Text(title, style = MaterialTheme.typography.bodyLarge); subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-        AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
 @Composable fun SettingsDialog(capture: Boolean, permission: Boolean, senders: List<TrustedSender>, rules: List<MerchantRule>, export: () -> Unit, restore: () -> Unit, untrust: (TrustedSender) -> Unit, removeRule: (MerchantRule) -> Unit, appSettings: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
@@ -156,53 +146,43 @@ import androidx.compose.ui.unit.dp
             appearance = it
             preferences.edit().putString("mode", it).apply()
         }
-        CardBlock {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Dynamic color", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                PocketSwitch(dynamic, "Dynamic color") { dynamic = it; preferences.edit().putBoolean("dynamic", it).apply() }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("High contrast", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                PocketSwitch(contrast, "High contrast") { contrast = it; preferences.edit().putBoolean("contrast", it).apply() }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Reduce motion", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                PocketSwitch(reduceMotion, "Reduce motion") { reduceMotion = it; preferences.edit().putBoolean("reduceMotion", it).apply() }
-            }
-            Text("System animation settings are also respected.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        GroupedSection(footer = "System animation settings are also respected.") {
+            GroupedRow("Dynamic color", trailing = { PocketSwitch(dynamic, "Dynamic color") { dynamic = it; preferences.edit().putBoolean("dynamic", it).apply() } })
+            GroupedDivider()
+            GroupedRow("High contrast", trailing = { PocketSwitch(contrast, "High contrast") { contrast = it; preferences.edit().putBoolean("contrast", it).apply() } })
+            GroupedDivider()
+            GroupedRow("Reduce motion", trailing = { PocketSwitch(reduceMotion, "Reduce motion") { reduceMotion = it; preferences.edit().putBoolean("reduceMotion", it).apply() } })
         }
-        SectionLabel("Permissions & capture")
-        CardBlock {
-            SettingsRow("sms", "SMS access", if (permission) "Permission granted" else "Permission not granted", onClick = appSettings)
-            HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
-            Row(verticalAlignment = Alignment.CenterVertically) { Text("Automatic capture", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge); StatusPill(if (capture && permission) "Active" else "Paused", if (capture && permission) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant) }
+        GroupedSection("Permissions & capture") {
+            GroupedRow("SMS access", subtitle = if (permission) "Permission granted" else "Permission not granted", leading = { IconTile("sms", size = 30) }, chevron = true, onClick = appSettings)
+            GroupedDivider(inset = 58.dp)
+            GroupedRow("Automatic capture", trailing = { StatusPill(if (capture && permission) "Active" else "Paused", if (capture && permission) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant) })
         }
-        SectionLabel("Home screen")
-        CardBlock {
-            Text("Home screen widgets", style = MaterialTheme.typography.titleMedium)
-            Text("Keep this month’s totals close at hand.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            SettingsRow("home", "Add monthly summary", "Income, spending, and balance", onClick = {
+        GroupedSection("Home screen", footer = "Keep this month\u2019s totals close at hand.") {
+            GroupedRow("Add monthly summary", subtitle = "Income, spending, and balance", leading = { IconTile("home", size = 30) }, chevron = true, onClick = {
                 if (!LedgerWidgets.pin(context, false)) android.widget.Toast.makeText(context, "Long-press your home screen, choose Widgets, then Ledger.", android.widget.Toast.LENGTH_LONG).show()
             })
-            SettingsRow("budgets", "Add budget widget", "Monthly limits and remaining amount", onClick = {
+            GroupedDivider(inset = 58.dp)
+            GroupedRow("Add budget widget", subtitle = "Monthly limits and remaining amount", leading = { IconTile("budgets", size = 30) }, chevron = true, onClick = {
                 if (!LedgerWidgets.pin(context, true)) android.widget.Toast.makeText(context, "Long-press your home screen, choose Widgets, then Ledger.", android.widget.Toast.LENGTH_LONG).show()
             })
         }
-        SectionLabel("Backups")
-        CardBlock {
-            SettingsRow("lock", "Save encrypted backup", "Choose a password and a safe location", onClick = export)
-            HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
-            SettingsRow("backup", "Restore a backup", "Replace data from a saved backup", onClick = restore)
+        GroupedSection("Backups") {
+            GroupedRow("Save encrypted backup", subtitle = "Choose a password and a safe location", leading = { IconTile("lock", size = 30) }, chevron = true, onClick = export)
+            GroupedDivider(inset = 58.dp)
+            GroupedRow("Restore a backup", subtitle = "Replace data from a saved backup", leading = { IconTile("backup", size = 30) }, chevron = true, onClick = restore)
         }
-        SectionLabel("Trusted senders")
-        CardBlock {
-            if (senders.isEmpty()) Text("Confirm your bank's sender IDs after previewing SMS history.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            senders.forEach { sender -> Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(sender.sender, style = MaterialTheme.typography.bodyLarge); Text(sender.bank, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; TextButton(onClick = { untrust(sender) }) { Text("Remove", color = rust, style = MaterialTheme.typography.bodyMedium) } } }
+        GroupedSection("Trusted senders", footer = if (senders.isEmpty()) "Confirm your bank's sender IDs after previewing SMS history." else null) {
+            senders.forEachIndexed { index, sender ->
+                if (index > 0) GroupedDivider()
+                GroupedRow(sender.sender, subtitle = sender.bank, trailing = { TextButton(onClick = { untrust(sender) }) { Text("Remove", color = rust, style = MaterialTheme.typography.bodyMedium) } })
+            }
         }
-        SectionLabel("Remembered categories")
-        CardBlock {
-            if (rules.isEmpty()) Text("Remember a payee's category when editing a transaction to use it for future alerts.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            rules.forEach { rule -> Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(rule.merchant, style = MaterialTheme.typography.bodyMedium); Text(rule.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; TextButton(onClick = { removeRule(rule) }) { Text("Remove", color = rust, style = MaterialTheme.typography.bodyMedium) } } }
+        GroupedSection("Remembered categories", footer = if (rules.isEmpty()) "Remember a payee's category when editing a transaction to use it for future alerts." else null) {
+            rules.forEachIndexed { index, rule ->
+                if (index > 0) GroupedDivider()
+                GroupedRow(rule.merchant, subtitle = rule.category, trailing = { TextButton(onClick = { removeRule(rule) }) { Text("Remove", color = rust, style = MaterialTheme.typography.bodyMedium) } })
+            }
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) { Text("Ledger", style = MaterialTheme.typography.titleSmall); Text("Version $version · Built for your everyday", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }

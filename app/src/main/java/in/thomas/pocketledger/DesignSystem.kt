@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -304,6 +305,53 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
 
 @Composable fun SectionTitle(text: String) { Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() }) }
 @Composable fun SectionLabel(text: String) { Text(text.uppercase(), style = MaterialTheme.typography.labelMedium, letterSpacing = .8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, top = 4.dp).semantics { heading() }) }
+
+/**
+ * Grouped inset list: an optional caption above, one rounded container, hairline separators
+ * between rows and an optional footnote below. Prefer this to a stack of separate cards.
+ */
+@Composable fun GroupedSection(header: String? = null, footer: String? = null, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier.fillMaxWidth()) {
+        header?.let {
+            Text(it.uppercase(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = LedgerSpace.margin, bottom = 6.dp).semantics { heading() })
+        }
+        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) { Column(content = content) }
+        footer?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = LedgerSpace.margin, end = LedgerSpace.margin, top = 6.dp))
+        }
+    }
+}
+
+@Composable fun GroupedDivider(inset: Dp = LedgerSpace.margin) {
+    HorizontalDivider(Modifier.padding(start = inset), thickness = Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+/** A row with custom content. Rows that hold their own control (a switch) should not pass [onClick]. */
+@Composable fun GroupedItem(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onClickLabel: String? = null, content: @Composable RowScope.() -> Unit) {
+    val base = modifier.fillMaxWidth().heightIn(min = 52.dp)
+    Row((if (onClick != null) base.ledgerClickable(onClickLabel = onClickLabel, onClick = onClick) else base)
+        .padding(horizontal = LedgerSpace.margin, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LedgerSpace.medium), content = content)
+}
+
+@Composable fun GroupedRow(
+    title: String, modifier: Modifier = Modifier, subtitle: String? = null, leading: (@Composable () -> Unit)? = null,
+    value: String? = null, trailing: (@Composable () -> Unit)? = null, chevron: Boolean = false,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface, onClick: (() -> Unit)? = null, onClickLabel: String? = null
+) {
+    GroupedItem(modifier, onClick, onClickLabel) {
+        leading?.invoke()
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
+            subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        value?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        trailing?.invoke()
+        if (chevron) AppIcon("right", Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
 
 @Composable fun StatusPill(text: String, color: Color = MaterialTheme.colorScheme.primary) {
     Text(text, color = color, style = MaterialTheme.typography.labelMedium, modifier = Modifier.clip(CircleShape).background(color.copy(alpha = .1f)).padding(horizontal = 10.dp, vertical = 5.dp))
