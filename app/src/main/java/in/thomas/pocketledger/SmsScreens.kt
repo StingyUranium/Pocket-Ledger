@@ -26,7 +26,10 @@ import androidx.compose.ui.unit.dp
         }.take(10).toList()
     }
     val messageList = remember(messages, showAll) { messages.filter { showAll || it.status == "REVIEW" } }
-    PullToRefreshBox(isRefreshing = refreshing, onRefresh = refresh, modifier = Modifier.fillMaxSize()) {
+    val refreshState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+    val headerInset = LocalLedgerHeaderInset.current
+    PullToRefreshBox(isRefreshing = refreshing, onRefresh = refresh, state = refreshState, modifier = Modifier.fillMaxSize(),
+        indicator = { androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(state = refreshState, isRefreshing = refreshing, modifier = Modifier.align(Alignment.TopCenter).padding(top = headerInset)) }) {
     FluidList(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { CardBlock {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

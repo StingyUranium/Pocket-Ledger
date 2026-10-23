@@ -185,7 +185,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     }
 }
 
-@Composable fun Transactions(entries: List<Entry>, accounts: List<Account>, month: YearMonth, initialType: String = "ALL", initialCategory: String = "ALL", edit: (Entry) -> Unit) {
+@Composable fun Transactions(entries: List<Entry>, accounts: List<Account>, month: YearMonth, initialType: String = "ALL", initialCategory: String = "ALL", leading: (@Composable () -> Unit)? = null, edit: (Entry) -> Unit) {
     var search by rememberSaveable { mutableStateOf("") }
     var type by rememberSaveable(initialType) { mutableStateOf(initialType) }
     var account by rememberSaveable { mutableStateOf("ALL") }
@@ -199,34 +199,36 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     androidx.activity.compose.ReportDrawnWhen { result != null }
     val groups = result.orEmpty()
     val categoryOptions = remember(entries) { (defaultCategories + entries.map { it.category }).distinct() }
-    Column {
-        Box(Modifier.padding(horizontal = 22.dp, vertical = 6.dp)) {
+    // Search and filters live in the list so the overlaid page header never leaves a gap above them.
+    FluidList(contentPadding = PaddingValues(bottom = 28.dp)) {
+        leading?.let { header -> item(key = "leading", contentType = "leading") { header() } }
+        item(key = "search", contentType = "search") { Box(Modifier.padding(horizontal = 22.dp, vertical = 6.dp)) {
             TextField(search, { search = it }, label = { Text("Search transactions") }, placeholder = { Text("Payee, category or note", color = MaterialTheme.colorScheme.onSurfaceVariant) }, leadingIcon = { AppIcon("search", Modifier.size(19.dp), MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true, trailingIcon = { if (search.isNotEmpty()) IconButton(onClick = { search = "" }) { AppIcon("close", Modifier.semantics { contentDescription = "Clear search" }) } }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = fieldColors())
-        }
-        FluidRow(contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        } }
+        item(key = "filters", contentType = "filters") { FluidRow(contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             item { ChoiceChip("Type", type, listOf("ALL", "EXPENSE", "INCOME", "TRANSFER"), { if (it == "ALL") "All types" else it.lowercase().replaceFirstChar(Char::titlecase) }) { type = it } }
             item { ChoiceChip("Account", account, listOf("ALL") + accounts.map { it.id }, { value -> accounts.find { it.id == value }?.name ?: "All accounts" }) { account = it } }
             item { ChoiceChip("Category", category, listOf("ALL") + categoryOptions, { if (it == "ALL") "All categories" else it }) { category = it } }
-        }
-        FluidList(contentPadding = PaddingValues(22.dp, 8.dp, 22.dp, 28.dp)) {
-            if (result == null) item(key = "loading", contentType = "loading") { Text("Filtering transactions...", style = MaterialTheme.typography.bodyMedium) }
-            else if (groups.isEmpty()) item(key = "empty", contentType = "empty") {
+        } }
+        run {
+            if (result == null) item(key = "loading", contentType = "loading") { Text("Filtering transactions...", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) }
+            else if (groups.isEmpty()) item(key = "empty", contentType = "empty") { Column(Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) {
                 Empty("Try another month or clear the filters. Add an entry with +, or review bank alerts in Inbox.", "No matching transactions", "receipt")
                 if (search.isNotEmpty() || type != "ALL" || category != "ALL" || account != "ALL") TextButton(onClick = { search = ""; type = "ALL"; category = "ALL"; account = "ALL" }) { Text("Clear filters") }
-            }
+            } }
             groups.forEach { (date, group) ->
-                item(key = "date-$date", contentType = "heading") { Box(Modifier.padding(top = LedgerSpace.section, bottom = LedgerSpace.small)) { SectionLabel(displayDate(dayMillis(date))) } }
+                item(key = "date-$date", contentType = "heading") { Box(Modifier.padding(start = 22.dp, end = 22.dp, top = LedgerSpace.section, bottom = LedgerSpace.small)) { SectionLabel(displayDate(dayMillis(date))) } }
                 itemsIndexed(group, key = { _, entry -> entry.id }, contentType = { _, _ -> "entry" }) { index, entry ->
                     val top = if (index == 0) 16.dp else 0.dp
                     val bottom = if (index == group.lastIndex) 16.dp else 0.dp
-                    Surface(modifier = if (LocalReducedMotion.current) Modifier else Modifier.animateItem(),
+                    Surface(modifier = (if (LocalReducedMotion.current) Modifier else Modifier.animateItem()).padding(horizontal = 22.dp),
                         shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom),
                         color = MaterialTheme.colorScheme.surface) {
                         EntryRow(entry, accounts, divider = index < group.lastIndex) { edit(entry) }
                     }
                 }
             }
-            if (groups.isNotEmpty()) item(key = "count", contentType = "footer") { Text("${groups.values.sumOf { it.size }} transactions", modifier = Modifier.padding(top = LedgerSpace.content), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (groups.isNotEmpty()) item(key = "count", contentType = "footer") { Text("${groups.values.sumOf { it.size }} transactions", modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = LedgerSpace.content), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }

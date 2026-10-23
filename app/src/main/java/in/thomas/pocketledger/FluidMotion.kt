@@ -12,6 +12,7 @@ import androidx.compose.ui.input.nestedscroll.*
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.preferredFrameRate
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -75,7 +76,13 @@ fun Modifier.motionSurface(active: Boolean = false): Modifier = composed {
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
     content: LazyListScope.() -> Unit
 ) {
-    LazyColumn(modifier, contentPadding = contentPadding,
+    val inset = LocalLedgerHeaderInset.current
+    val direction = LocalLayoutDirection.current
+    val padding = if (inset == 0.dp) contentPadding else PaddingValues(
+        start = contentPadding.calculateStartPadding(direction), top = contentPadding.calculateTopPadding() + inset,
+        end = contentPadding.calculateEndPadding(direction), bottom = contentPadding.calculateBottomPadding()
+    )
+    LazyColumn(modifier, contentPadding = padding,
         verticalArrangement = verticalArrangement, content = content)
 }
 

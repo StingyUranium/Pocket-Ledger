@@ -10,6 +10,9 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /** Keep navigation controls available to exploration users and when motion is disabled. */
@@ -26,9 +29,13 @@ internal fun rememberHeaderPinned(): Boolean {
     return LocalReducedMotion.current || exploring
 }
 
+/** Space the page content reserves under the overlaid header: status bar plus full header height. */
+val LocalLedgerHeaderInset = compositionLocalOf { 0.dp }
+
 /**
- * Material owns drag consumption, fling settling and interruption. Only the wrapper's visible
- * height changes during scrolling; the header child is measured with unchanged constraints.
+ * Material owns drag consumption, fling settling and interruption. The header is an overlay: only
+ * its own visible height changes during scrolling, so the list below keeps a constant viewport and
+ * never re-clamps its scroll position at the end. Pages reserve [LocalLedgerHeaderInset] instead.
  * The status-bar inset stays outside the clipped region so content never enters its safe area.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,9 +43,14 @@ internal fun rememberHeaderPinned(): Boolean {
 internal fun ScrollingLedgerHeader(
     state: TopAppBarState,
     pinned: Boolean,
+    modifier: Modifier = Modifier,
+    onInset: (Dp) -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
+    val density = LocalDensity.current
+    val statusTop = WindowInsets.statusBars.getTop(density)
+    val reportInset by rememberUpdatedState(onInset)
+    Column(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
         Layout(
             modifier = Modifier.fillMaxWidth().clipToBounds(),
             content = {
@@ -46,6 +58,7 @@ internal fun ScrollingLedgerHeader(
                     val fraction = state.collapsedFraction
                     state.heightOffsetLimit = -size.height.toFloat()
                     state.heightOffset = state.heightOffsetLimit * fraction
+                    reportInset(with(density) { (size.height + statusTop).toDp() })
                 }, content = content)
             }
         ) { measurables, constraints ->

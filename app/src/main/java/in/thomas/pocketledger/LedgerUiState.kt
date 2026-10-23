@@ -61,7 +61,7 @@ fun <T> backgroundCalculation(vararg inputs: Any?, cacheKey: String? = null, cal
 }
 
 @Composable fun LedgerSkeleton() {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxSize().padding(top = LocalLedgerHeaderInset.current).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Loading your ledger", style = MaterialTheme.typography.bodyLarge)
         repeat(4) { index ->
             Surface(Modifier.fillMaxWidth().height(if (index == 0) 144.dp else 72.dp),

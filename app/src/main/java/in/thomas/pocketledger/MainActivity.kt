@@ -25,6 +25,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -203,6 +204,7 @@ private sealed interface LedgerRoute {
     }
     val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val calculationCache = remember { CalculationCache() }
+    val lastHeaderInset = remember { floatArrayOf(0f) }
     val titles = destinationLabels
     // Keep the shared card data ready while detail pages are open, including during back previews.
     val overviewReport by backgroundCalculation(entries, budgets, month) { calculateOverviewReport(entries, budgets, month) }
@@ -259,10 +261,18 @@ private sealed interface LedgerRoute {
         headerState.heightOffset = 0f
         headerState.contentOffset = 0f
     }
+    // The header overlays the page; pages reserve its full height so scrolling never resizes a list.
+    var headerInset by remember { mutableStateOf(lastHeaderInset[0].dp) }
     Scaffold(
         modifier = Modifier.weight(1f).nestedScroll(headerScroll.nestedScrollConnection),
-        topBar = {
-            ScrollingLedgerHeader(headerState, pinned = headerPinned) {
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets.exclude(WindowInsets.statusBars),
+        bottomBar = { if (!wide && shownRoute == LedgerRoute.Tabs) PocketTabBar(tab, pending) { tab = it } },
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snack) }
+    ) { padding ->
+        Box(Modifier.padding(padding).fillMaxSize()) {
+            ScrollingLedgerHeader(headerState, pinned = headerPinned, modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).zIndex(1f),
+                onInset = { inset -> if (inset != headerInset) { headerInset = inset; lastHeaderInset[0] = inset.value } }) {
             PocketHeader(
                 title = when (val current = shownRoute) {
                     LedgerRoute.Settings -> "Settings"
@@ -277,40 +287,34 @@ private sealed interface LedgerRoute {
                     }
                 }) else null
             )
-            // Animate the picker so switching between tabs with and without it does not jump the content.
-            AnimatedVisibility(
-                visible = shownRoute is LedgerRoute.Transactions || (shownRoute == LedgerRoute.Tabs && tab in listOf(0, 1, 3, 5)),
-                enter = if (reducedMotion) EnterTransition.None else expandVertically(ledgerNavigationTween()) + fadeIn(fluidTween()),
-                exit = if (reducedMotion) ExitTransition.None else shrinkVertically(ledgerNavigationTween()) + fadeOut(fluidTween())
-            ) { MonthPicker(month) { month = it } }
+            if (shownRoute is LedgerRoute.Transactions || (shownRoute == LedgerRoute.Tabs && tab in listOf(0, 1, 3, 5))) {
+                MonthPicker(month) { month = it }
             }
-        },
-        bottomBar = { if (!wide && shownRoute == LedgerRoute.Tabs) PocketTabBar(tab, pending) { tab = it } },
-        containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snack) }
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
+            }
             readState.error?.let { error ->
-                Surface(color = MaterialTheme.colorScheme.errorContainer) {
+                Surface(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).zIndex(1f), color = MaterialTheme.colorScheme.errorContainer) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Text(error, Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
                         TextButton(onClick = { readAttempt++ }) { Text("Retry") }
                     }
                 }
             }
+            if (busy && shownRoute == LedgerRoute.Tabs && snapshot != null) {
+                Text("Updating ledger...", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart).zIndex(1f).padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+            CompositionLocalProvider(LocalLedgerHeaderInset provides headerInset) {
+            Column(Modifier.fillMaxSize()) {
             if (shownRoute == LedgerRoute.Settings) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     SettingsDialog(capture, permission, senders, rules, { passwordMode = "export" }, { chooseRestore.launch(arrayOf("*/*")) }, { work { dao.untrust(it.sender, it.bank) } }, { work { dao.removeRule(it.merchant) } }, { repo.context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${repo.context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
                 }
             } else if (shownRoute is LedgerRoute.Transactions) {
-                Column(Modifier.fillMaxSize()) {
-                    if (shownRoute.category == "ALL") MetricDetailHeader(shownRoute.type, month, overviewReport?.summary)
-                    Transactions(entries, accounts, month, shownRoute.type, shownRoute.category) { editor = it }
-                }
+                Transactions(entries, accounts, month, shownRoute.type, shownRoute.category,
+                    leading = if (shownRoute.category == "ALL") ({ MetricDetailHeader(shownRoute.type, month, overviewReport?.summary) }) else null) { editor = it }
             } else if (snapshot == null) {
                 if (readState.error == null) LedgerSkeleton()
             } else Column(Modifier.fillMaxSize()) {
-            if (busy) Text("Updating ledger...", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
                 val page = tab
                 val entrance = rememberDestinationEntrance(page)
@@ -346,7 +350,7 @@ private sealed interface LedgerRoute {
             }
         }
     }
-    } } } } } } }
+    } } } } } } } } }
     if (expandedEditor && editor != null) {
         VerticalDivider(Modifier.fillMaxHeight())
         Box(Modifier.width(400.dp).fillMaxHeight().statusBarsPadding().navigationBarsPadding()) {
