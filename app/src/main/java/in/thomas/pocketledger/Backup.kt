@@ -11,6 +11,7 @@ import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 object BackupCrypto {
+    private const val MaxBackupBytes = 33_554_432
     private val header = "PKTLGR01".toByteArray()
     private fun key(password: CharArray, salt: ByteArray): SecretKeySpec {
         val spec = PBEKeySpec(password, salt, 600_000, 256)
@@ -18,18 +19,34 @@ object BackupCrypto {
     }
     fun encrypt(data: ByteArray, password: CharArray): ByteArray {
         require(password.size >= 8) { "Use a password of at least 8 characters" }
+        require(data.size <= MaxBackupBytes - 52) { "Backup is too large" }
         val random = SecureRandom(); val salt = ByteArray(16).also(random::nextBytes); val iv = ByteArray(12).also(random::nextBytes)
         val c = Cipher.getInstance("AES/GCM/NoPadding"); c.init(Cipher.ENCRYPT_MODE, key(password, salt), GCMParameterSpec(128, iv)); c.updateAAD(header)
         return header + salt + iv + c.doFinal(data)
     }
     fun decrypt(data: ByteArray, password: CharArray): ByteArray {
-        require(data.size in 52..33_554_432 && data.copyOfRange(0, 8).contentEquals(header)) { "This is not a Ledger backup" }
+        require(data.size in 52..MaxBackupBytes && data.copyOfRange(0, 8).contentEquals(header)) { "This is not a Ledger backup" }
         val c = Cipher.getInstance("AES/GCM/NoPadding"); c.init(Cipher.DECRYPT_MODE, key(password, data.copyOfRange(8, 24)), GCMParameterSpec(128, data.copyOfRange(24, 36))); c.updateAAD(header)
         return try { c.doFinal(data, 36, data.size - 36) } catch (_: javax.crypto.AEADBadTagException) { error("Incorrect password or damaged backup") }
     }
 }
 
-private fun json(v: Any): JSONObject = JSONObject().also { obj -> v.javaClass.declaredFields.filter { !java.lang.reflect.Modifier.isStatic(it.modifiers) }.forEach { f -> f.isAccessible = true; obj.put(f.name, f.get(v) ?: JSONObject.NULL) } }
+// Backup keys are a wire format: never derive them from R8-obfuscatable field names.
+private fun json(vararg fields: Pair<String, Any?>) = JSONObject().also { obj ->
+    fields.forEach { (name, value) -> obj.put(name, value ?: JSONObject.NULL) }
+}
+private fun Account.backupJson() = json("id" to id, "name" to name, "bank" to bank, "suffix" to suffix,
+    "opening" to opening, "openingDate" to openingDate)
+private fun Entry.backupJson() = json("id" to id, "accountId" to accountId, "destinationId" to destinationId,
+    "type" to type, "amount" to amount, "date" to date, "dateOnly" to dateOnly, "payee" to payee,
+    "category" to category, "note" to note, "smsKey" to smsKey, "deleted" to deleted)
+private fun SmsRecord.backupJson() = json("key" to key, "sender" to sender, "body" to body,
+    "received" to received, "bank" to bank, "suffix" to suffix, "amount" to amount, "direction" to direction,
+    "date" to date, "dateOnly" to dateOnly, "payee" to payee, "reference" to reference,
+    "balance" to balance, "complete" to complete, "status" to status, "reason" to reason)
+private fun TrustedSender.backupJson() = json("sender" to sender, "bank" to bank)
+private fun Budget.backupJson() = json("category" to category, "amount" to amount)
+private fun MerchantRule.backupJson() = json("merchant" to merchant, "category" to category, "type" to type)
 private fun objects(a: JSONArray) = (0 until a.length()).map { a.getJSONObject(it) }
 private fun JSONObject.str(k: String): String? = if (isNull(k)) null else getString(k)
 private fun JSONObject.longOrNull(k: String): Long? = if (isNull(k)) null else getLong(k)
@@ -38,9 +55,9 @@ object Backup {
     suspend fun export(db: LedgerDatabase, password: CharArray): ByteArray {
         val d = db.dao()
         val root = db.withTransaction {
-            JSONObject().put("version", 2).put("accounts", JSONArray(d.allAccounts().map(::json)))
-                .put("entries", JSONArray(d.allEntries().map(::json))).put("messages", JSONArray(d.allMessages().map(::json)))
-                .put("senders", JSONArray(d.allSenders().map(::json))).put("budgets", JSONArray(d.allBudgets().map(::json))).put("rules", JSONArray(d.allRules().map(::json)))
+            JSONObject().put("version", 2).put("accounts", JSONArray(d.allAccounts().map { it.backupJson() }))
+                .put("entries", JSONArray(d.allEntries().map { it.backupJson() })).put("messages", JSONArray(d.allMessages().map { it.backupJson() }))
+                .put("senders", JSONArray(d.allSenders().map { it.backupJson() })).put("budgets", JSONArray(d.allBudgets().map { it.backupJson() })).put("rules", JSONArray(d.allRules().map { it.backupJson() }))
         }
         return BackupCrypto.encrypt(root.toString().toByteArray(), password)
     }
@@ -61,6 +78,13 @@ object Backup {
         }
         val ids = accounts.map { it.id }.toSet(); val keys = messages.map { it.key }.toSet()
         require(accounts.isNotEmpty() && ids.size == accounts.size && entries.map { it.id }.distinct().size == entries.size && keys.size == messages.size) { "Backup contains duplicate or missing records" }
+        val smsKeys = entries.mapNotNull { it.smsKey }
+        require(smsKeys.distinct().size == smsKeys.size) { "Backup contains duplicate SMS transactions" }
+        require(messages.all { m ->
+            m.status in listOf("REVIEW", "SAVED", "DISMISSED", "LINKED") &&
+                (!m.complete || m.amount != null && m.amount > 0 && m.date != null &&
+                    m.direction in listOf("INCOME", "EXPENSE") && m.suffix != null && m.reference != null)
+        }) { "Backup contains invalid SMS records" }
         require(entries.all { it.amount > 0 && it.accountId in ids && it.type in listOf("INCOME", "EXPENSE", "TRANSFER") && (it.type != "TRANSFER" || it.destinationId in ids && it.destinationId != it.accountId) && (it.smsKey == null || it.smsKey in keys) }) { "Backup contains invalid transactions" }
         require(budgets.all { it.category.isNotBlank() && it.amount >= 0 }) { "Backup contains invalid budgets" }
         require(rules.all { it.type in listOf("INCOME", "EXPENSE") && it.category.isNotBlank() } &&

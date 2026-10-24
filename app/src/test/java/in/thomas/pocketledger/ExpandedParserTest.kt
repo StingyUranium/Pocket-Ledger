@@ -170,4 +170,13 @@ class ExpandedParserTest {
         val refund = SmsParser.parseSelected("INR 123.45 credited to your Axis Bank account from refund")!!
         assertFalse(refund.complete)
     }
+
+    @Test fun refundExceptionNeverAdmitsOtpRequestsOrFutureCredits() {
+        val refund = sbm("UPI/P2P/123456789012/REFUND/", true, amount = "123.45") + " Refund for failed payment."
+        assertTrue(SmsParser.parseSelected(refund)!!.complete)
+        assertNull(SmsParser.parseSelected(refund + " OTP 123456"))
+        assertNull(SmsParser.parseSelected(refund + " Someone has requested money"))
+        assertNull(SmsParser.parseSelected(refund.replace("is credited", "will be credited")))
+        assertNull(SmsParser.parseSelected(refund + " Scheduled refund"))
+    }
 }

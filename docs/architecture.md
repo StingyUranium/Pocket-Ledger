@@ -51,7 +51,7 @@ list's viewport. Both bars blur the page beneath them with Haze (`hazeSource` on
 the bars) and fall back to a translucent fill. Destination changes reveal controls without resetting
 lists; reduced motion and touch exploration pin the header.
 
-Room flows feed `ledgerSnapshots`; calculations and I/O belong off the main thread. `LedgerApp` observes entries and budgets to refresh installed widgets.
+Room flows feed `ledgerSnapshots`; calculations and I/O belong off the main thread, including the selected-month income-plan summary. The calculation cache retains at most 32 call-site results, evicting the least recently used result so visiting many custom categories cannot retain every historical input snapshot. `LedgerApp` observes entries and budgets to refresh installed widgets.
 
 Widgets remain Android RemoteViews, with shared light/dark frosted drawable resources and resource
 spacing/shape tokens. `LedgerWidgets` builds compact or expanded views from launcher-provided dp
@@ -77,9 +77,13 @@ shares as less than 0.1%. Large-text rows stack values, and chart totals move ou
 - Money is integer paise; transaction and month boundaries use Asia/Kolkata.
 - Income/spending reports exclude deleted entries and transfers. Account balances include transfer effects.
 - Recurring category budgets apply to each selected month. Overspending retains a negative remaining amount.
+- Renaming an existing budget replaces its old category in one transaction; it cannot overwrite a different category's budget.
 - The 50/30/20 income allocation is a planning tool, separate from budgets and actual savings.
 - Preserve SMS keys, manual corrections, tombstones, backup compatibility, and Room migrations. Schemas are tracked under `app/schemas/`.
 - Restoring replaces validated data and disables capture until explicitly enabled again.
+- Backup JSON uses explicit format keys, independent of release field obfuscation. Export and restore share a 32 MiB encrypted-file limit. Restore rejects duplicate SMS associations and malformed complete SMS records before replacing data.
+- Repository deletion and Inbox dismissal resolve current records under the ingestion lock. Stale actions cannot overwrite newer corrections, recreate missing entries, or change an already saved message back to dismissed. Deleted entries cannot be resurrected by an old editor.
+- An unavailable SMS provider cursor fails reconciliation without advancing its scan boundary. Receiver completion is unconditional even if immediate recovery scheduling fails; cancellation is propagated and failure diagnostics contain no SMS contents.
 - Processing stays local; the application declares no internet permission.
 
 ## Tests and performance

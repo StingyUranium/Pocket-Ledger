@@ -49,7 +49,9 @@ class Repository(val context: Context, val db: LedgerDatabase) {
     suspend fun scan(from: Long, to: Long): List<Candidate> = withContext(Dispatchers.IO) {
         if (!hasSmsPermission()) error("SMS permission is required. Manual entries are still available.")
         val result = mutableListOf<Candidate>()
-        context.contentResolver.query(Telephony.Sms.Inbox.CONTENT_URI, arrayOf("address", "body", "date"), "date >= ? AND date < ?", arrayOf(from.toString(), to.toString()), "date ASC")?.use { c ->
+        val cursor = context.contentResolver.query(Telephony.Sms.Inbox.CONTENT_URI, arrayOf("address", "body", "date"), "date >= ? AND date < ?", arrayOf(from.toString(), to.toString()), "date ASC")
+            ?: error("Could not read SMS. Try again later.")
+        cursor.use { c ->
             while (c.moveToNext()) {
                 val body = c.getString(1).orEmpty(); val parsed = SmsParser.parseSelected(body) ?: continue
                 result += Candidate(c.getString(0).orEmpty(), body, c.getLong(2), parsed)
@@ -61,6 +63,9 @@ class Repository(val context: Context, val db: LedgerDatabase) {
         if (requireCapture && !prefs.getBoolean("enabled", false)) return@withLock
         val previousIds = dao.allEntries().map { it.id }.toSet()
         db.withTransaction {
+        val trustedSenders = dao.allSenders()
+        val accounts = dao.allAccounts()
+        val rules = dao.allRules()
         val stored = dao.allMessages().filter { !it.key.contains(":conflict:") }
         val legacyBodies = stored.filter { !it.complete }.associateBy { SmsParser.bodyKey(it.sender, it.body, 0) }
         val semanticKeys = stored.associateBy { m ->
@@ -83,13 +88,13 @@ class Repository(val context: Context, val db: LedgerDatabase) {
             }
             val key = if (conflict) c.key + ":conflict:" + digest(c.body) else existing?.key ?: c.key
             if (conflict && dao.message(key) != null) continue
-            val trusted = dao.allSenders().any { it.bank == p.bank && it.sender == normalizedSender(c.sender) }
-            val account = dao.allAccounts().filter { it.bank == p.bank && it.suffix == p.suffix }.singleOrNull()
+            val trusted = trustedSenders.any { it.bank == p.bank && it.sender == normalizedSender(c.sender) }
+            val account = accounts.filter { it.bank == p.bank && it.suffix == p.suffix }.singleOrNull()
             val reason = when { conflict -> "Conflicts with an existing reference: check for a duplicate"; forceReview -> "Review historical transaction"; !p.complete -> "Incomplete or unfamiliar bank format"; !trusted -> "Confirm this sender ID"; account == null -> "Map this account in Accounts"; p.date != null && p.date < account.openingDate -> "Before account opening date"; p.date != null && p.date > c.received + 86_400_000L -> "Transaction date is after message receipt"; else -> "" }
             val record = SmsRecord(key, c.sender, c.body, c.received, p.bank, p.suffix, p.amount, p.direction, p.date, p.dateOnly, p.payee, p.reference, p.balance, p.complete, reason = reason)
             dao.message(record)
             if (!conflict) semanticKeys[c.key] = record
-            if (reason.isEmpty() && account != null) saveParsed(record, account)
+            if (reason.isEmpty() && account != null) saveParsed(record, account, rules)
         }
         matchTransfers()
     }
@@ -100,9 +105,9 @@ class Repository(val context: Context, val db: LedgerDatabase) {
             CategoryNotifications.show(context, it)
         }
     }
-    private suspend fun saveParsed(m: SmsRecord, a: Account) {
+    private suspend fun saveParsed(m: SmsRecord, a: Account, rules: List<MerchantRule>) {
         if (dao.entryForSms(m.key) != null) return
-        val rule = dao.allRules().find { it.merchant == m.payee.trim().uppercase() && it.type == m.direction }
+        val rule = rules.find { it.merchant == m.payee.trim().uppercase() && it.type == m.direction }
         dao.entry(Entry(UUID.randomUUID().toString(), a.id, type = requireNotNull(m.direction), amount = requireNotNull(m.amount), date = requireNotNull(m.date), dateOnly = m.dateOnly, payee = m.payee, category = rule?.category ?: "Uncategorized", smsKey = m.key))
         dao.message(m.copy(status = "SAVED", reason = ""))
     }
@@ -110,10 +115,10 @@ class Repository(val context: Context, val db: LedgerDatabase) {
     suspend fun processReview() = mutex.withLock {
         val previousIds = dao.allEntries().map { it.id }.toSet()
         db.withTransaction {
-        val trusted = dao.allSenders(); val accounts = dao.allAccounts()
+        val trusted = dao.allSenders(); val accounts = dao.allAccounts(); val rules = dao.allRules()
         dao.allMessages().filter { it.status == "REVIEW" && it.complete && !it.key.contains(":conflict:") && (it.date ?: Long.MAX_VALUE) <= it.received + 86_400_000L }.forEach { m ->
             val a = accounts.singleOrNull { it.bank == m.bank && it.suffix == m.suffix }
-            if (a != null && m.date != null && m.date >= a.openingDate && trusted.any { it.bank == m.bank && it.sender == normalizedSender(m.sender) }) saveParsed(m, a)
+            if (a != null && m.date != null && m.date >= a.openingDate && trusted.any { it.bank == m.bank && it.sender == normalizedSender(m.sender) }) saveParsed(m, a, rules)
         }
         matchTransfers()
         }
@@ -145,6 +150,8 @@ class Repository(val context: Context, val db: LedgerDatabase) {
             require(entry.date >= target.openingDate) { "Transfer is before destination opening date" }
         }
         db.withTransaction {
+            require(dao.entry(entry.id)?.deleted != true) { "This transaction was deleted. Reopen the ledger before editing." }
+            entry.smsKey?.let { key -> require(dao.message(key) != null) { "This source SMS is no longer in the ledger" } }
             entry.smsKey?.let { key -> require(dao.entryForSms(key)?.let { it.id == entry.id } != false) { "This SMS already has a transaction. Edit it from Entries." } }
             dao.entry(entry)
             if (remember && entry.payee.isNotBlank() && entry.type != "TRANSFER") dao.rule(MerchantRule(entry.payee.trim().uppercase(), entry.category, entry.type))
@@ -152,11 +159,20 @@ class Repository(val context: Context, val db: LedgerDatabase) {
         }
         if (!needsCategoryNotification(entry)) CategoryNotifications.cancel(context, entry.id)
     }
-    suspend fun delete(entry: Entry) = db.withTransaction {
-        dao.entry(entry.copy(deleted = true))
-        entry.smsKey?.let { key -> dao.message(key)?.let { dao.message(it.copy(status = "DISMISSED")) } }
+    suspend fun delete(entry: Entry) = mutex.withLock {
+        db.withTransaction {
+            val current = dao.entry(entry.id) ?: return@withTransaction
+            dao.entry(current.copy(deleted = true))
+            current.smsKey?.let { key -> dao.message(key)?.let { dao.message(it.copy(status = "DISMISSED")) } }
+        }
+        CategoryNotifications.cancel(context, entry.id)
     }
-    suspend fun dismiss(m: SmsRecord) { dao.message(m.copy(status = "DISMISSED")) }
+    suspend fun dismiss(m: SmsRecord) = mutex.withLock {
+        db.withTransaction {
+            val current = dao.message(m.key)
+            if (current?.status == "REVIEW") dao.message(current.copy(status = "DISMISSED"))
+        }
+    }
     suspend fun undoDismiss(m: SmsRecord) = mutex.withLock {
         val current = dao.message(m.key)
         if (m.status == "REVIEW" && current?.status == "DISMISSED") {
@@ -182,6 +198,18 @@ class Repository(val context: Context, val db: LedgerDatabase) {
     suspend fun replaceData(action: suspend LedgerDao.() -> Unit) = mutex.withLock {
         db.withTransaction { dao.action() }
         prefs.edit().putBoolean("enabled", false).remove("from").commit()
+    }
+    suspend fun saveBudget(budget: Budget, originalCategory: String? = null) = mutex.withLock {
+        require(budget.category.isNotBlank() && budget.amount >= 0) { "Enter a category and a non-negative limit" }
+        db.withTransaction {
+            if (originalCategory != null && originalCategory != budget.category) {
+                val current = dao.allBudgets()
+                require(current.any { it.category == originalCategory }) { "This budget no longer exists. Reopen budgets." }
+                require(current.none { it.category == budget.category }) { "This category already has a budget. Edit it from Budgets." }
+                dao.removeBudget(originalCategory)
+            }
+            dao.budget(budget)
+        }
     }
     suspend fun reconcile() {
         if (!prefs.getBoolean("enabled", false) || !hasSmsPermission()) return

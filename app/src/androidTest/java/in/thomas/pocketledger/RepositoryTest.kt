@@ -133,6 +133,108 @@ class RepositoryTest {
         assertEquals(3, db.dao().allAccounts().size)
     }
 
+    @Test fun staleDeletePreservesLatestCorrectionAndDoesNotRecreateMissingEntry() = runBlocking {
+        val original = Entry("manual", "axis", type = "EXPENSE", amount = 100, date = dayMillis("2026-10-20"))
+        repo.save(original)
+        val corrected = original.copy(amount = 250, category = "Food")
+        repo.save(corrected)
+        repo.delete(original)
+        assertEquals(corrected.copy(deleted = true), db.dao().allEntries().single())
+        db.dao().clearEntries()
+        repo.delete(original)
+        assertTrue(db.dao().allEntries().isEmpty())
+    }
+
+    @Test fun staleDismissCannotOverwriteSavedMessageOrRefreshedFields() = runBlocking {
+        repo.ingest(listOf(candidate()))
+        val review = db.dao().allMessages().single()
+        val refreshed = review.copy(payee = "Updated merchant")
+        db.dao().message(refreshed)
+        repo.dismiss(review)
+        assertEquals(refreshed.copy(status = "DISMISSED"), db.dao().allMessages().single())
+        repo.undoDismiss(review)
+        repo.trust("VM-AXISBK", "AXIS")
+        val saved = db.dao().allMessages().single()
+        repo.dismiss(review)
+        assertEquals(saved, db.dao().allMessages().single())
+        assertEquals("SAVED", saved.status)
+    }
+
+    @Test fun staleEditorCannotResurrectDeletedOrLinkedEntry() = runBlocking {
+        val original = Entry("manual", "axis", type = "EXPENSE", amount = 100, date = dayMillis("2026-10-20"))
+        repo.save(original)
+        repo.delete(original)
+        try { repo.save(original.copy(category = "Food")); fail("Expected deleted entry rejection") }
+        catch (_: IllegalArgumentException) { }
+        assertTrue(db.dao().allEntries().single().deleted)
+    }
+
+    @Test fun savingMissingSmsCannotCreateDanglingAssociation() = runBlocking {
+        val original = Entry("manual", "axis", type = "EXPENSE", amount = 100, date = dayMillis("2026-10-20"), smsKey = "missing")
+        try { repo.save(original); fail("Expected missing SMS rejection") }
+        catch (_: IllegalArgumentException) { }
+        assertTrue(db.dao().allEntries().isEmpty())
+    }
+
+    @Test fun duplicateSmsAssociationInBackupLeavesLedgerAndCaptureIntact() = runBlocking {
+        repo.trust("VM-AXISBK", "AXIS"); repo.ingest(listOf(candidate()))
+        val original = db.dao().allEntries().single()
+        val password = "test-password".toCharArray()
+        val root = org.json.JSONObject(String(BackupCrypto.decrypt(Backup.export(db, password), password), Charsets.UTF_8))
+        val duplicate = org.json.JSONObject(root.getJSONArray("entries").getJSONObject(0).toString()).put("id", "duplicate")
+        root.getJSONArray("entries").put(duplicate)
+        prefs.edit().putBoolean("enabled", true).commit()
+        try {
+            Backup.restore(repo, BackupCrypto.encrypt(root.toString().toByteArray(), password), password)
+            fail("Expected duplicate SMS rejection")
+        } catch (_: IllegalArgumentException) { }
+        assertEquals(listOf(original), db.dao().allEntries())
+        assertTrue(prefs.getBoolean("enabled", false))
+    }
+
+    @Test fun backupUsesStableFieldsAndPreservesNullsAndAllRecordTypes() = runBlocking {
+        repo.trust("VM-AXISBK", "AXIS"); repo.ingest(listOf(candidate()))
+        repo.save(db.dao().allEntries().single().copy(category = "Food", note = "Synthetic note"), true)
+        db.dao().budget(Budget("Food", 10000))
+        val password = "test-password".toCharArray()
+        val bytes = Backup.export(db, password)
+        val root = org.json.JSONObject(String(BackupCrypto.decrypt(bytes, password), Charsets.UTF_8))
+        assertEquals(2, root.getInt("version"))
+        val entry = root.getJSONArray("entries").getJSONObject(0)
+        assertEquals("Synthetic note", entry.getString("note"))
+        assertTrue(entry.has("destinationId")); assertTrue(entry.isNull("destinationId"))
+        val before = listOf(db.dao().allAccounts(), db.dao().allEntries(), db.dao().allMessages(), db.dao().allSenders(), db.dao().allBudgets(), db.dao().allRules())
+        Backup.restore(repo, bytes, password)
+        assertEquals(before, listOf(db.dao().allAccounts(), db.dao().allEntries(), db.dao().allMessages(), db.dao().allSenders(), db.dao().allBudgets(), db.dao().allRules()))
+    }
+
+    @Test fun malformedCompleteSmsInBackupCannotReplaceLedger() = runBlocking {
+        repo.ingest(listOf(candidate()))
+        val original = db.dao().allMessages().single()
+        val password = "test-password".toCharArray()
+        val root = org.json.JSONObject(String(BackupCrypto.decrypt(Backup.export(db, password), password), Charsets.UTF_8))
+        root.getJSONArray("messages").getJSONObject(0).put("amount", org.json.JSONObject.NULL)
+        try {
+            Backup.restore(repo, BackupCrypto.encrypt(root.toString().toByteArray(), password), password)
+            fail("Expected invalid complete SMS rejection")
+        } catch (_: IllegalArgumentException) { }
+        assertEquals(listOf(original), db.dao().allMessages())
+    }
+
+    @Test fun renamingBudgetReplacesOldCategoryWithoutDoublingLimit() = runBlocking {
+        repo.saveBudget(Budget("Food", 10000))
+        repo.saveBudget(Budget("Groceries", 15000), "Food")
+        assertEquals(listOf(Budget("Groceries", 15000)), db.dao().allBudgets())
+    }
+
+    @Test fun renamingBudgetCannotOverwriteAnotherCategory() = runBlocking {
+        repo.saveBudget(Budget("Food", 10000)); repo.saveBudget(Budget("Rent", 20000))
+        val before = db.dao().allBudgets().toSet()
+        try { repo.saveBudget(Budget("Rent", 15000), "Food"); fail("Expected category collision rejection") }
+        catch (_: IllegalArgumentException) { }
+        assertEquals(before, db.dao().allBudgets().toSet())
+    }
+
     private fun neftCandidate(): Candidate = candidate(
         "INR 123.45 credited to Axis Bank A/c XX0424 on 20-10-26 at 12:30:45 IST. Ref: NEFT/FBPT123456789012/SAMPLE REMITTER.View bal: https://example.invalid"
     )

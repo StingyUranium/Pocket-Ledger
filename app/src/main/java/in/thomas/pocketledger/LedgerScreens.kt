@@ -287,9 +287,10 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
     }
 }
 
-@Composable fun BudgetScreen(budgets: List<Budget>, entries: List<Entry>, month: YearMonth, save: (Budget, () -> Unit) -> Unit) {
+@Composable fun BudgetScreen(budgets: List<Budget>, entries: List<Entry>, month: YearMonth, save: (Budget, String?, () -> Unit) -> Unit) {
     val largeText = LocalDensity.current.fontScale > 1.3f
     var edit by remember { mutableStateOf<Budget?>(null) }
+    var originalCategory by remember { mutableStateOf<String?>(null) }
     var allocationView by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     val current = remember(budgets) { budgets.filter { it.amount > 0 } }
     val spending by backgroundCalculation(entries, month, cacheKey = "budget-spending") { entries.filter { !it.deleted && it.type == "EXPENSE" && inMonth(it, month) }.groupBy { it.category }.mapValues { it.value.sumOf { entry -> entry.amount } } }
@@ -313,7 +314,7 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
                 Text(if (planned > 0) money(planned - spent) else "Make a little room", style = MaterialTheme.typography.headlineMedium, color = if (spent > planned) rust else MaterialTheme.colorScheme.onSurface)
                 Text(if (planned > 0) "Left across your budgeted categories" else "Set a limit. Give every category a little direction.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (planned > 0) ProportionBar(progress = (spent.toDouble() / planned).toFloat(), modifier = Modifier.fillMaxWidth().height(6.dp), color = if (spent > planned) rust else MaterialTheme.colorScheme.tertiary, trackColor = MaterialTheme.colorScheme.surfaceVariant)
-                Button(onClick = { edit = Budget("Food", 0) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { AppIcon("plus", Modifier.size(17.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(7.dp)); Text("Set a budget") }
+                Button(onClick = { originalCategory = null; edit = Budget("Food", 0) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { AppIcon("plus", Modifier.size(17.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(7.dp)); Text("Set a budget") }
             } }
             if (current.isEmpty()) {
                 item { GroupedSection("Your categories") {} }
@@ -324,7 +325,7 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
                         if (index > 0) GroupedDivider()
                         val amount = spentByCategory[b.category] ?: 0L
                         val over = amount > b.amount
-                        GroupedItem(onClick = { edit = b }, onClickLabel = "Edit ${b.category} budget") {
+                        GroupedItem(onClick = { originalCategory = b.category; edit = b }, onClickLabel = "Edit ${b.category} budget") {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (largeText) Column(verticalArrangement = Arrangement.spacedBy(LedgerSpace.xs)) {
                                     Text(b.category, style = MaterialTheme.typography.bodyLarge)
@@ -346,5 +347,5 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
             }
         }
     }
-    edit?.let { b -> BudgetEditor(b, { edit = null }, knownEntries = entries) { budget -> save(budget) { edit = null } } }
+    edit?.let { b -> BudgetEditor(b, { edit = null }, knownEntries = entries) { budget -> save(budget, originalCategory) { edit = null } } }
 }

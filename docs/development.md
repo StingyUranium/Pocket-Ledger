@@ -52,6 +52,8 @@ Benchmarks, profile generation, and refresh-mode matrix runs are opt-in. Target 
 
 Record what was actually run, the scope of device checks, and remaining limitations. An installed APK proves installation, not notification delivery or UI correctness. Keep personal device identifiers, SMS, financial amounts, and backups out of committed documentation.
 
+For a reliability audit, capture bounded logs for the validation app's UID during synthetic journeys, including `LedgerSms`, `LedgerWidgets`, and `LedgerFrames`. `LedgerSms` records generic capture/retry/scheduling failures without message contents or exception text. Frame counts are heuristic diagnostics, not frame-deadline certification. Review the merged release manifest and build a minified release when changing backup serialization. See [the October 2026 audit](audit-2026-10-24.md) for findings and dated validation evidence.
+
 ## Optional visual review
 
 `VisualReviewTest` is skipped by default. Enable it with the instrumentation argument

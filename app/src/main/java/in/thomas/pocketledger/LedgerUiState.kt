@@ -32,9 +32,12 @@ fun ledgerSnapshots(dao: LedgerDao): Flow<LedgerReadState> {
 }
 
 /** Latest result per call site, so revisiting a root tab with unchanged inputs paints immediately. */
-class CalculationCache {
+class CalculationCache(private val maxEntries: Int = 32) {
+    init { require(maxEntries > 0) }
     private class Stored(val inputs: List<Any?>, val value: Any)
-    private val stored = HashMap<String, Stored>()
+    private val stored = object : LinkedHashMap<String, Stored>(16, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Stored>?) = size > maxEntries
+    }
     @Suppress("UNCHECKED_CAST")
     fun <T> find(key: String, inputs: List<Any?>): T? = stored[key]?.takeIf { it.inputs == inputs }?.value as T?
     fun store(key: String, inputs: List<Any?>, value: Any) { stored[key] = Stored(inputs, value) }
@@ -49,8 +52,8 @@ val LocalCalculationCache = staticCompositionLocalOf<CalculationCache?> { null }
 fun <T> backgroundCalculation(vararg inputs: Any?, cacheKey: String? = null, calculation: () -> T): State<T?> {
     val dependencies = inputs.toList()
     val cache = LocalCalculationCache.current
-    val result = remember(dependencies) { mutableStateOf<T?>(cacheKey?.let { cache?.find<T>(it, dependencies) }) }
-    LaunchedEffect(dependencies) {
+    val result = remember(dependencies, cacheKey, cache) { mutableStateOf<T?>(cacheKey?.let { cache?.find<T>(it, dependencies) }) }
+    LaunchedEffect(dependencies, cacheKey, cache) {
         if (result.value == null) {
             val value = withContext(Dispatchers.Default) { calculation() }
             result.value = value

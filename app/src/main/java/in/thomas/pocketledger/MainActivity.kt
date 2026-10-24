@@ -341,7 +341,7 @@ private sealed interface LedgerRoute {
                     0 -> Overview(accounts, entries, messages, month, budgets, overviewReport, { tab = 2 }, { tab = 4 }, openTransactions) { editor = it }
                     1 -> Transactions(entries, accounts, month, delete = { deleteCandidate = it }) { editor = it }
                     2 -> AccountsScreen(accounts, entries, messages, { accountEditor = it }, { accountEditor = Account(UUID.randomUUID().toString(), "", "CASH", "", openingDate = dayMillis(LocalDate.now(india).withDayOfMonth(1).toString())) })
-                    3 -> BudgetScreen(budgets, entries, month) { budget, saved -> work { dao.budget(budget); withContext(Dispatchers.Main) { saved() } } }
+                    3 -> BudgetScreen(budgets, entries, month) { budget, originalCategory, saved -> work { repo.saveBudget(budget, originalCategory); withContext(Dispatchers.Main) { saved() } } }
                     5 -> GraphsScreen(entries, month, { month = it }, openTransactions)
                     4 -> SmsScreen(messages, entries, accounts, senders, permission, capture, from, to, { from = it }, { to = it },
                         { disclosure = true }, { enabled ->

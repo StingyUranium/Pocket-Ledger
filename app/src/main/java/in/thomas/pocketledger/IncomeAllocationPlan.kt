@@ -20,7 +20,9 @@ import java.time.YearMonth
     var income by remember { mutableLongStateOf(preferences.getLong("monthly_income", 0L)) }
     var editing by rememberSaveable { mutableStateOf(false) }
     val allocation = incomeAllocation(income)
-    val summary = monthlySummary(entries, emptyList(), month)
+    val summary by backgroundCalculation(entries, month, cacheKey = "income-plan-summary") {
+        monthlySummary(entries, emptyList(), month)
+    }
     val colors = listOf(MaterialTheme.colorScheme.primary, Color(0xFFAF52DE), MaterialTheme.colorScheme.tertiary)
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         CardBlock {
@@ -52,9 +54,12 @@ import java.time.YearMonth
         }
         CardBlock {
             Text("Selected month", style = MaterialTheme.typography.titleMedium)
-            Text("Recorded income: "+money(summary.income))
-            Text("Expenses: "+money(summary.spent))
-            Text("Income remaining: "+money(summary.balance), color = if (summary.balance < 0) rust else MaterialTheme.colorScheme.tertiary)
+            val ready = summary
+            if (ready == null) Text("Loading your ledger") else {
+                Text("Recorded income: "+money(ready.income))
+                Text("Expenses: "+money(ready.spent))
+                Text("Income remaining: "+money(ready.balance), color = if (ready.balance < 0) rust else MaterialTheme.colorScheme.tertiary)
+            }
             Text("Income remaining is recorded income minus expenses, not confirmed savings. Transfers are excluded. Category budgets track individual spending limits.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

@@ -27,4 +27,7 @@ class LedgerTest {
     }
     @Test(expected = IllegalArgumentException::class) fun rejectsShortPassword() { BackupCrypto.encrypt(byteArrayOf(1), "short".toCharArray()) }
     @Test(expected = IllegalArgumentException::class) fun rejectsInvalidHeader() { BackupCrypto.decrypt(ByteArray(64), "test-password".toCharArray()) }
+    @Test(expected = IllegalArgumentException::class) fun cannotExportBackupLargerThanRestoreLimit() {
+        BackupCrypto.encrypt(ByteArray(33_554_432 - 51), "test-password".toCharArray())
+    }
 }

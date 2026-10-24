@@ -26,11 +26,13 @@ fun SmsRecord.parsed() = ParsedSms(bank, suffix, amount, direction, date, dateOn
     @Query("SELECT * FROM MerchantRule") suspend fun allRules(): List<MerchantRule>
     @Query("SELECT * FROM SmsRecord WHERE `key` = :key") suspend fun message(key: String): SmsRecord?
     @Query("SELECT * FROM Entry WHERE smsKey = :key LIMIT 1") suspend fun entryForSms(key: String): Entry?
+    @Query("SELECT * FROM Entry WHERE id = :id") suspend fun entry(id: String): Entry?
     @Upsert suspend fun account(v: Account)
     @Upsert suspend fun entry(v: Entry)
     @Upsert suspend fun message(v: SmsRecord)
     @Upsert suspend fun sender(v: TrustedSender)
     @Upsert suspend fun budget(v: Budget)
+    @Query("DELETE FROM Budget WHERE category = :category") suspend fun removeBudget(category: String)
     @Upsert suspend fun rule(v: MerchantRule)
     @Query("DELETE FROM TrustedSender WHERE sender = :sender AND bank = :bank") suspend fun untrust(sender: String, bank: String)
     @Query("DELETE FROM MerchantRule WHERE merchant = :merchant AND type = :type") suspend fun removeRule(merchant: String, type: String)

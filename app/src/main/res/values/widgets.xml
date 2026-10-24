@@ -2,14 +2,11 @@
     <string name="widget_monthly_name">Ledger · Monthly summary</string>
     <string name="widget_budget_name">Ledger · Budget</string>
     <string name="widget_expenses_label">Expenses</string>
-    <string name="widget_this_month">This month</string>
     <string name="widget_monthly_description">Monthly income or expenses. Tap a tab to switch; tap the total to see transactions.</string>
     <string name="widget_budget_description">Recurring budget remaining this month, including overspending.</string>
     <string name="widget_month_preview">This month · Ledger</string>
-    <string name="widget_open">Open ›</string>
     <string name="widget_income_label">Income</string>
     <string name="widget_spent_label">Spent</string>
-    <string name="widget_balance_label">Balance</string>
     <string name="widget_remaining_label">Budget remaining</string>
     <string name="widget_no_budget">Set a budget</string>
     <string name="widget_budget_usage">%1$s of %2$s used</string>
@@ -22,7 +19,6 @@
     <color name="widget_panel">#B8E3E3E8</color>
     <color name="widget_text">#1C1C1E</color>
     <color name="widget_secondary">#53535B</color>
-    <color name="widget_income">#16814A</color>
     <color name="widget_expense">#B93728</color>
     <color name="widget_accent">#0066CC</color>
     <string name="widget_tab_accessibility">%1$s, %2$s</string>

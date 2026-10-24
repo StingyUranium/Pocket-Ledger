@@ -15,8 +15,8 @@ data class ParsedSms(val bank: String, val suffix: String?, val amount: Long?, v
 
 object SmsParser {
     private const val MONEY = "([0-9][0-9,]*(?:\\.[0-9]*)?)"
-    private val ignored = Regex(
-        "credit\\s*card|one[ -]time password|\\bOTP\\b|\\bfailed\\b|declined|unsuccessful|" +
+    private val alwaysIgnored = Regex(
+        "credit\\s*card|one[ -]time password|\\bOTP\\b|" +
             "will be (?:debited|credited)|scheduled|due date|pre[- ]?approved|apply now|" +
             "limited[- ]time|cashback offer|reward points|has requested money|" +
             "mandate (?:is |has been )?successfully (?:created|modified|revoked)|funds blocked",
@@ -93,7 +93,8 @@ object SmsParser {
         val completedRefund = allowFailedRefund &&
             Regex("\\b(?:refund(?:ed)?|revers(?:al|ed)|chargeback)\\b", RegexOption.IGNORE_CASE).containsMatchIn(text) &&
             Regex("\\bcredited\\b", RegexOption.IGNORE_CASE).containsMatchIn(text)
-        if (ignored.containsMatchIn(text) && !completedRefund) return null
+        if (alwaysIgnored.containsMatchIn(text)) return null
+        if (Regex("\\bfailed\\b|declined|unsuccessful", RegexOption.IGNORE_CASE).containsMatchIn(text) && !completedRefund) return null
         val bank = when {
             Regex("SBM\\s+BANK\\s*(?:\\(INDIA\\)|INDIA)", RegexOption.IGNORE_CASE).containsMatchIn(text) -> "SBM"
             text.contains("Axis Bank", true) -> "AXIS"
