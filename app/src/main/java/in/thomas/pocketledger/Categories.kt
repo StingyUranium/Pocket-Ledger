@@ -14,6 +14,50 @@ val incomeCategories = listOf(
     "Cashback", "Other income"
 )
 
+/** Presentation only: saved category names and custom categories retain their existing identity. */
+fun categoryIconName(category: String): String = when (category) {
+    "ALL", "Other", "Other income" -> "more"
+    "Uncategorized" -> "receipt"
+    "Food" -> "utensils"
+    "Dining out" -> "plate"
+    "Groceries" -> "basket"
+    "Transport" -> "car"
+    "Uber/Bus" -> "bus"
+    "Fuel" -> "fuel"
+    "Rent", "Rental income" -> "house"
+    "Shopping" -> "bag"
+    "Bills" -> "receipt"
+    "Utilities" -> "bolt"
+    "Mobile & internet" -> "phone"
+    "Health" -> "medical"
+    "Medicines" -> "pill"
+    "Insurance" -> "shield"
+    "Education" -> "book"
+    "Entertainment" -> "play"
+    "Subscriptions" -> "repeat"
+    "Travel" -> "plane"
+    "Personal care" -> "sparkles"
+    "Home & repairs" -> "tools"
+    "Family" -> "people"
+    "Gifts", "Gifts received" -> "gift"
+    "Donations" -> "heart"
+    "Pets" -> "paw"
+    "Loan payments", "Taxes" -> "bank"
+    "Fees & charges", "Interest" -> "percent"
+    "Investment", "Investment returns" -> "trend"
+    "Salary" -> "briefcase"
+    "Bonus" -> "star"
+    "Freelance" -> "laptop"
+    "Business income" -> "store"
+    "Dividends" -> "bars"
+    "Pension" -> "wallet"
+    "Refunds" -> "return"
+    "Reimbursements" -> "receipt-check"
+    "Cashback" -> "coins"
+    "Transfer" -> "transfer"
+    else -> "receipt"
+}
+
 fun categoriesForType(type: String): List<String> = when (type) {
     "EXPENSE" -> expenseCategories
     "INCOME" -> incomeCategories

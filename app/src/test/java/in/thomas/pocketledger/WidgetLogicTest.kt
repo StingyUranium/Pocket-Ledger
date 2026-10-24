@@ -8,6 +8,38 @@ import java.time.ZonedDateTime
 import java.util.Locale
 
 class WidgetLogicTest {
+    @Test fun amountsKeepPaiseAndGroupingWithoutCurrency() {
+        assertEquals("23,627.27", WidgetLogic.amount(2362727))
+        assertEquals("0.01", WidgetLogic.amount(1))
+        assertEquals("0.00", WidgetLogic.amount(0))
+        assertEquals("-1,234.56", WidgetLogic.amount(-123456))
+    }
+
+    @Test fun expenseComparisonUsesDirectionAndAbsoluteDifference() {
+        val increase = WidgetLogic.comparison(2362727, 1802703, false)
+        assertEquals(560024L, increase.delta)
+        assertEquals("▲ 5,600.24", increase.text)
+        assertEquals(false, increase.favorable)
+        val decrease = WidgetLogic.comparison(1802703, 2362727, false)
+        assertEquals(-560024L, decrease.delta)
+        assertEquals("▼ 5,600.24", decrease.text)
+        assertEquals(true, decrease.favorable)
+    }
+
+    @Test fun incomeComparisonReversesFavorableDirection() {
+        assertEquals(true, WidgetLogic.comparison(20000, 10000, true).favorable)
+        assertEquals(false, WidgetLogic.comparison(10000, 20000, true).favorable)
+    }
+
+    @Test fun unchangedAndMissingPreviousTotalsHaveDefinedComparisons() {
+        val unchanged = WidgetLogic.comparison(10000, 10000, false)
+        assertEquals(0L, unchanged.delta)
+        assertEquals("0.00", unchanged.text)
+        assertNull(unchanged.favorable)
+        assertEquals("▲ 100.00", WidgetLogic.comparison(10000, 0, false).text)
+        assertEquals("0.00", WidgetLogic.comparison(0, 0, true).text)
+    }
+
     @Test fun contextAppearsOnlyWhenTallEnoughForFontScale() {
         assertFalse(WidgetLogic.showContext(143, 1f))
         assertTrue(WidgetLogic.showContext(144, 1f))

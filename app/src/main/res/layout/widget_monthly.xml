@@ -1,26 +1,42 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:padding="@dimen/widget_space" android:background="@drawable/widget_background">
-    <TextView android:id="@+id/widget_title" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginHorizontal="@dimen/widget_space" android:layout_marginBottom="@dimen/widget_space" android:text="@string/widget_month_preview"
-        android:textColor="@color/widget_secondary" android:textSize="@dimen/widget_label_size" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="@dimen/widget_touch_target" android:orientation="horizontal"
-        android:background="@drawable/widget_panel" android:baselineAligned="false">
-        <TextView android:id="@+id/widget_income_tab" android:layout_width="0dp" android:layout_height="match_parent"
-            android:layout_weight="1" android:gravity="center" android:text="@string/widget_income_label" android:textSize="@dimen/widget_tab_size"
-            android:fontFamily="sans-serif-medium" android:textColor="@color/widget_tab_text" android:background="@drawable/widget_tab_background" android:maxLines="1" android:ellipsize="end"
-            android:autoSizeTextType="uniform" android:autoSizeMinTextSize="@dimen/widget_tab_min_size" android:autoSizeMaxTextSize="@dimen/widget_tab_size" android:autoSizeStepGranularity="1sp" />
-        <TextView android:id="@+id/widget_expense_tab" android:layout_width="0dp" android:layout_height="match_parent"
-            android:layout_weight="1" android:gravity="center" android:text="@string/widget_expenses_label" android:textSize="@dimen/widget_tab_size"
-            android:fontFamily="sans-serif-medium" android:textColor="@color/widget_tab_text" android:background="@drawable/widget_tab_background"
-            android:maxLines="1" android:ellipsize="end" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="@dimen/widget_tab_min_size" android:autoSizeMaxTextSize="@dimen/widget_tab_size" android:autoSizeStepGranularity="1sp" />
+    android:orientation="vertical" android:paddingHorizontal="12dp" android:paddingTop="16dp" android:paddingBottom="12dp"
+    android:background="@drawable/widget_monthly_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="@dimen/widget_touch_target"
+        android:orientation="horizontal" android:baselineAligned="false">
+        <TextView android:id="@+id/widget_income_tab" style="@style/WidgetMonthlyTab"
+            android:text="@string/widget_income_label" android:textColor="@color/widget_monthly_secondary" />
+        <TextView android:id="@+id/widget_expense_tab" style="@style/WidgetMonthlyTab"
+            android:text="@string/widget_expenses_label" android:textColor="@color/widget_monthly_text" />
     </LinearLayout>
-    <TextView android:id="@+id/widget_total" android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="1" android:minHeight="@dimen/widget_touch_target" android:gravity="center_vertical|start" android:paddingHorizontal="@dimen/widget_space"
-        android:text="@string/widget_amount_preview" android:textColor="@color/widget_text" android:textSize="@dimen/widget_amount_size"
-        android:fontFamily="sans-serif-medium" android:maxLines="1" android:ellipsize="end" android:autoSizeTextType="uniform"
-        android:autoSizeMinTextSize="@dimen/widget_label_size" android:autoSizeMaxTextSize="@dimen/widget_amount_size" android:autoSizeStepGranularity="1sp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="1.5dp"
+        android:orientation="horizontal" android:baselineAligned="false" android:importantForAccessibility="no"
+        android:background="@color/widget_monthly_divider">
+        <ImageView android:id="@+id/widget_income_line" android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:background="@color/widget_monthly_red" android:visibility="invisible" android:importantForAccessibility="no" />
+        <ImageView android:id="@+id/widget_expense_line" android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:background="@color/widget_monthly_red" android:importantForAccessibility="no" />
+    </LinearLayout>
+    <GridLayout android:id="@+id/widget_body" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:columnCount="2" android:paddingTop="16dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_columnWeight="1"
+            android:orientation="vertical" android:gravity="center" android:paddingHorizontal="4dp">
+            <TextView android:id="@+id/widget_title" style="@style/WidgetMonthlyLabel"
+                android:text="@string/widget_this_month" android:textColor="@color/widget_monthly_text" />
+            <TextView android:id="@+id/widget_total" style="@style/WidgetMonthlyLabel"
+                android:layout_marginTop="10dp" android:text="@string/widget_monthly_zero"
+                android:textSize="28sp" android:autoSizeMaxTextSize="28sp" android:textStyle="bold"
+                android:textColor="@color/widget_monthly_text" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_columnWeight="1"
+            android:orientation="vertical" android:gravity="center" android:paddingHorizontal="4dp">
+            <TextView android:id="@+id/widget_delta" style="@style/WidgetMonthlyLabel"
+                android:text="@string/widget_monthly_zero" android:textColor="@color/widget_monthly_secondary" />
+            <TextView android:id="@+id/widget_comparison" style="@style/WidgetMonthlyLabel"
+                android:layout_marginTop="10dp" android:text="@string/widget_mom" android:textColor="@color/widget_monthly_secondary" />
+        </LinearLayout>
+    </GridLayout>
     <TextView android:id="@+id/widget_status" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginHorizontal="@dimen/widget_space" android:text="@string/widget_stale"
-        android:textColor="@color/widget_secondary" android:textSize="@dimen/widget_label_size" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        android:gravity="center" android:text="@string/widget_stale" android:textColor="@color/widget_monthly_secondary"
+        android:textSize="@dimen/widget_label_size" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
 </LinearLayout>

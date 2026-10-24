@@ -9,6 +9,19 @@ import java.util.Locale
 
 /** Pure widget helpers kept free of Android types so JVM tests can cover them. */
 internal object WidgetLogic {
+    /** Decimal formatting stays in paise until conversion; never round through a Double. */
+    fun amount(paise: Long): String = java.text.DecimalFormat("#,##0.00",
+        java.text.DecimalFormatSymbols(Locale.US)).format(java.math.BigDecimal.valueOf(paise, 2))
+
+    data class Comparison(val delta: Long, val favorable: Boolean?, val text: String)
+
+    fun comparison(current: Long, previous: Long, income: Boolean): Comparison {
+        val delta = current - previous
+        val arrow = when { delta > 0 -> "\u25B2 "; delta < 0 -> "\u25BC "; else -> "" }
+        return Comparison(delta, if (delta == 0L) null else (delta > 0) == income,
+            arrow + amount(kotlin.math.abs(delta)))
+    }
+
     const val PROGRESS_MAX = 1000
     const val CONTEXT_HEIGHT_DP = 144
     private const val BOUNDARY_SLACK_SECONDS = 5L

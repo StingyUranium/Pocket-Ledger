@@ -229,13 +229,16 @@ font scales. The complete run reports 37 tests including that assumption-skipped
 
 ## Home-screen widgets
 
-Monthly summary and Budget share a frosted gradient surface, subtle highlight border, 20dp outer
-corners, semantic light/dark colors, and rounded controls. Monthly uses a 48dp segmented selector
-(Expenses shortens to Spent above 130% font scale) and a separate 48dp amount target; its minimum height is 112dp while the default grid request remains
-3x1. Budget retains its 4x1 request and negative remaining values. Both expand to show month context
-at 144dp; Budget also shows usage. The context threshold scales with font size to protect core content.
-Android RemoteViews resources mirror app spacing/shape tokens; no new dependency is required.
-This treatment uses translucent fills and highlights, not launcher wallpaper blur or refraction.
+Monthly summary follows the supplied launcher reference: an opaque charcoal surface, 12dp corners,
+white/grey text, equal Income/Expenses tabs and a red underline over a grey divider. Two centered
+columns show This Month with its total, and an absolute direction-marked change above vs. MoM.
+The comparison uses the entire previous calendar month in Asia/Kolkata. Expense increases and income
+decreases are red; favorable changes are green, and zero is neutral. Visible numbers have comma
+grouping and two decimals without a currency symbol; spoken descriptions identify rupees.
+The preferred launcher request is 4x2, with a compact layout below 144dp times the font scale and
+resizing down to 160x110dp. Tabs retain 48dp touch targets. Budget keeps its theme-aware frosted
+surface, recurring limits, negative remaining values and height-dependent month/usage details.
+Neither widget captures or blurs launcher wallpaper. Old monthly pill-selector resources were removed.
 
 ### Widget validation - 2026-10-24
 
@@ -287,3 +290,85 @@ Remaining coverage limits: these journeys do not exhaustively certify every stat
 ## Widget test matrix change (24 October 2026)
 
 The widget rendering test (`renderWidgetsAcrossSizesAndThemes`) now covers 100% font scale in light and dark; the 200% case recorded in the widget validation notes above was removed on request and is no longer automated. There are no landscape or rotation device tests. The 23 October evidence above describes the earlier matrix and is kept as dated history.
+
+## Category picker refresh validation (24 October 2026)
+
+The category presentation now uses accent icon badges, a selected-row checkmark, immediate draft selection, Close dismissal and a separate transaction-editor Add category action. The category list owns its viewport and scrolls to the current selection, including custom categories loaded with the snapshot. Other choice sheets keep their existing controls.
+
+Validation: debug assembly, all 111 JVM tests and debug lint passed (no new lint issues; the existing 27-warning baseline remains). The isolated validation package's Android UI tests compile, including `CategoryPickerUiTest`, which covers selected custom-category visibility, Close without mutation, the separate add callback and immediate selection. No Android device was connected, so instrumentation execution, light/dark screenshot review, 200% text, landscape and TalkBack checks remain unverified. No APK was installed and no performance claim is made.
+
+
+## Category sheet scrolling and recognizable icons (24 October 2026)
+
+The category lazy list now participates in the same sheet gesture ownership guard as editor forms.
+Previously `scrollContent = false` omitted the form state without supplying the category list state,
+leaving sheet dragging enabled while the list scrolled. The shared sheet API accepts `ScrollableState`,
+so both lazy lists and forms retain gesture ownership until scrolling settles at the top. The existing
+weighted list viewport, separate title and separate Add category action remain in place.
+
+Category-picker rows use small category-specific vector icons, replacing repeated income/expense
+arrows. Custom and uncategorized names use a neutral receipt. Icons retain semantic accent colors,
+32dp badges, 18dp glyphs and the existing full-row touch targets. Category values, ordering, financial
+data and picker selection behavior are unchanged.
+
+Validation evidence: debug app and Android test APKs built successfully. All 116 JVM tests passed,
+and debug lint passed with no new issues (27 warnings filtered by the existing baseline). On the
+physical device, all seven focused category/form-sheet tests passed at 100% font scale; all four
+category-picker tests passed again at 200%. The runs cover repeated bottom flings, direction
+reversals, scrolled-header dragging, a fling from below the list top, settled-top dismissal, custom
+category selection, Close and Add category. Header/footer bounds are sampled during animation.
+Twenty-four synthetic category screenshots (income/expense, top/middle/end, light/dark, 100%/200%)
+were captured and inspected; long labels wrap and the separate controls remain accessible. The
+original system font scale was restored in `finally`.
+
+Validation used only `in.thomas.pocketledger.validation`; the personal package was not replaced.
+Concurrent work initially invalidated shared build outputs and interrupted one device run through
+a validation-package update; isolated build outputs and completed reruns provide the results above.
+The personal debug APK was separately built and its metadata checked before local delivery.
+Raw captures and logs remain ignored under `artifacts/`. These functional checks do not certify
+frame deadlines or exhaust landscape, keyboard, foldable or TalkBack behavior.
+
+
+### Monthly reference refresh validation - 2026-10-24
+
+The personal-package debug build, all 116 JVM tests and lint passed after the reference redesign.
+Lint reported no new issues (26 existing warnings filtered by the committed baseline; one baseline
+warning no longer occurs). No baseline was regenerated. The APK application ID was checked as
+`in.thomas.pocketledger`; this task did not install it into the personal ledger.
+
+All five `WidgetRenderingTest` cases passed on the connected physical device using only the
+validation package. The matrix covers both tabs, light/dark configurations, four sizes from
+160x112dp through 320x220dp, empty/normal/large synthetic values, independent tab preferences,
+routes, underline state, colours, comparison text and accessibility. Reference-sized, compact and
+240x144dp images were visually inspected in ignored `artifacts/widget-review/`. A separate
+reference-fixture run at system font scale 2.0 passed; its 320x196dp capture was visually inspected
+and the original font scale restored in finally. This is a focused large-text check, not a full
+large-font matrix. The picker preview is a transparent zero-value render from the synthetic fixture.
+
+The reference layout is closely reproduced; exact physical pixels vary with launcher sizing and
+font configuration. Large amounts may autosize or ellipsize at compact widths, with full spoken
+values. These host renders do not certify actual launcher placement, TalkBack gestures or frame
+deadlines. Raw images remain ignored; only the synthetic zero-value picker asset is tracked.
+
+
+### Combined delivery validation (24 October 2026)
+
+The final personal-package APK was rebuilt from the shared workspace with both the category
+scrolling/icons changes and the monthly-widget reference redesign, including the compact widget
+layout, comparison data and synthetic picker preview. Debug assembly, all 116 JVM tests and lint
+passed with no new lint issues (26 baseline warnings filtered). All 12 combined category-picker,
+form-sheet and widget-rendering device tests passed in the isolated validation package at 100%
+font scale; the original font scale was restored. Build-input hashes remained unchanged throughout
+validation. Final APK metadata was checked as `in.thomas.pocketledger`; the personal app was not
+replaced. APKs, source-hash manifests and test logs remain in ignored `artifacts/`.
+
+
+### Combined personal update installed (24 October 2026)
+
+The user-authorized combined APK was installed in place with `adb install -r` after confirming
+its `in.thomas.pocketledger` application ID, unchanged build inputs and matching signing certificate.
+The installed APK was pulled back and its SHA-256 matched the delivered combined APK exactly.
+The existing application was not uninstalled and no application data was cleared. Android reported
+a successful launch of `MainActivity` after installation. This establishes installation and launch,
+not exhaustive verification of the personal ledger or launcher-hosted widgets; functional evidence
+remains the isolated combined test results above.

@@ -102,6 +102,6 @@ For screenshots that must remain available after a run, build both validation AP
 
 ## Widget and device-test notes
 
-- `WidgetRenderingTest` renders at 100% font scale only; the former 200% case was removed on request, so widget text-fit and clipping checks at large font scales are now manual (see the optional visual review above).
+- `WidgetRenderingTest` renders its matrix at 100% font scale; the reference fixture uses the device font scale; the former 200% case was removed on request, so widget text-fit and clipping checks at large font scales are now manual (see the optional visual review above).
 - RemoteViews cannot call `setSelected`; widget colours are set directly at render time. Keep the `WidgetRenderingTest` assertions in step with `LedgerWidgets.monthlyViews` and `budgetViews`.
-- `WidgetLogic.kt` holds the pure widget helpers (`showContext`, `monthTitle`, `progress`, `overspent`, `nextBoundary`, `buckets`) and is covered by `WidgetLogicTest` on the JVM.
+- `WidgetLogic.kt` holds the pure widget helpers (`amount`, `comparison`, `showContext`, `monthTitle`, `progress`, `overspent`, `nextBoundary`, `buckets`) and is covered by `WidgetLogicTest` on the JVM.

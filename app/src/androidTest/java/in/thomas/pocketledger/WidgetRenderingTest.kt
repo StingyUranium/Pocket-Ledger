@@ -35,6 +35,7 @@ class WidgetRenderingTest {
             "empty" to MonthlySummary(0, 0, 0, 0),
             "over" to MonthlySummary(100000000000, 99999999999, 10000, 99999999999)
         )
+        val previous = MonthlySummary(3000000, 1802703, 0, 0)
         for (night in listOf(false, true)) for (scale in listOf(1f)) {
             val configuration = Configuration(context.resources.configuration).apply {
                 uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
@@ -43,21 +44,43 @@ class WidgetRenderingTest {
             }
             val themed = context.createConfigurationContext(configuration)
             for ((name, summary) in fixtures) for (income in listOf(false, true)) {
-                for ((width, height) in listOf(160 to 112, 240 to 144, 320 to 220)) {
-                    val views = LedgerWidgets.monthlyViews(themed, 900001, summary, "October 2026", income, height)
-                    capture(themed, views, width, height, File(output, "monthly-$night-$scale-$name-$income-$width.png")) { root ->
+                for ((width, height) in listOf(160 to 112, 240 to 144, 320 to 196, 320 to 220)) {
+                    val baseline = if (name == "empty") MonthlySummary(0, 0, 0, 0) else previous
+                    val views = LedgerWidgets.monthlyViews(themed, 900001, summary, "October 2026", income, height, previous = baseline)
+                    capture(themed, views, width, height, File(output, "monthly-$night-$scale-$name-$income-$width-$height.png")) { root ->
                         val total = root.findViewById<TextView>(R.id.widget_total)
-                        assertEquals(money(if (income) summary.income else summary.spent), total.text.toString())
+                        assertEquals(WidgetLogic.amount(if (income) summary.income else summary.spent), total.text.toString())
                         assertTrue(total.contentDescription.contains(total.text))
-                        assertTouchHeight(themed, total)
+                        assertEquals(Color.WHITE, total.currentTextColor)
                         assertTouchHeight(themed, root.findViewById(R.id.widget_income_tab))
                         assertTouchHeight(themed, root.findViewById(R.id.widget_expense_tab))
                         for (tabId in listOf(R.id.widget_income_tab, R.id.widget_expense_tab)) {
                             val tab = root.findViewById<TextView>(tabId)
                             assertTrue("Full tab label must fit at $width dp / $scale: ${tab.text} (${tab.paint.measureText(tab.text.toString())}px in ${tab.width}px)", tab.paint.measureText(tab.text.toString()) <= tab.width - tab.totalPaddingLeft - tab.totalPaddingRight)
                         }
-                        assertEquals(if (height >= 144 * scale) View.VISIBLE else View.GONE,
-                            root.findViewById<View>(R.id.widget_title).visibility)
+                        val title = root.findViewById<TextView>(R.id.widget_title)
+                        assertEquals(View.VISIBLE, title.visibility)
+                        assertEquals("This Month", title.text.toString())
+                        assertEquals(if (income) View.VISIBLE else View.INVISIBLE,
+                            root.findViewById<View>(R.id.widget_income_line).visibility)
+                        assertEquals(if (income) View.INVISIBLE else View.VISIBLE,
+                            root.findViewById<View>(R.id.widget_expense_line).visibility)
+                        assertEquals(themed.getColor(R.color.widget_monthly_text),
+                            root.findViewById<TextView>(if (income) R.id.widget_income_tab else R.id.widget_expense_tab).currentTextColor)
+                        assertEquals(themed.getColor(R.color.widget_monthly_secondary),
+                            root.findViewById<TextView>(if (income) R.id.widget_expense_tab else R.id.widget_income_tab).currentTextColor)
+                        val comparison = WidgetLogic.comparison(if (income) summary.income else summary.spent,
+                            if (income) baseline.income else baseline.spent, income)
+                        val delta = root.findViewById<TextView>(R.id.widget_delta)
+                        assertEquals(comparison.text, delta.text.toString())
+                        val expectedColor = when (comparison.favorable) {
+                            true -> R.color.widget_monthly_green
+                            false -> R.color.widget_monthly_red
+                            null -> R.color.widget_monthly_secondary
+                        }
+                        assertEquals(themed.getColor(expectedColor), delta.currentTextColor)
+                        assertNotNull(delta.contentDescription)
+                        assertEquals("vs. MoM", root.findViewById<TextView>(R.id.widget_comparison).text.toString())
                     }
                 }
             }
@@ -72,6 +95,34 @@ class WidgetRenderingTest {
                     assertTrue(root.findViewById<View>(R.id.widget_root).contentDescription.contains(amount.text))
                 }
             }
+        }
+    }
+
+    @Test fun referenceFixtureShowsFullMonthComparison() {
+        check(context.packageName == "in.thomas.pocketledger.validation")
+        val output = File(context.getExternalFilesDir(null), "widget-review").apply { mkdirs() }
+        val current = MonthlySummary(0, 2362727, 0, 0)
+        val previous = MonthlySummary(0, 1802703, 0, 0)
+        val views = LedgerWidgets.monthlyViews(context, 900001, current, "October 2026", false, 196, previous = previous)
+        capture(context, views, 320, 196, File(output, "monthly-reference.png")) { root ->
+            assertEquals("23,627.27", root.findViewById<TextView>(R.id.widget_total).text.toString())
+            val delta = root.findViewById<TextView>(R.id.widget_delta)
+            assertEquals("▲ 5,600.24", delta.text.toString())
+            assertEquals(context.getColor(R.color.widget_monthly_red), delta.currentTextColor)
+            assertTrue(delta.contentDescription.toString().contains("5,600.24"))
+        }
+    }
+
+    @Test fun zeroComparisonIsNeutralAndStaleDataIsMarked() {
+        check(context.packageName == "in.thomas.pocketledger.validation")
+        instrumentation.runOnMainSync {
+            val summary = MonthlySummary(10000, 20000, 0, 0)
+            val root = LedgerWidgets.monthlyViews(context, 900001, summary, "October 2026", false, 196,
+                stale = true, previous = summary).apply(context, null)
+            val delta = root.findViewById<TextView>(R.id.widget_delta)
+            assertEquals("0.00", delta.text.toString())
+            assertEquals(context.getColor(R.color.widget_monthly_secondary), delta.currentTextColor)
+            assertEquals(View.VISIBLE, root.findViewById<View>(R.id.widget_status).visibility)
         }
     }
 
@@ -91,7 +142,7 @@ class WidgetRenderingTest {
             assertFalse(prefs.getBoolean("income_$second", false))
             awaitPreference(prefs, "income_$first") {
                 val root = LedgerWidgets.monthlyViews(context, first, summary, "October 2026", prefs.getBoolean("income_$first", false), 112).apply(context, null)
-                assertEquals(money(summary.income), root.findViewById<TextView>(R.id.widget_total).text.toString())
+                assertEquals(WidgetLogic.amount(summary.income), root.findViewById<TextView>(R.id.widget_total).text.toString())
                 assertTrue(root.findViewById<View>(R.id.widget_expense_tab).performClick())
             }
             assertFalse(prefs.getBoolean("income_$first", false))
@@ -161,7 +212,6 @@ class WidgetRenderingTest {
             verify(root)
             val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
-            canvas.drawColor(Color.rgb(105, 120, 145))
             host.draw(canvas)
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()

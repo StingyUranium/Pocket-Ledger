@@ -28,7 +28,7 @@ All Kotlin filenames below are relative to `app/src/main/java/in/thomas/pocketle
 
 `Categories.kt` owns separate income and expense suggestions. Editors retain a draft category for
 each type; filters include saved custom/legacy categories only for the selected type, while budgets
-offer expense categories. Category discovery runs off-thread. Existing entries are never relabeled.
+offer expense categories. Category discovery runs off-thread. Existing entries are never relabeled. Category pickers use an explicit category presentation in `Editors.kt`, with immediate draft selection, a single Close control and a separate optional add callback; non-category pickers keep the generic choice sheet. Category rows resolve recognizable glyphs through `categoryIconName` and the existing `AppIcon` vectors, with a neutral receipt for custom categories. Names and stored categories are unchanged.
 Remembered payee rules use `(merchant, type)` as the Room v3 key, so the same payee can have independent
 income and spending rules. Migration 2→3 infers each old rule's type from the latest matching entry,
 falling back to an income-only category or expense. Backup format 2 stores rule types and accepts
@@ -51,19 +51,23 @@ list's viewport. Both bars blur the page beneath them with Haze (`hazeSource` on
 the bars) and fall back to a translucent fill. Destination changes reveal controls without resetting
 lists; reduced motion and touch exploration pin the header.
 
-Room flows feed `ledgerSnapshots`; calculations and I/O belong off the main thread, including the selected-month income-plan summary. The calculation cache retains at most 32 call-site results, evicting the least recently used result so visiting many custom categories cannot retain every historical input snapshot. `LedgerApp` observes the current month's entries and budgets to refresh installed widgets while any exist.
+Room flows feed `ledgerSnapshots`; calculations and I/O belong off the main thread, including the selected-month income-plan summary. The calculation cache retains at most 32 call-site results, evicting the least recently used result so visiting many custom categories cannot retain every historical input snapshot. `LedgerApp` observes the current and previous months' entries and budgets to refresh installed widgets while any exist.
 
-Widgets remain Android RemoteViews, with shared light/dark frosted drawable resources and resource
-spacing/shape tokens. `LedgerWidgets` builds compact or expanded views from launcher-provided dp
-sizes, with a portrait/landscape fallback for older hosts; options changes refresh installed widgets.
-Month context and budget usage appear at 144dp height, scaled upward with the font scale. Monthly
-selection remains in `widget_tabs` per installed ID. Amount descriptions retain full values even
-when a compact view ellipsizes them. Surfaces approximate frosting without wallpaper capture or blur.
+Widgets remain Android RemoteViews. The monthly widget uses its own opaque charcoal resources in
+both device themes, underlined Income/Expenses tabs and two summary columns. Its current-month total
+is compared with the full previous calendar month in Asia/Kolkata; both summaries are retained in
+the cache for tab switching and stale fallback. Visible monthly amounts omit the currency symbol;
+accessibility retains full amounts and spoken comparison direction. The preferred size is 4 by 2
+launcher cells, with compact resizing supported. Monthly selection remains in `widget_tabs` per ID.
+Budget retains its theme-aware frosted resources and reveals month context and usage at 144dp,
+scaled upward with font scale. Options changes refresh installed widgets; surfaces do not capture
+or blur wallpaper.
 
 
-`LedgerSheet` shares its form scroll state with `FluidModalSheet`. A scrolled form retains gesture
-ownership through its fling, including reaching the top, so a fast downward reversal cannot start
-dragging the sheet. Material sheet dragging becomes available again once the form settles at the top;
+`LedgerSheet` shares its content `ScrollableState` with `FluidModalSheet`: the default form state or
+an explicitly supplied lazy-list state. Category pickers supply their own list state. Scrolled content
+retains gesture ownership through its fling, including reaching the top, so a fast downward reversal
+cannot start dragging the sheet. Material sheet dragging becomes available again once the content settles at the top;
 Cancel, back and outside-tap dismissal remain available while the form is scrolled.
 
 Overview's breakdown bars show each category's share of total monthly expense spending, with an
@@ -84,7 +88,7 @@ shares as less than 0.1%. Large-text rows stack values, and chart totals move ou
 - Room migration 3->4 adds a unique index on `Entry.smsKey` (NULLs allowed) and indices on `date` and `accountId`. Duplicate keys keep every row: one live row keeps the key, the others are marked deleted with a null key, so no money rows are lost.
 - Stored SMS bodies are replaced by `purged:` plus a hash of sender and normalized body once a message is saved, linked or dismissed (dismissed rows at the next launch, so undo still works). Keys, parsed fields and tombstones are unchanged; `SmsRecord.semanticKey()` gives the same identity before and after a purge, and the editor hides "Original bank message" for purged rows.
 - Ingest and transfer matching use targeted queries and join by reference instead of loading whole tables. More than three new uncategorized entries post one summary reminder with no amounts; the notification channel is created once in `LedgerApp.onCreate`.
-- `LedgerApp` collects only the current month for widgets (debounced, distinct) and only while widgets exist; the periodic reconcile worker is scheduled only while capture is enabled.
+- `LedgerApp` collects the current and previous months for widgets (debounced, distinct) and only while widgets exist; the periodic reconcile worker is scheduled only while capture is enabled.
 - Backup export is read back and verified after writing, and restore first writes an encrypted safety copy to `files/backup-safety/pre-restore.plbackup`.
 - Seeded bank account suffixes come from the git-ignored asset `local-accounts.properties`; without it only Cash is seeded.
 - Widgets: `MonthlyWidgetProvider` alone handles date, time and timezone broadcasts and an inexact alarm fired just after Asia/Kolkata midnight (which also covers month boundaries). Tab taps re-render only their own widget. Text colours are resolved when rendering because RemoteViews cannot call `setSelected`, so an application `ComponentCallbacks` re-renders after a font-scale or night-mode change while the process is alive; otherwise the next update picks it up. The budget widget stacks two progress bars with fixed tints and shows the red one when overspent. Failed loads show the cached month as "Not updated" or a "Can't load data" state. Pure helpers live in `WidgetLogic.kt`.

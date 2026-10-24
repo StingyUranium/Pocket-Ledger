@@ -2,11 +2,10 @@
     <string name="widget_monthly_name">Ledger · Monthly summary</string>
     <string name="widget_budget_name">Ledger · Budget</string>
     <string name="widget_expenses_label">Expenses</string>
-    <string name="widget_monthly_description">Monthly income or expenses. Tap a tab to switch; tap the total to see transactions.</string>
+    <string name="widget_monthly_description">Monthly income or expenses compared with last month. Tap a tab to switch; tap the total to see transactions.</string>
     <string name="widget_budget_description">Recurring budget remaining this month, including overspending.</string>
     <string name="widget_month_preview">This month · Ledger</string>
     <string name="widget_income_label">Income</string>
-    <string name="widget_spent_label">Spent</string>
     <string name="widget_remaining_label">Budget remaining</string>
     <string name="widget_no_budget">Set a budget</string>
     <string name="widget_budget_usage">%1$s of %2$s used</string>
@@ -15,7 +14,6 @@
     <color name="widget_background">#F2F2F2F7</color>
     <color name="widget_glass_top">#FAFFFFFF</color>
     <color name="widget_glass_edge">#B3FFFFFF</color>
-    <color name="widget_selected">#E6FFFFFF</color>
     <color name="widget_panel">#B8E3E3E8</color>
     <color name="widget_text">#1C1C1E</color>
     <color name="widget_secondary">#53535B</color>
@@ -27,6 +25,6 @@
     <string name="widget_tab_accessibility">%1$s, %2$s</string>
     <string name="widget_selected_label">selected</string>
     <string name="widget_not_selected_label">not selected</string>
-    <string name="widget_total_accessibility">%1$s, %2$s, %3$s. Open transactions</string>
+    <string name="widget_total_accessibility">%1$s, %2$s, %3$s rupees. Open transactions</string>
     <string name="widget_budget_accessibility">%1$s, budget remaining %2$s. %3$s. Open budgets</string>
 </resources>

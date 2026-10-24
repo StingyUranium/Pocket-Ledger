@@ -67,6 +67,16 @@ class MonthlySummaryBucketTest {
         for (month in months) assertEquals(reference(fixture, emptyList(), month), batched.getValue(month))
     }
 
+    @Test fun widgetComparisonCrossesYearBoundaryAndUsesWholePreviousMonth() {
+        val january = YearMonth.of(2027, 1)
+        val previous = january.minusMonths(1)
+        val summaries = monthlySummaries(fixture, emptyList(), listOf(january, previous))
+        assertEquals(-1_400L, WidgetLogic.comparison(summaries.getValue(january).spent,
+            summaries.getValue(previous).spent, income = false).delta)
+        assertEquals(1_500L, WidgetLogic.comparison(summaries.getValue(january).income,
+            summaries.getValue(previous).income, income = true).delta)
+    }
+
     @Test fun octoberTotalsExcludeTransfersDeletedAndNeighbouringMonths() {
         val summary = monthlySummary(fixture, budgets, october)
         assertEquals(5_000L, summary.income)

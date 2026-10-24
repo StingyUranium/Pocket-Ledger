@@ -3,7 +3,6 @@
     <color name="widget_background">@android:color/system_neutral1_50</color>
     <color name="widget_glass_top">@android:color/system_neutral1_10</color>
     <color name="widget_glass_edge">@android:color/system_neutral1_0</color>
-    <color name="widget_selected">@android:color/system_neutral1_0</color>
     <color name="widget_panel">@android:color/system_neutral2_100</color>
     <color name="widget_text">@android:color/system_neutral1_900</color>
     <color name="widget_secondary">@android:color/system_neutral2_700</color>

@@ -44,3 +44,9 @@ This is the intended design and acceptance checklist, not evidence that every st
 The same state layouts inherit both theme palettes and reduced motion. Raw screenshot evidence uses synthetic ledger data and stays ignored.
 
 Automated coverage note (24 October 2026): the widget rendering test no longer exercises 200% font scale, and no automated landscape or rotation test exists; those checks in the matrix above are manual.
+
+## Category picker visual refresh
+
+Category pickers in transaction editing, category review, budgets and Activity filters use one scrollable grouped list with 16dp margins. Small accent icon badges use recognizable category-specific glyphs for built-in options and a neutral receipt for custom options; the selected row uses semibold accent text and a checkmark with a reserved trailing slot. The current selection opens in view. Rows wrap at large text sizes.
+
+Selecting a row immediately updates the caller draft and closes the picker. A single Close control dismisses without changing that draft; parent editor Save behavior is unchanged. Transaction editing exposes Add category as a separate grouped action that opens the existing custom-name field. Category order, names, type separation and financial persistence remain unchanged. Other choice sheets retain their existing presentation.
