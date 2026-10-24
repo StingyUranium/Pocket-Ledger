@@ -225,3 +225,35 @@ Validation: debug assembly, lint and all 56 JVM tests pass. The final isolated i
 passes all 36 functional tests, including pixel checks for proportional fill, a continuous track and
 zero-value bars; the opt-in visual fixture is skipped in that run and was run separately for the two
 font scales. The complete run reports 37 tests including that assumption-skipped fixture.
+
+
+## Home-screen widgets
+
+Monthly summary and Budget share a frosted gradient surface, subtle highlight border, 20dp outer
+corners, semantic light/dark colors, and rounded controls. Monthly uses a 48dp segmented selector
+(Expenses shortens to Spent above 130% font scale) and a separate 48dp amount target; its minimum height is 112dp while the default grid request remains
+3x1. Budget retains its 4x1 request and negative remaining values. Both expand to show month context
+at 144dp; Budget also shows usage. The context threshold scales with font size to protect core content.
+Android RemoteViews resources mirror app spacing/shape tokens; no new dependency is required.
+This treatment uses translucent fills and highlights, not launcher wallpaper blur or refraction.
+
+### Widget validation - 2026-10-24
+
+Final personal-package debug build and all 56 JVM tests passed. Lint completed with 0 errors and
+27 warnings. The APK application ID was verified as `in.thomas.pocketledger`. On user request,
+`adb install -r` successfully updated the personal installation on 2026-10-24; this confirms installation,
+not launcher visual acceptance. Focused physical-device tests in the validation
+package passed for RemoteViews host rendering, per-widget selection persistence and all three tap
+routes (income, expenses, budgets). The rendering matrix covers light/dark, 100%/200% font scale,
+compact/enlarged sizes, empty data, normal data and large overspending, using synthetic fixtures.
+Device-rendered images revealed a fixed-height Budget label clipping at 200%; the label now measures
+its content and a focused regression assertion checks its line height. The corrected rendering matrix,
+selection test and three-route tap test all passed in a final AndroidJUnitRunner run (3 tests). All 108 synthetic device-rendered images were pulled to ignored
+`artifacts/widget-review/`; representative light/dark, compact/expanded and large-font images were
+visually inspected. Large-font labels fit after shortening Expenses to Spent and allowing Budget
+remaining to measure its height; the latter can ellipsize at compact widths.
+
+These tests exercise an AppWidgetHostView with configured sizes and font scales. They do not certify
+launcher placement/resizing gestures, global font-setting changes, TalkBack interaction, older Android
+hosts, wallpaper contrast across launchers, or performance. Very large values can ellipsize in compact
+layouts, with full amounts available through accessibility descriptions.

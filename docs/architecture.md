@@ -53,6 +53,14 @@ lists; reduced motion and touch exploration pin the header.
 
 Room flows feed `ledgerSnapshots`; calculations and I/O belong off the main thread. `LedgerApp` observes entries and budgets to refresh installed widgets.
 
+Widgets remain Android RemoteViews, with shared light/dark frosted drawable resources and resource
+spacing/shape tokens. `LedgerWidgets` builds compact or expanded views from launcher-provided dp
+sizes, with a portrait/landscape fallback for older hosts; options changes refresh installed widgets.
+Month context and budget usage appear at 144dp height, scaled upward with the font scale. Monthly
+selection remains in `widget_tabs` per installed ID. Amount descriptions retain full values even
+when a compact view ellipsizes them. Surfaces approximate frosting without wallpaper capture or blur.
+
+
 `LedgerSheet` shares its form scroll state with `FluidModalSheet`. A scrolled form retains gesture
 ownership through its fling, including reaching the top, so a fast downward reversal cannot start
 dragging the sheet. Material sheet dragging becomes available again once the form settles at the top;

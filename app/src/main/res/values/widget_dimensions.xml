@@ -1,0 +1,11 @@
+<resources>
+    <!-- RemoteViews equivalents of the app's spacing and shape tokens. -->
+    <dimen name="widget_corner">20dp</dimen>
+    <dimen name="widget_control_corner">12dp</dimen>
+    <dimen name="widget_space">8dp</dimen>
+    <dimen name="widget_small_space">4dp</dimen>
+    <dimen name="widget_touch_target">48dp</dimen>
+    <dimen name="widget_amount_size">32sp</dimen>
+    <dimen name="widget_label_size">12sp</dimen>
+    <dimen name="widget_tab_size">14sp</dimen>
+</resources>

@@ -1,18 +1,23 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:padding="8dp" android:background="@drawable/widget_monthly_background">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false">
-        <LinearLayout android:id="@+id/widget_income_tile" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-            <TextView android:id="@+id/widget_income_tab" android:layout_width="match_parent" android:layout_height="32dp" android:gravity="center" android:text="@string/widget_income_label" android:textSize="18sp" android:textColor="#999A9E" />
-            <TextView android:id="@+id/widget_income_indicator" android:layout_width="match_parent" android:layout_height="2dp" android:background="#48494D" />
-        </LinearLayout>
-        <LinearLayout android:id="@+id/widget_spent_tile" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-            <TextView android:id="@+id/widget_expense_tab" android:layout_width="match_parent" android:layout_height="32dp" android:gravity="center" android:text="@string/widget_expenses_label" android:textSize="18sp" android:textColor="#FFFFFF" />
-            <TextView android:id="@+id/widget_expense_indicator" android:layout_width="match_parent" android:layout_height="2dp" android:background="#FF554D" />
-        </LinearLayout>
+    android:orientation="vertical" android:padding="@dimen/widget_space" android:background="@drawable/widget_background">
+    <TextView android:id="@+id/widget_title" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/widget_space" android:layout_marginBottom="@dimen/widget_space" android:text="@string/widget_month_preview"
+        android:textColor="@color/widget_secondary" android:textSize="@dimen/widget_label_size" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="@dimen/widget_touch_target" android:orientation="horizontal"
+        android:background="@drawable/widget_panel" android:baselineAligned="false">
+        <TextView android:id="@+id/widget_income_tab" android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center" android:text="@string/widget_income_label" android:textSize="@dimen/widget_tab_size"
+            android:fontFamily="sans-serif-medium" android:textColor="@color/widget_secondary" android:maxLines="1" android:ellipsize="end"
+            android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="@dimen/widget_tab_size" android:autoSizeStepGranularity="1sp" />
+        <TextView android:id="@+id/widget_expense_tab" android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center" android:text="@string/widget_expenses_label" android:textSize="@dimen/widget_tab_size"
+            android:fontFamily="sans-serif-medium" android:textColor="@color/widget_accent" android:background="@drawable/widget_selected"
+            android:maxLines="1" android:ellipsize="end" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="@dimen/widget_tab_size" android:autoSizeStepGranularity="1sp" />
     </LinearLayout>
-    <LinearLayout android:id="@+id/widget_total_tile" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-        <TextView android:layout_width="match_parent" android:layout_height="18dp" android:text="@string/widget_this_month" android:gravity="center" android:textSize="13sp" android:textColor="#EEEEEF" />
-        <TextView android:id="@+id/widget_total" android:layout_width="match_parent" android:layout_height="28dp" android:text="@string/widget_amount_preview" android:gravity="center" android:textStyle="bold" android:fontFamily="sans-serif" android:textColor="#FFFFFF" android:textSize="24sp" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="16sp" android:autoSizeMaxTextSize="24sp" android:autoSizeStepGranularity="1sp" />
-    </LinearLayout>
+    <TextView android:id="@+id/widget_total" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:minHeight="@dimen/widget_touch_target" android:gravity="center_vertical|start" android:paddingHorizontal="@dimen/widget_space"
+        android:text="@string/widget_amount_preview" android:textColor="@color/widget_text" android:textSize="@dimen/widget_amount_size"
+        android:fontFamily="sans-serif-medium" android:maxLines="1" android:ellipsize="end" android:autoSizeTextType="uniform"
+        android:autoSizeMinTextSize="@dimen/widget_label_size" android:autoSizeMaxTextSize="@dimen/widget_amount_size" android:autoSizeStepGranularity="1sp" />
 </LinearLayout>

@@ -42,7 +42,7 @@ Deposit-account refunds and reversals are included. Credit cards, OTPs, failed p
 
 Automatic saving requires a confirmed sender, mapped account, positive amount, direction, date, and usable reference. Incomplete selected alerts remain in review. Missing references, account-less debits, interest, and wallet top-ups can require manual confirmation. SMS-reported balances are displayed separately from ledger calculations.
 
-Amounts use integer paise in INR; dates use Asia/Kolkata. Transfers and deleted entries are excluded from income and spending reports. Missing alerts and cash activity require manual entries. Widgets use the current month and refresh when ledger data changes and during periodic Android updates. The compact monthly widget uses a dark appearance; the Budget widget follows the device theme.
+Amounts use integer paise in INR; dates use Asia/Kolkata. Transfers and deleted entries are excluded from income and spending reports. Missing alerts and cash activity require manual entries. Widgets use the current month and refresh when ledger data changes and during periodic Android updates. Both widgets use frosted surfaces that follow the device theme. Monthly summary keeps its Income/Expenses selection per widget; taller widgets reveal month context, and Budget also reveals usage details. Monthly summary needs at least 112dp height for its touch targets. Frosting uses translucent gradients and highlights; it does not blur the launcher wallpaper. Very large amounts may shorten on compact widgets; accessibility descriptions retain the full values.
 
 ## Privacy, backups, and upgrades
 

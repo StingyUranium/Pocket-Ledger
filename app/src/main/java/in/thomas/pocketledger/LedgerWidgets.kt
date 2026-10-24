@@ -6,6 +6,10 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.util.SizeF
+import android.view.View
 import android.util.Log
 import android.widget.RemoteViews
 import androidx.room.withTransaction
@@ -38,6 +42,8 @@ class BudgetWidgetProvider : LedgerWidgetProvider()
 
 open class LedgerWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = refresh(context)
+
+    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) = refresh(context)
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
@@ -75,37 +81,80 @@ object LedgerWidgets {
         val summary = monthlySummary(entries, budgets, month)
         val manager = AppWidgetManager.getInstance(context)
         val title = month.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
-        val textColor = context.getColor(R.color.widget_text)
-        val negativeColor = context.getColor(R.color.widget_expense)
         manager.getAppWidgetIds(ComponentName(context, MonthlyWidgetProvider::class.java)).forEach { id ->
-            val views = RemoteViews(context.packageName, R.layout.widget_monthly)
             val income = context.getSharedPreferences("widget_tabs", Context.MODE_PRIVATE).getBoolean("income_$id", false)
-            views.setTextViewText(R.id.widget_total, money(if (income) summary.income else summary.spent))
-            views.setTextColor(R.id.widget_income_tab, android.graphics.Color.parseColor(if (income) "#FFFFFF" else "#999A9E"))
-            views.setTextColor(R.id.widget_expense_tab, android.graphics.Color.parseColor(if (income) "#999A9E" else "#FFFFFF"))
-            views.setInt(R.id.widget_income_indicator, "setBackgroundColor", android.graphics.Color.parseColor(if (income) "#64C99A" else "#48494D"))
-            views.setInt(R.id.widget_expense_indicator, "setBackgroundColor", android.graphics.Color.parseColor(if (income) "#48494D" else "#FF554D"))
-            views.setOnClickPendingIntent(R.id.widget_root, open(context, if (income) "income" else "expense"))
-            views.setOnClickPendingIntent(R.id.widget_income_tile, selectTab(context, id, true))
-            views.setOnClickPendingIntent(R.id.widget_spent_tile, selectTab(context, id, false))
-            views.setOnClickPendingIntent(R.id.widget_income_tab, selectTab(context, id, true))
-            views.setOnClickPendingIntent(R.id.widget_expense_tab, selectTab(context, id, false))
-            views.setOnClickPendingIntent(R.id.widget_income_indicator, selectTab(context, id, true))
-            views.setOnClickPendingIntent(R.id.widget_expense_indicator, selectTab(context, id, false))
-            views.setOnClickPendingIntent(R.id.widget_total_tile, open(context, if (income) "income" else "expense"))
-            manager.updateAppWidget(id, views)
+            manager.updateAppWidget(id, responsiveViews(manager.getAppWidgetOptions(id), 112) { height ->
+                monthlyViews(context, id, summary, title, income, height)
+            })
         }
         manager.getAppWidgetIds(ComponentName(context, BudgetWidgetProvider::class.java)).forEach { id ->
-            val views = RemoteViews(context.packageName, R.layout.widget_budget)
-            views.setTextViewText(R.id.widget_title, title)
-            views.setTextViewText(R.id.widget_remaining, if (summary.budgetLimit > 0) money(summary.budgetRemaining) else context.getString(R.string.widget_no_budget))
-            views.setTextColor(R.id.widget_remaining, if (summary.budgetRemaining < 0) negativeColor else textColor)
-            views.setTextViewText(R.id.widget_budget_meta, context.getString(R.string.widget_budget_usage, money(summary.budgetSpent), money(summary.budgetLimit)))
-            val progress = if (summary.budgetLimit > 0) (summary.budgetSpent.toDouble() / summary.budgetLimit * 1000).coerceIn(0.0, 1000.0).toInt() else 0
-            views.setProgressBar(R.id.widget_progress, 1000, progress, false)
-            views.setOnClickPendingIntent(R.id.widget_root, open(context, "budget"))
-            manager.updateAppWidget(id, views)
+            manager.updateAppWidget(id, responsiveViews(manager.getAppWidgetOptions(id), 110) { height ->
+                budgetViews(context, summary, title, height)
+            })
         }
+    }
+
+    /** Launcher-provided sizes are in dp, excluding host padding. Keep old hosts resize-aware too. */
+    private fun responsiveViews(options: Bundle, fallbackHeight: Int, create: (Int) -> RemoteViews): RemoteViews {
+        if (Build.VERSION.SDK_INT >= 31) {
+            @Suppress("DEPRECATION")
+            val sizes = options.getParcelableArrayList<SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)
+            if (!sizes.isNullOrEmpty() && sizes.size <= 16) {
+                return RemoteViews(sizes.associateWith { create(it.height.toInt()) })
+            }
+        }
+        val portrait = create(options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, fallbackHeight))
+        val landscape = create(options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, fallbackHeight))
+        // A host can omit options entirely during its first update.
+        return if (options.isEmpty) create(fallbackHeight) else RemoteViews(landscape, portrait)
+    }
+
+    private fun showContext(context: Context, height: Int): Boolean =
+        height >= 144 * context.resources.configuration.fontScale.coerceAtLeast(1f)
+
+    internal fun monthlyViews(context: Context, id: Int, summary: MonthlySummary, title: String, income: Boolean, height: Int): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.widget_monthly)
+        val amount = money(if (income) summary.income else summary.spent)
+        val label = context.getString(if (income) R.string.widget_income_label else R.string.widget_expenses_label)
+        views.setTextViewText(R.id.widget_title, title)
+        views.setViewVisibility(R.id.widget_title, if (showContext(context, height)) View.VISIBLE else View.GONE)
+        views.setTextViewText(R.id.widget_total, amount)
+        views.setTextViewText(R.id.widget_expense_tab, context.getString(
+            if (context.resources.configuration.fontScale > 1.3f) R.string.widget_spent_label else R.string.widget_expenses_label))
+        views.setContentDescription(R.id.widget_total, context.getString(R.string.widget_total_accessibility, title, label, amount))
+        listOf(R.id.widget_income_tab to true, R.id.widget_expense_tab to false).forEach { (viewId, tabIncome) ->
+            val selected = income == tabIncome
+            views.setTextColor(viewId, context.getColor(if (selected) R.color.widget_accent else R.color.widget_secondary))
+            views.setInt(viewId, "setBackgroundResource", if (selected) R.drawable.widget_selected else android.R.color.transparent)
+            val tabLabel = context.getString(if (tabIncome) R.string.widget_income_label else R.string.widget_expenses_label)
+            views.setContentDescription(viewId, context.getString(R.string.widget_tab_accessibility, tabLabel,
+                context.getString(if (selected) R.string.widget_selected_label else R.string.widget_not_selected_label)))
+            views.setOnClickPendingIntent(viewId, selectTab(context, id, tabIncome))
+        }
+        val destination = open(context, if (income) "income" else "expense")
+        views.setOnClickPendingIntent(R.id.widget_root, destination)
+        views.setOnClickPendingIntent(R.id.widget_total, destination)
+        return views
+    }
+
+    internal fun budgetViews(context: Context, summary: MonthlySummary, title: String, height: Int): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.widget_budget)
+        val hasBudget = summary.budgetLimit > 0
+        val remaining = if (hasBudget) money(summary.budgetRemaining) else context.getString(R.string.widget_no_budget)
+        val usage = if (hasBudget) context.getString(R.string.widget_budget_usage, money(summary.budgetSpent), money(summary.budgetLimit))
+            else context.getString(R.string.widget_budget_preview)
+        val expanded = showContext(context, height)
+        views.setTextViewText(R.id.widget_title, title)
+        views.setViewVisibility(R.id.widget_title, if (expanded) View.VISIBLE else View.GONE)
+        views.setTextViewText(R.id.widget_remaining, remaining)
+        views.setTextColor(R.id.widget_remaining, context.getColor(if (summary.budgetRemaining < 0) R.color.widget_expense else R.color.widget_text))
+        views.setTextViewText(R.id.widget_budget_meta, usage)
+        views.setViewVisibility(R.id.widget_budget_meta, if (expanded) View.VISIBLE else View.GONE)
+        val progress = if (hasBudget) (summary.budgetSpent.toDouble() / summary.budgetLimit * 1000).coerceIn(0.0, 1000.0).toInt() else 0
+        views.setProgressBar(R.id.widget_progress, 1000, progress, false)
+        views.setContentDescription(R.id.widget_root, context.getString(R.string.widget_budget_accessibility, title, remaining, usage))
+        views.setOnClickPendingIntent(R.id.widget_root, open(context, "budget"))
+        return views
     }
 
     private fun selectTab(context: Context, id: Int, income: Boolean): PendingIntent = PendingIntent.getBroadcast(

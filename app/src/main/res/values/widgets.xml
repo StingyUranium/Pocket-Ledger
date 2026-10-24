@@ -2,7 +2,7 @@
     <string name="widget_monthly_name">Ledger · Monthly summary</string>
     <string name="widget_budget_name">Ledger · Budget</string>
     <string name="widget_expenses_label">Expenses</string>
-    <string name="widget_this_month">This Month</string>
+    <string name="widget_this_month">This month</string>
     <string name="widget_monthly_description">Monthly income or expenses. Tap a tab to switch; tap the total to see transactions.</string>
     <string name="widget_budget_description">Recurring budget remaining this month, including overspending.</string>
     <string name="widget_month_preview">This month · Ledger</string>
@@ -15,11 +15,19 @@
     <string name="widget_budget_usage">%1$s of %2$s used</string>
     <string name="widget_amount_preview">₹0.00</string>
     <string name="widget_budget_preview">Spending against your monthly limits</string>
-    <color name="widget_background">#FAFAFC</color>
-    <color name="widget_panel">#F0F1F5</color>
-    <color name="widget_text">#172131</color>
-    <color name="widget_secondary">#5A6170</color>
+    <color name="widget_background">#F2F2F2F7</color>
+    <color name="widget_glass_top">#FAFFFFFF</color>
+    <color name="widget_glass_edge">#B3FFFFFF</color>
+    <color name="widget_selected">#E6FFFFFF</color>
+    <color name="widget_panel">#B8E3E3E8</color>
+    <color name="widget_text">#1C1C1E</color>
+    <color name="widget_secondary">#53535B</color>
     <color name="widget_income">#16814A</color>
     <color name="widget_expense">#B93728</color>
-    <color name="widget_accent">#007AFF</color>
+    <color name="widget_accent">#0066CC</color>
+    <string name="widget_tab_accessibility">%1$s, %2$s</string>
+    <string name="widget_selected_label">selected</string>
+    <string name="widget_not_selected_label">not selected</string>
+    <string name="widget_total_accessibility">%1$s, %2$s, %3$s. Open transactions</string>
+    <string name="widget_budget_accessibility">%1$s, budget remaining %2$s. %3$s. Open budgets</string>
 </resources>
