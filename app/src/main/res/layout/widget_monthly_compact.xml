@@ -1,0 +1,42 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:paddingHorizontal="12dp" android:paddingTop="4dp" android:paddingBottom="4dp"
+    android:background="@drawable/widget_monthly_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="@dimen/widget_touch_target"
+        android:orientation="horizontal" android:baselineAligned="false">
+        <TextView android:id="@+id/widget_income_tab" style="@style/WidgetMonthlyTab"
+            android:text="@string/widget_income_label" android:textColor="@color/widget_monthly_secondary" />
+        <TextView android:id="@+id/widget_expense_tab" style="@style/WidgetMonthlyTab"
+            android:text="@string/widget_expenses_label" android:textColor="@color/widget_monthly_text" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="1.5dp"
+        android:orientation="horizontal" android:baselineAligned="false" android:importantForAccessibility="no"
+        android:background="@color/widget_monthly_divider">
+        <ImageView android:id="@+id/widget_income_line" android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:background="@color/widget_monthly_red" android:visibility="invisible" android:importantForAccessibility="no" />
+        <ImageView android:id="@+id/widget_expense_line" android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:background="@color/widget_monthly_red" android:importantForAccessibility="no" />
+    </LinearLayout>
+    <GridLayout android:id="@+id/widget_body" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:columnCount="2" android:paddingTop="0dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_columnWeight="1"
+            android:orientation="vertical" android:gravity="center" android:paddingHorizontal="4dp">
+            <TextView android:id="@+id/widget_title" style="@style/WidgetMonthlyCompactLabel"
+                android:text="@string/widget_this_month" android:textColor="@color/widget_monthly_text" />
+            <TextView android:id="@+id/widget_total" style="@style/WidgetMonthlyCompactLabel"
+                android:layout_marginTop="4dp" android:text="@string/widget_monthly_zero"
+                android:textSize="22sp" android:autoSizeMaxTextSize="22sp" android:textStyle="bold"
+                android:textColor="@color/widget_monthly_text" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_columnWeight="1"
+            android:orientation="vertical" android:gravity="center" android:paddingHorizontal="4dp">
+            <TextView android:id="@+id/widget_delta" style="@style/WidgetMonthlyCompactLabel"
+                android:text="@string/widget_monthly_zero" android:textColor="@color/widget_monthly_secondary" />
+            <TextView android:id="@+id/widget_comparison" style="@style/WidgetMonthlyCompactLabel"
+                android:layout_marginTop="4dp" android:text="@string/widget_mom" android:textColor="@color/widget_monthly_secondary" />
+        </LinearLayout>
+    </GridLayout>
+    <TextView android:id="@+id/widget_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center" android:text="@string/widget_stale" android:textColor="@color/widget_monthly_secondary"
+        android:textSize="@dimen/widget_label_size" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+</LinearLayout>

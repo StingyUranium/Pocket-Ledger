@@ -60,7 +60,7 @@ class LedgerApp : Application() {
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
     private suspend fun collectWidgetData() {
         // The database is only observed while at least one widget is placed; changes are coalesced and unchanged data is skipped.
-        widgetsPresent.flatMapLatest { present -> if (present) currentMonthData() else emptyFlow() }
+        widgetsPresent.flatMapLatest { present -> if (present) widgetMonthData() else emptyFlow() }
             .debounce(500).distinctUntilChanged().collect { (entries, budgets) ->
                 if (!LedgerWidgets.hasWidgets(this)) { widgetsPresent.value = false; return@collect }
                 runCatching { LedgerWidgets.render(this, entries, budgets) }
@@ -68,8 +68,8 @@ class LedgerApp : Application() {
             }
     }
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun currentMonthData(): Flow<Pair<List<Entry>, List<Budget>>> = monthTicks().flatMapLatest { month ->
-        val from = month.atDay(1).atStartOfDay(india).toInstant().toEpochMilli()
+    private fun widgetMonthData(): Flow<Pair<List<Entry>, List<Budget>>> = monthTicks().flatMapLatest { month ->
+        val from = month.minusMonths(1).atDay(1).atStartOfDay(india).toInstant().toEpochMilli()
         val to = month.plusMonths(1).atDay(1).atStartOfDay(india).toInstant().toEpochMilli()
         combine(db.dao().entriesBetween(from, to), db.dao().budgets()) { entries, budgets -> entries to budgets }
     }

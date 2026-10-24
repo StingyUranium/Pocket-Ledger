@@ -86,7 +86,8 @@ object LedgerWidgets {
     private val watchingConfiguration = AtomicBoolean(false)
     @Volatile private var renderedFontScale = 0f
     @Volatile private var renderedNight = -1
-    @Volatile private var lastSummary: Pair<YearMonth, MonthlySummary>? = null
+    private data class WidgetSummary(val month: YearMonth, val current: MonthlySummary, val previous: MonthlySummary)
+    @Volatile private var lastSummary: WidgetSummary? = null
 
     fun hasWidgets(context: Context): Boolean {
         val manager = AppWidgetManager.getInstance(context)
@@ -129,28 +130,31 @@ object LedgerWidgets {
     private suspend fun refreshFromCache(context: Context, ids: Set<Int>?) {
         val month = YearMonth.now(india)
         val last = lastSummary
-        if (last != null && last.first == month) renderSummary(context, last.second, month, ids, stale = false)
+        if (last != null && last.month == month) renderSummary(context, last, ids, stale = false)
         else refresh(context, ids)
     }
 
     fun render(context: Context, entries: List<Entry>, budgets: List<Budget>, ids: Set<Int>? = null) {
         val month = YearMonth.now(india)
-        val summary = monthlySummary(entries, budgets, month)
-        lastSummary = month to summary
-        renderSummary(context, summary, month, ids, stale = false)
+        val summaries = monthlySummaries(entries, budgets, listOf(month, month.minusMonths(1)))
+        val summary = WidgetSummary(month, summaries.getValue(month), summaries.getValue(month.minusMonths(1)))
+        lastSummary = summary
+        renderSummary(context, summary, ids, stale = false)
     }
 
     private fun renderFallback(context: Context, ids: Set<Int>?) {
         val month = YearMonth.now(india)
         val last = lastSummary
-        if (last != null && last.first == month) renderSummary(context, last.second, month, ids, stale = true)
+        if (last != null && last.month == month) renderSummary(context, last, ids, stale = true)
         else renderUnavailable(context, month, ids)
     }
 
     private fun idsOf(context: Context, provider: Class<*>, only: Set<Int>?): List<Int> =
         AppWidgetManager.getInstance(context).getAppWidgetIds(ComponentName(context, provider)).filter { only == null || it in only }
 
-    private fun renderSummary(context: Context, summary: MonthlySummary, month: YearMonth, ids: Set<Int>?, stale: Boolean) {
+    private fun renderSummary(context: Context, data: WidgetSummary, ids: Set<Int>?, stale: Boolean) {
+        val summary = data.current
+        val month = data.month
         val manager = AppWidgetManager.getInstance(context)
         val title = WidgetLogic.monthTitle(month)
         val prefs = context.getSharedPreferences(TABS_PREFS, Context.MODE_PRIVATE)
@@ -159,7 +163,7 @@ object LedgerWidgets {
         idsOf(context, MonthlyWidgetProvider::class.java, ids).forEach { id ->
             val income = prefs.getBoolean("income_$id", false)
             manager.updateAppWidget(id, responsiveViews(context, manager.getAppWidgetOptions(id), FALLBACK_HEIGHT) { height ->
-                monthlyViews(context, id, summary, title, income, height, stale)
+                monthlyViews(context, id, summary, title, income, height, stale, data.previous)
             })
         }
         idsOf(context, BudgetWidgetProvider::class.java, ids).forEach { id ->
@@ -175,12 +179,14 @@ object LedgerWidgets {
         val manager = AppWidgetManager.getInstance(context)
         val title = WidgetLogic.monthTitle(month)
         idsOf(context, MonthlyWidgetProvider::class.java, ids).forEach { id ->
-            val views = RemoteViews(context.packageName, R.layout.widget_monthly)
-            views.setTextViewText(R.id.widget_title, title)
+            val income = context.getSharedPreferences(TABS_PREFS, Context.MODE_PRIVATE).getBoolean("income_$id", false)
+            val views = monthlyViews(context, id, MonthlySummary(0, 0, 0, 0), title, income, FALLBACK_HEIGHT)
+            views.setTextViewText(R.id.widget_delta, context.getString(R.string.widget_unavailable_amount))
+            views.setContentDescription(R.id.widget_delta, context.getString(R.string.widget_unavailable))
+            views.setContentDescription(R.id.widget_total, context.getString(R.string.widget_unavailable))
             views.setTextViewText(R.id.widget_total, context.getString(R.string.widget_unavailable_amount))
             views.setTextViewText(R.id.widget_status, context.getString(R.string.widget_unavailable))
             views.setViewVisibility(R.id.widget_status, View.VISIBLE)
-            views.setOnClickPendingIntent(R.id.widget_root, open(context, "expense"))
             manager.updateAppWidget(id, views)
         }
         idsOf(context, BudgetWidgetProvider::class.java, ids).forEach { id ->
@@ -214,23 +220,36 @@ object LedgerWidgets {
     private fun showContext(context: Context, height: Int): Boolean =
         WidgetLogic.showContext(height, context.resources.configuration.fontScale)
 
-    internal fun monthlyViews(context: Context, id: Int, summary: MonthlySummary, title: String, income: Boolean, height: Int, stale: Boolean = false): RemoteViews {
-        val views = RemoteViews(context.packageName, R.layout.widget_monthly)
-        val amount = money(if (income) summary.income else summary.spent)
+    internal fun monthlyViews(context: Context, id: Int, summary: MonthlySummary, title: String, income: Boolean, height: Int, stale: Boolean = false, previous: MonthlySummary = MonthlySummary(0, 0, 0, 0)): RemoteViews {
+        val views = RemoteViews(context.packageName,
+            if (showContext(context, height)) R.layout.widget_monthly else R.layout.widget_monthly_compact)
+        val total = if (income) summary.income else summary.spent
+        val amount = WidgetLogic.amount(total)
+        val comparison = WidgetLogic.comparison(total, if (income) previous.income else previous.spent, income)
         val label = context.getString(if (income) R.string.widget_income_label else R.string.widget_expenses_label)
-        views.setTextViewText(R.id.widget_title, title)
-        views.setViewVisibility(R.id.widget_title, if (showContext(context, height)) View.VISIBLE else View.GONE)
+        views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_this_month))
+        views.setTextViewText(R.id.widget_delta, comparison.text)
+        views.setTextColor(R.id.widget_delta, context.getColor(when (comparison.favorable) {
+            true -> R.color.widget_monthly_green
+            false -> R.color.widget_monthly_red
+            null -> R.color.widget_monthly_secondary
+        }))
+        val direction = context.getString(when {
+            comparison.delta > 0 -> R.string.widget_increase
+            comparison.delta < 0 -> R.string.widget_decrease
+            else -> R.string.widget_unchanged
+        })
+        views.setContentDescription(R.id.widget_delta, context.getString(R.string.widget_delta_accessibility,
+            direction, WidgetLogic.amount(kotlin.math.abs(comparison.delta))))
         views.setTextViewText(R.id.widget_total, amount)
         views.setTextViewText(R.id.widget_status, context.getString(R.string.widget_stale))
         views.setViewVisibility(R.id.widget_status, if (stale) View.VISIBLE else View.GONE)
-        views.setTextViewText(R.id.widget_expense_tab, context.getString(
-            if (context.resources.configuration.fontScale > 1.3f) R.string.widget_spent_label else R.string.widget_expenses_label))
         views.setContentDescription(R.id.widget_total, context.getString(R.string.widget_total_accessibility, title, label, amount))
         listOf(R.id.widget_income_tab to true, R.id.widget_expense_tab to false).forEach { (viewId, tabIncome) ->
             val selected = income == tabIncome
-            // RemoteViews cannot call setSelected, so colour and background are chosen here; a uiMode change re-renders.
-            views.setTextColor(viewId, context.getColor(if (selected) R.color.widget_accent else R.color.widget_secondary))
-            views.setInt(viewId, "setBackgroundResource", if (selected) R.drawable.widget_selected else 0)
+            views.setTextColor(viewId, context.getColor(if (selected) R.color.widget_monthly_text else R.color.widget_monthly_secondary))
+            views.setViewVisibility(if (tabIncome) R.id.widget_income_line else R.id.widget_expense_line,
+                if (selected) View.VISIBLE else View.INVISIBLE)
             val tabLabel = context.getString(if (tabIncome) R.string.widget_income_label else R.string.widget_expenses_label)
             views.setContentDescription(viewId, context.getString(R.string.widget_tab_accessibility, tabLabel,
                 context.getString(if (selected) R.string.widget_selected_label else R.string.widget_not_selected_label)))

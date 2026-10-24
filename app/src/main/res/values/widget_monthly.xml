@@ -1,0 +1,49 @@
+<resources>
+    <!-- Monthly widgets reproduce the reference independently of wallpaper and night mode. -->
+    <color name="widget_monthly_background">#25262A</color>
+    <color name="widget_monthly_text">#FFFFFF</color>
+    <color name="widget_monthly_secondary">#9A9A9D</color>
+    <color name="widget_monthly_red">#FF4B42</color>
+    <color name="widget_monthly_green">#53C483</color>
+    <color name="widget_monthly_divider">#45464A</color>
+    <style name="WidgetMonthlyTab">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:autoSizeTextType">uniform</item>
+        <item name="android:autoSizeMinTextSize">10sp</item>
+        <item name="android:autoSizeMaxTextSize">24sp</item>
+        <item name="android:autoSizeStepGranularity">1sp</item>
+    </style>
+    <style name="WidgetMonthlyLabel">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">center</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:autoSizeTextType">uniform</item>
+        <item name="android:autoSizeMinTextSize">10sp</item>
+        <item name="android:autoSizeMaxTextSize">22sp</item>
+        <item name="android:autoSizeStepGranularity">1sp</item>
+    </style>
+    <style name="WidgetMonthlyCompactLabel" parent="WidgetMonthlyLabel">
+        <item name="android:textSize">14sp</item>
+        <item name="android:autoSizeMaxTextSize">14sp</item>
+    </style>
+    <string name="widget_this_month">This Month</string>
+    <string name="widget_mom">vs. MoM</string>
+    <string name="widget_monthly_zero">0.00</string>
+    <string name="widget_delta_accessibility">%1$s by %2$s rupees compared with last month</string>
+    <string name="widget_increase">Increased</string>
+    <string name="widget_decrease">Decreased</string>
+    <string name="widget_unchanged">Unchanged</string>
+</resources>

@@ -225,7 +225,7 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
         item(key = "filters", contentType = "filters") { FluidRow(contentPadding = PaddingValues(horizontal = LedgerSpace.margin, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             item(key = "type", contentType = "chip") { ChoiceChip("Type", type, listOf("ALL", "EXPENSE", "INCOME", "TRANSFER"), { if (it == "ALL") "All types" else it.lowercase().replaceFirstChar(Char::titlecase) }) { if (type != it) { type = it; category = "ALL" } } }
             item(key = "account", contentType = "chip") { ChoiceChip("Account", account, listOf("ALL") + accounts.map { it.id }, { value -> accounts.find { it.id == value }?.name ?: "All accounts" }) { account = it } }
-            item(key = "category", contentType = "chip") { ChoiceChip("Category", category, listOf("ALL") + categoryOptions, { if (it == "ALL") "All categories" else it }) { category = it } }
+            item(key = "category", contentType = "chip") { ChoiceChip("Category", category, listOf("ALL") + categoryOptions, { if (it == "ALL") "All categories" else it }, categoryPresentation = true) { category = it } }
         } }
         run {
             if (result == null) item(key = "loading", contentType = "loading") { Text("Filtering transactions...", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.padding(horizontal = LedgerSpace.margin, vertical = 8.dp)) }

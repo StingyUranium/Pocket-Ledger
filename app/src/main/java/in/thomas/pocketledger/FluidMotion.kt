@@ -14,7 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.preferredFrameRate
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -116,7 +116,7 @@ private val LocalSheetExited = staticCompositionLocalOf<() -> Unit> { {} }
 
 /** Material owns dragging, nested scrolling, accessibility and predictive back. */
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun FluidModalSheet(dismiss: () -> Unit, formScroll: ScrollState? = null, content: @Composable (close: () -> Unit) -> Unit) {
+@Composable fun FluidModalSheet(dismiss: () -> Unit, contentScroll: ScrollableState? = null, content: @Composable (close: () -> Unit) -> Unit) {
     if (LocalReducedMotion.current) {
         val exitRequested = LocalSheetExitRequested.current
         val exited = LocalSheetExited.current
@@ -141,11 +141,11 @@ private val LocalSheetExited = staticCompositionLocalOf<() -> Unit> { {} }
         return
     }
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var formOwnsGesture by remember(formScroll) { mutableStateOf(false) }
-    LaunchedEffect(formScroll) {
-        if (formScroll != null) snapshotFlow { formScroll.isScrollInProgress to formScroll.canScrollBackward }
+    var contentOwnsGesture by remember(contentScroll) { mutableStateOf(false) }
+    LaunchedEffect(contentScroll) {
+        if (contentScroll != null) snapshotFlow { contentScroll.isScrollInProgress to contentScroll.canScrollBackward }
             .collect { (scrolling, belowTop) ->
-                if (!scrolling) formOwnsGesture = false else if (belowTop) formOwnsGesture = true
+                if (!scrolling) contentOwnsGesture = false else if (belowTop) contentOwnsGesture = true
             }
     }
     val scope = rememberCoroutineScope()
@@ -165,8 +165,8 @@ private val LocalSheetExited = staticCompositionLocalOf<() -> Unit> { {} }
         onDismissRequest = dismiss,
         modifier = Modifier.motionSurface(active = state.isAnimationRunning),
         sheetState = state,
-        // Keep fast reversals and flings with the form until it has settled at the top.
-        sheetGesturesEnabled = formScroll?.let { !it.canScrollBackward && !formOwnsGesture } ?: true,
+        // Keep fast reversals and flings with the content until it has settled at the top.
+        sheetGesturesEnabled = contentScroll?.let { !it.canScrollBackward && !contentOwnsGesture } ?: true,
         sheetMaxWidth = 640.dp,
         shape = MaterialTheme.shapes.extraLarge.copy(bottomStart = androidx.compose.foundation.shape.ZeroCornerSize, bottomEnd = androidx.compose.foundation.shape.ZeroCornerSize),
         containerColor = MaterialTheme.colorScheme.background,

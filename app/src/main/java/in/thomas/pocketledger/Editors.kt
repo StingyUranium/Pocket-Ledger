@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.ImeAction
@@ -117,7 +119,54 @@ private fun validationMessage(e: Exception, fallback: String) = if (e is Invalid
     }
 }
 
-@Composable fun Pick(label: String, value: String, options: List<String>, display: (String) -> String = { it.lowercase().replaceFirstChar(Char::titlecase) }, change: (String) -> Unit) {
+/** Category-only presentation; other choice sheets retain their existing controls. */
+@Composable private fun CategoryChoiceSheet(value: String, options: List<String>, display: (String) -> String,
+    dismiss: () -> Unit, addCategory: (() -> Unit)?, change: (String) -> Unit) {
+    val choices = options.filter { it.isNotBlank() }.distinct()
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = choices.indexOf(value).coerceAtLeast(0))
+    LaunchedEffect(choices, value) {
+        listState.scrollToItem(choices.indexOf(value).coerceAtLeast(0))
+    }
+    LedgerSheet("Category", dismiss, closeLabel = "Close", scrollContent = false, showAction = false,
+        contentPadding = LedgerSpace.margin, contentScroll = listState) {
+        // One viewport owns scrolling; no fixed-height list nested inside a scrolling form.
+        GroupedSection(modifier = Modifier.weight(1f)) {
+            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
+                if (choices.isEmpty()) item(key = "empty", contentType = "empty") {
+                    GroupedItem { Text("No categories available", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+                items(choices, key = { it }, contentType = { "category" }) { option ->
+                    Column {
+                        GroupedItem(modifier = Modifier.semantics { selected = option == value }
+                            .ledgerClickable(role = Role.RadioButton) { change(option); dismiss() }) {
+                            Box(Modifier.size(32.dp).clip(MaterialTheme.shapes.small)
+                                .background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                                AppIcon(categoryIconName(option), Modifier.size(18.dp), MaterialTheme.colorScheme.primary)
+                            }
+                            Text(display(option), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (option == value) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (option == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                                if (option == value) AppIcon("check", Modifier.size(19.dp), MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        if (option != choices.last()) GroupedDivider(inset = LedgerSpace.margin + 32.dp + LedgerSpace.medium)
+                    }
+                }
+            }
+        }
+        addCategory?.let { add ->
+            GroupedSection {
+                GroupedRow("Add category\u2026", titleColor = MaterialTheme.colorScheme.primary,
+                    leading = { Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                        AppIcon("plus", Modifier.size(20.dp), MaterialTheme.colorScheme.primary)
+                    } }, onClick = { dismiss(); add() })
+            }
+        }
+    }
+}
+
+@Composable fun Pick(label: String, value: String, options: List<String>, display: (String) -> String = { it.lowercase().replaceFirstChar(Char::titlecase) }, categoryPresentation: Boolean = false, addCategory: (() -> Unit)? = null, change: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val largeText = LocalDensity.current.fontScale > 1.3f
     GroupedItem(onClick = { open = true }) {
@@ -131,17 +180,23 @@ private fun validationMessage(e: Exception, fallback: String) = if (e is Invalid
         }
         AppIcon("down", Modifier.size(13.dp), MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    if (open) ChoiceSheet(label, value, options, display, { open = false }, change)
+    if (open) {
+        if (categoryPresentation) CategoryChoiceSheet(value, options, display, { open = false }, addCategory, change)
+        else ChoiceSheet(label, value, options, display, { open = false }, change)
+    }
 }
 
-@Composable fun ChoiceChip(label: String, value: String, options: List<String>, display: (String) -> String, change: (String) -> Unit) {
+@Composable fun ChoiceChip(label: String, value: String, options: List<String>, display: (String) -> String, categoryPresentation: Boolean = false, change: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val active = value != "ALL"
     Row(Modifier.heightIn(min = LedgerSpace.touch).clip(MaterialTheme.shapes.medium).background(if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface).ledgerClickable { open = true }.padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(display(value), style = MaterialTheme.typography.bodyMedium, color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
         AppIcon("down", Modifier.size(11.dp), if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    if (open) ChoiceSheet(label, value, options, display, { open = false }, change)
+    if (open) {
+        if (categoryPresentation) CategoryChoiceSheet(value, options, display, { open = false }, null, change)
+        else ChoiceSheet(label, value, options, display, { open = false }, change)
+    }
 }
 
 /**
@@ -247,8 +302,9 @@ private fun validationMessage(e: Exception, fallback: String) = if (e is Invalid
             GroupedField("Payee or description", payee, { payee = it })
             GroupedDivider()
             if (type != "TRANSFER") {
-                Pick("Category", category, (categories + category + "Add category\u2026").filter { it.isNotBlank() }.distinct(), { it }) {
-                    if (it == "Add category\u2026") customCategory = true else { category = it; customCategory = false }
+                Pick("Category", category, (categories + category).filter { it.isNotBlank() }.distinct(), { it },
+                    categoryPresentation = true, addCategory = { customCategory = true }) {
+                    category = it; customCategory = false
                 }
                 GroupedDivider()
                 if (customCategory) { GroupedField("Custom category", category, { category = it }); GroupedDivider() }
@@ -336,7 +392,7 @@ private fun validationMessage(e: Exception, fallback: String) = if (e is Invalid
         Text("A plan that carries forward.", style = MaterialTheme.typography.headlineMedium)
         Text("Choose a category and set its limit for every month.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         GroupedSection(footer = "Transfers are excluded from spending. Removing a limit preserves transactions.") {
-            Pick("Category", category, ((savedCategories ?: expenseCategories) + category).distinct(), { it }) { category = it }
+            Pick("Category", category, ((savedCategories ?: expenseCategories) + category).distinct(), { it }, categoryPresentation = true) { category = it }
             GroupedDivider()
             GroupedField("Category name", category, { category = it })
             GroupedDivider()
@@ -389,7 +445,7 @@ private fun validationMessage(e: Exception, fallback: String) = if (e is Invalid
         Text(entry.payee.ifBlank { "Transaction" }, style = MaterialTheme.typography.titleMedium)
         Text(money(entry.amount), style = MaterialTheme.typography.headlineMedium)
         GroupedSection {
-            Pick("Category", category, options ?: categoriesForType(entry.type), { it }) { category = it }
+            Pick("Category", category, (options ?: categoriesForType(entry.type)) + category, { it }, categoryPresentation = true) { category = it }
             GroupedField("Category name", category, { category = it })
             GroupedRow("Remember for this payee", trailing = { PocketSwitch(rememberPayee, "Remember for this payee") { rememberPayee = it } })
         }

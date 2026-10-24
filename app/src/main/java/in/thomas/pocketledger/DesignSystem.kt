@@ -182,7 +182,11 @@ private fun iconKey(name: String) = when (name) {
     "accounts" -> "wallet"
     "chart" -> "budgets"
     "home", "entries", "wallet", "budgets", "sms", "settings", "more", "plus", "close", "left", "right", "down",
-    "income", "expense", "check", "search", "lock", "shield", "calendar", "backup" -> name
+    "income", "expense", "check", "search", "lock", "shield", "calendar", "backup",
+    "utensils", "plate", "basket", "car", "bus", "fuel", "house", "bag", "bolt", "phone",
+    "medical", "pill", "book", "play", "repeat", "plane", "sparkles", "tools", "people",
+    "gift", "heart", "paw", "bank", "percent", "trend", "briefcase", "star", "laptop",
+    "store", "bars", "return", "receipt-check", "coins" -> name
     else -> "receipt"
 }
 
@@ -220,6 +224,39 @@ private fun buildIcon(key: String): IconGeometry {
         }
         "calendar" -> { box(3f, 5f, 18f, 16f); line(3f, 10f, 21f, 10f); line(8f, 2f, 8f, 7f); line(16f, 2f, 16f, 7f); dot(8f, 14f, 1f); dot(12f, 14f, 1f); dot(16f, 14f, 1f); dot(8f, 18f, 1f) }
         "backup" -> { arc(3f, 3f, 18f, 18f, -120f, 300f); line(3f, 3f, 3f, 9f); line(3f, 9f, 9f, 9f); line(12f, 7f, 12f, 12f); line(12f, 12f, 16f, 14f) }
+        "utensils" -> { line(5f, 3f, 5f, 8f); line(8f, 3f, 8f, 8f); line(11f, 3f, 11f, 8f); arc(5f, 5f, 6f, 6f, 0f, 180f); line(8f, 11f, 8f, 21f); line(18f, 3f, 18f, 21f); line(18f, 3f, 15f, 11f); line(15f, 11f, 18f, 11f) }
+        "plate" -> { ring(12f, 12f, 7f); ring(12f, 12f, 4f); line(2f, 4f, 2f, 20f); line(22f, 4f, 22f, 20f) }
+        "basket" -> { line(3f, 9f, 21f, 9f); line(4f, 9f, 7f, 20f); line(7f, 20f, 17f, 20f); line(17f, 20f, 20f, 9f); line(7f, 9f, 10f, 3f); line(17f, 9f, 14f, 3f); line(9f, 13f, 10f, 17f); line(15f, 13f, 14f, 17f) }
+        "car" -> { box(3f, 10f, 18f, 9f, 2f); line(5f, 10f, 8f, 4f); line(8f, 4f, 16f, 4f); line(16f, 4f, 19f, 10f); line(5f, 19f, 5f, 21f); line(19f, 19f, 19f, 21f); dot(7f, 14f, 1f); dot(17f, 14f, 1f) }
+        "bus" -> { box(5f, 3f, 14f, 17f, 3f); line(5f, 12f, 19f, 12f); line(12f, 3f, 12f, 12f); dot(8f, 16f, 1f); dot(16f, 16f, 1f); line(7f, 20f, 7f, 22f); line(17f, 20f, 17f, 22f) }
+        "fuel" -> { box(4f, 3f, 10f, 17f, 1f); box(6f, 5f, 6f, 5f, 1f); line(2f, 21f, 16f, 21f); line(14f, 11f, 18f, 11f); line(18f, 11f, 18f, 18f); arc(18f, 16f, 4f, 4f, 0f, 180f); line(22f, 18f, 22f, 8f); line(22f, 8f, 18f, 4f) }
+        "house" -> { line(2f, 11f, 12f, 3f); line(12f, 3f, 22f, 11f); line(5f, 9f, 5f, 21f); line(5f, 21f, 19f, 21f); line(19f, 21f, 19f, 9f); box(10f, 14f, 4f, 7f, 0f) }
+        "bag" -> { box(4f, 7f, 16f, 14f, 2f); arc(8f, 2f, 8f, 10f, 180f, 180f); line(8f, 7f, 8f, 10f); line(16f, 7f, 16f, 10f) }
+        "bolt" -> { stroke.moveTo(14f, 2f); stroke.lineTo(4f, 14f); stroke.lineTo(11f, 14f); stroke.lineTo(10f, 22f); stroke.lineTo(20f, 10f); stroke.lineTo(13f, 10f); stroke.close() }
+        "phone" -> { box(6f, 2f, 12f, 20f, 2f); line(10f, 5f, 14f, 5f); dot(12f, 19f, .8f) }
+        "medical" -> { box(3f, 3f, 18f, 18f, 4f); line(12f, 7f, 12f, 17f); line(7f, 12f, 17f, 12f) }
+        "pill" -> { stroke.moveTo(4f, 12f); stroke.cubicTo(-2f, 18f, 6f, 26f, 12f, 20f); stroke.lineTo(20f, 12f); stroke.cubicTo(26f, 6f, 18f, -2f, 12f, 4f); stroke.close(); line(8f, 8f, 16f, 16f) }
+        "book" -> { box(4f, 3f, 16f, 18f, 2f); line(8f, 3f, 8f, 21f); line(11f, 8f, 17f, 8f); line(11f, 12f, 17f, 12f) }
+        "play" -> { ring(12f, 12f, 9f); stroke.moveTo(10f, 7f); stroke.lineTo(17f, 12f); stroke.lineTo(10f, 17f); stroke.close() }
+        "repeat" -> { line(4f, 8f, 19f, 8f); line(19f, 8f, 15f, 4f); line(19f, 8f, 15f, 12f); line(20f, 16f, 5f, 16f); line(5f, 16f, 9f, 12f); line(5f, 16f, 9f, 20f) }
+        "plane" -> { stroke.moveTo(21f, 3f); stroke.lineTo(15f, 21f); stroke.lineTo(11f, 14f); stroke.lineTo(3f, 10f); stroke.close(); line(11f, 14f, 21f, 3f) }
+        "sparkles" -> { stroke.moveTo(11f, 3f); stroke.lineTo(14f, 9f); stroke.lineTo(20f, 12f); stroke.lineTo(14f, 15f); stroke.lineTo(11f, 21f); stroke.lineTo(8f, 15f); stroke.lineTo(2f, 12f); stroke.lineTo(8f, 9f); stroke.close(); line(20f, 2f, 20f, 6f); line(18f, 4f, 22f, 4f) }
+        "tools" -> { arc(12f, 2f, 10f, 10f, -30f, 270f); line(13f, 10f, 3f, 20f); line(3f, 20f, 5f, 22f); line(5f, 22f, 15f, 12f); line(16f, 2f, 16f, 6f); line(16f, 6f, 21f, 6f) }
+        "people" -> { ring(9f, 7f, 3f); arc(2f, 12f, 14f, 16f, 180f, 180f); ring(18f, 8f, 2f); arc(15f, 13f, 8f, 14f, 200f, 160f) }
+        "gift" -> { box(4f, 10f, 16f, 11f, 1f); box(3f, 7f, 18f, 4f, 1f); line(12f, 7f, 12f, 21f); arc(5f, 2f, 7f, 6f, 0f, 300f); arc(12f, 2f, 7f, 6f, -120f, 300f) }
+        "heart" -> { stroke.moveTo(12f, 21f); stroke.cubicTo(8f, 17f, 2f, 13f, 2f, 8f); stroke.cubicTo(2f, 2f, 9f, 1f, 12f, 6f); stroke.cubicTo(15f, 1f, 22f, 2f, 22f, 8f); stroke.cubicTo(22f, 13f, 16f, 17f, 12f, 21f) }
+        "paw" -> { ring(5f, 8f, 2f); ring(10f, 4f, 2f); ring(16f, 5f, 2f); ring(20f, 10f, 2f); stroke.moveTo(6f, 17f); stroke.cubicTo(6f, 12f, 12f, 10f, 14f, 13f); stroke.cubicTo(21f, 15f, 20f, 23f, 14f, 20f); stroke.cubicTo(8f, 23f, 4f, 21f, 6f, 17f) }
+        "bank" -> { line(2f, 8f, 12f, 2f); line(12f, 2f, 22f, 8f); line(2f, 8f, 22f, 8f); line(5f, 11f, 5f, 18f); line(12f, 11f, 12f, 18f); line(19f, 11f, 19f, 18f); line(3f, 21f, 21f, 21f) }
+        "percent" -> { ring(7f, 7f, 3f); ring(17f, 17f, 3f); line(5f, 21f, 19f, 3f) }
+        "trend" -> { line(3f, 18f, 9f, 12f); line(9f, 12f, 13f, 15f); line(13f, 15f, 21f, 5f); line(15f, 5f, 21f, 5f); line(21f, 5f, 21f, 11f) }
+        "briefcase" -> { box(3f, 7f, 18f, 14f, 2f); box(8f, 3f, 8f, 4f, 1f); line(3f, 13f, 21f, 13f); line(10f, 13f, 14f, 13f); line(12f, 11f, 12f, 15f) }
+        "star" -> { stroke.moveTo(12f, 2f); stroke.lineTo(15f, 8f); stroke.lineTo(22f, 9f); stroke.lineTo(17f, 14f); stroke.lineTo(18f, 21f); stroke.lineTo(12f, 18f); stroke.lineTo(6f, 21f); stroke.lineTo(7f, 14f); stroke.lineTo(2f, 9f); stroke.lineTo(9f, 8f); stroke.close() }
+        "laptop" -> { box(5f, 3f, 14f, 13f, 1f); stroke.moveTo(5f, 16f); stroke.lineTo(2f, 21f); stroke.lineTo(22f, 21f); stroke.lineTo(19f, 16f); stroke.close() }
+        "store" -> { box(4f, 10f, 16f, 11f, 1f); stroke.moveTo(3f, 10f); stroke.lineTo(5f, 3f); stroke.lineTo(19f, 3f); stroke.lineTo(21f, 10f); stroke.close(); line(9f, 3f, 8f, 10f); line(15f, 3f, 16f, 10f); box(9f, 15f, 6f, 6f, 0f) }
+        "bars" -> { line(3f, 21f, 21f, 21f); box(4f, 12f, 3f, 6f, .5f); box(10f, 8f, 3f, 10f, .5f); box(16f, 3f, 3f, 15f, .5f) }
+        "return" -> { line(9f, 4f, 3f, 10f); line(3f, 10f, 9f, 16f); line(3f, 10f, 15f, 10f); arc(10f, 10f, 12f, 12f, -90f, 180f); line(16f, 22f, 10f, 22f) }
+        "receipt-check" -> { box(4f, 2f, 16f, 20f, 2f); line(8f, 7f, 16f, 7f); line(8f, 13f, 11f, 16f); line(11f, 16f, 17f, 10f) }
+        "coins" -> { stroke.addOval(Rect(3f, 3f, 17f, 9f)); arc(3f, 7f, 14f, 6f, 0f, 180f); line(3f, 6f, 3f, 10f); line(17f, 6f, 17f, 10f); stroke.addOval(Rect(8f, 12f, 22f, 18f)); arc(8f, 16f, 14f, 6f, 0f, 180f); line(8f, 15f, 8f, 19f); line(22f, 15f, 22f, 19f) }
         else -> { box(5f, 2f, 14f, 20f, 2f); line(9f, 7f, 15f, 7f); line(9f, 11f, 15f, 11f); line(9f, 15f, 13f, 15f) }
     }
     return IconGeometry(stroke, fill)
@@ -503,7 +540,7 @@ private fun buildIcon(key: String): IconGeometry {
 val LocalInlineSheet = staticCompositionLocalOf { false }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun LedgerSheet(title: String, dismiss: () -> Unit, actionLabel: String = "Done", action: () -> Unit = dismiss, closeLabel: String = "Cancel", scrollContent: Boolean = true, actionEnabled: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
+@Composable fun LedgerSheet(title: String, dismiss: () -> Unit, actionLabel: String = "Done", action: () -> Unit = dismiss, closeLabel: String = "Cancel", scrollContent: Boolean = true, actionEnabled: Boolean = true, showAction: Boolean = true, contentPadding: Dp = 20.dp, contentScroll: androidx.compose.foundation.gestures.ScrollableState? = null, content: @Composable ColumnScope.() -> Unit) {
     val clearError = LocalLedgerClearError.current
     LaunchedEffect(Unit) { clearError() }
     val scroll = rememberScrollState()
@@ -514,17 +551,18 @@ val LocalInlineSheet = staticCompositionLocalOf { false }
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = close) { Text(closeLabel, fontWeight = FontWeight.Normal) }
                 Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2)
-                TextButton(onClick = action, enabled = actionEnabled && !LocalLedgerBusy.current) { Text(actionLabel) }
+                if (showAction) TextButton(onClick = action, enabled = actionEnabled && !LocalLedgerBusy.current) { Text(actionLabel) }
+                else TextButton(onClick = {}, enabled = false, modifier = Modifier.clearAndSetSemantics { }.alpha(0f)) { Text(closeLabel) }
             }
             HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
             LocalLedgerOperationError.current?.let { error ->
                 Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
             }
-            val contentModifier = Modifier.weight(1f).then(if (scrollContent) Modifier.verticalScroll(scroll) else Modifier).padding(20.dp).padding(bottom = 24.dp)
+            val contentModifier = Modifier.weight(1f).then(if (scrollContent) Modifier.verticalScroll(scroll) else Modifier).padding(contentPadding).padding(bottom = 24.dp)
             Column(contentModifier, verticalArrangement = Arrangement.spacedBy(18.dp), content = content)
         }
         }
     }
     if (LocalInlineSheet.current) Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { body(dismiss) }
-    else FluidModalSheet(dismiss, formScroll = scroll.takeIf { scrollContent }, content = body)
+    else FluidModalSheet(dismiss, contentScroll = contentScroll ?: scroll.takeIf { scrollContent }, content = body)
 }
