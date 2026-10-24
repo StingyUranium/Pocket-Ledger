@@ -29,25 +29,28 @@ class RedesignUiTest {
     private fun ready() {
         check(ui.activity.packageName == "in.thomas.pocketledger.validation")
         ui.waitForIdle()
-        ui.waitUntil(15_000) { ui.onAllNodesWithText("Monthly balance").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
+        ui.waitUntil(15_000) { ui.onAllNodesWithText("Spent").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
         InstrumentationRegistry.getArguments().getString("ledger.expectedHz")?.toFloat()?.let { expected ->
             ui.waitUntil(10_000) { kotlin.math.abs(ui.activity.window.decorView.display.refreshRate - expected) < 1f }
         }
     }
 
-    @Test fun compactNavigationExposesAccountsInboxAndGraphs() {
+    @Test fun compactNavigationExposesReviewAndManagement() {
         ready()
-        ui.onNodeWithText("More").performClick()
+        ui.onNodeWithText("Inbox").performClick()
+        ui.onNodeWithText("Bank messages").assertExists()
+        ui.onNodeWithText("Manage").performClick()
         ui.onNodeWithText("Accounts").performClick()
-        ui.onNode(hasScrollAction()).performScrollToNode(hasText("Add account"))
+        ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasText("Add account"))
         ui.onNodeWithText("Add account").assertExists()
         ui.onNodeWithContentDescription("Back").performClick()
-        ui.onNodeWithText("Accounts").performClick()
-        ui.onNode(hasText("More") and !hasContentDescription("Back")).performClick()
-        ui.onNodeWithText("Inbox").performClick()
-        ui.onNodeWithText("Automatic capture").assertExists()
+        ui.onNodeWithText("Income plan").performClick()
+        ui.onNodeWithText("50 / 30 / 20").assertExists()
         ui.onNodeWithContentDescription("Back").performClick()
-        ui.onNodeWithText("Graphs").performClick()
+        ui.onNodeWithContentDescription("Back").performClick()
+        ui.onNode(hasText("Overview") and isSelectable()).performClick()
+        ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasText("Insights"))
+        ui.onNodeWithText("Insights").performClick()
         ui.waitUntil(10_000) { ui.onAllNodesWithText("Where it goes").fetchSemanticsNodes().isNotEmpty() }
     }
 
@@ -60,7 +63,7 @@ class RedesignUiTest {
         ui.onNodeWithText("New transaction").assertExists()
         ui.onNodeWithText("Cancel").performClick()
         ui.waitUntil(10_000) { ui.onAllNodesWithText("New transaction").fetchSemanticsNodes().isEmpty() }
-        ui.onNodeWithText("Monthly balance").assertExists()
+        ui.onNodeWithText("Spent").assertExists()
     }
 
     @Test fun metricPagesSettleAfterRepeatedOpenAndBack() {
@@ -68,16 +71,16 @@ class RedesignUiTest {
         repeat(3) {
             ui.onNodeWithText("Spent").performClick()
             ui.onNodeWithText("Spent this month").assertIsDisplayed()
-            ui.onNodeWithText("Monthly balance").assertDoesNotExist()
+            ui.onNodeWithText("Income remaining").assertDoesNotExist()
             ui.onNodeWithContentDescription("Back").performClick()
-            ui.onNodeWithText("Monthly balance").assertIsDisplayed()
+            ui.onNodeWithText("Spent").assertIsDisplayed()
             ui.onNodeWithText("Spent this month").assertDoesNotExist()
             ui.onNodeWithText("Income").performClick()
             ui.onNodeWithText("Income this month").assertIsDisplayed()
             ui.onNodeWithText("Spent this month").assertDoesNotExist()
-            ui.onNodeWithText("Monthly balance").assertDoesNotExist()
+            ui.onNodeWithText("Income remaining").assertDoesNotExist()
             ui.onNodeWithContentDescription("Back").performClick()
-            ui.onNodeWithText("Monthly balance").assertIsDisplayed()
+            ui.onNodeWithText("Spent").assertIsDisplayed()
             ui.onNodeWithText("Income this month").assertDoesNotExist()
         }
     }
@@ -85,7 +88,7 @@ class RedesignUiTest {
     @Test fun predictiveBackCancellationAndCompletionKeepMetricAndHeaderTogether() {
         ready()
         ui.waitUntil(10_000) { ui.onAllNodesWithText("Updating ledger...").fetchSemanticsNodes().isEmpty() }
-        val overviewTop = ui.onNodeWithText("Monthly balance").fetchSemanticsNode().boundsInRoot.top
+        val overviewTop = ui.onNodeWithText("Income remaining").fetchSemanticsNode().boundsInRoot.top
         ui.onNodeWithText("Spent").performClick()
         ui.onNodeWithText("Spent this month").assertIsDisplayed()
         val dispatcher = ui.activity.onBackPressedDispatcher
@@ -95,18 +98,18 @@ class RedesignUiTest {
             ui.runOnUiThread { dispatcher.dispatchOnBackProgressed(BackEventCompat(150f, 400f, .6f, BackEventCompat.EDGE_LEFT)) }
             ui.waitForIdle()
             assertEquals("Overview stays in place behind the moving metric card", overviewTop,
-                ui.onNodeWithText("Monthly balance").fetchSemanticsNode().boundsInRoot.top, 1f)
+                ui.onNodeWithText("Income remaining").fetchSemanticsNode().boundsInRoot.top, 1f)
         }
         previewBack()
         ui.runOnUiThread { dispatcher.dispatchOnBackCancelled() }
         ui.waitForIdle()
         ui.onNodeWithText("Spent").assertIsDisplayed()
         ui.onNodeWithText("Spent this month").assertIsDisplayed()
-        ui.onNodeWithText("Monthly balance").assertDoesNotExist()
+        ui.onNodeWithText("Income remaining").assertDoesNotExist()
         previewBack()
         ui.runOnUiThread { dispatcher.onBackPressed() }
         ui.waitForIdle()
-        ui.onNodeWithText("Monthly balance").assertIsDisplayed()
+        ui.onNodeWithText("Spent").assertIsDisplayed()
         ui.onNodeWithText("Spent this month").assertDoesNotExist()
         ui.onNodeWithContentDescription("Back").assertDoesNotExist()
         ui.onNodeWithText("Income").performClick()
@@ -117,9 +120,10 @@ class RedesignUiTest {
     @Test fun appearanceControlsAndRecurringBudgetsAreAvailable() {
         ready()
         ui.onNodeWithText("Budgets").performClick()
-        ui.waitUntil(10_000) { ui.onAllNodesWithText("Category budgets").fetchSemanticsNodes().isNotEmpty() }
-        ui.onNodeWithText("Category budgets").assertExists()
-        ui.onNodeWithContentDescription("Settings").performClick()
+        ui.waitUntil(10_000) { ui.onAllNodesWithText("Budget remaining").fetchSemanticsNodes().isNotEmpty() }
+        ui.onNodeWithText("Budget remaining").assertExists()
+        ui.onNodeWithText("Manage").performClick()
+        ui.onNodeWithText("Settings and backups").performClick()
         ui.onNodeWithText("High contrast").performScrollTo().assertExists()
         ui.onNodeWithText("Reduce motion").performScrollTo().assertExists()
     }
@@ -153,19 +157,16 @@ class RedesignUiTest {
         ui.onNodeWithText("Groceries").performScrollTo().assertIsDisplayed()
         ui.onNodeWithText("Cancel").performClick()
     }
-    @Test fun budgetSegmentsSettleAndRetainSelectionAcrossTabs() {
+    @Test fun incomePlanIsSeparateFromRecurringBudgets() {
         ready()
         ui.onNodeWithText("Budgets").performClick()
-        ui.waitUntil(10_000) { ui.onAllNodesWithText("Category budgets").fetchSemanticsNodes().isNotEmpty() }
-        repeat(3) {
-            ui.onNode(hasText("50 / 30 / 20") and hasClickAction()).performClick()
-            ui.onAllNodesWithText("50 / 30 / 20").filter(isSelected()).assertCountEquals(1)
-            ui.onNodeWithText("Category budgets").performClick().assertIsSelected()
-        }
-        ui.onNodeWithText("Overview").performClick()
-        ui.onNodeWithText("Budgets").performClick()
-        ui.onNodeWithText("Category budgets").assertIsSelected()
-        ui.onNodeWithText("Set a budget").assertIsDisplayed()
+        ui.onNodeWithContentDescription("Add budget").performClick()
+        ui.onNodeWithText("Category budget").assertExists()
+        ui.onNodeWithText("Cancel").performClick()
+        ui.onNodeWithText("Manage").performClick()
+        ui.onNodeWithText("Income plan").performClick()
+        ui.onNodeWithText("50 / 30 / 20").assertExists()
+        ui.onNodeWithText("Category budget").assertDoesNotExist()
     }
 
     @Test fun searchCanBeClearedWithoutLosingTheActivityDestination() {
@@ -179,28 +180,66 @@ class RedesignUiTest {
     }
     @Test fun overviewLargeTitleAndMonthCollapseWhilePinnedControlsRemain() {
         ready()
-        ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
+        ui.onNodeWithText("Manage").assertIsDisplayed()
         ui.onNodeWithContentDescription("Previous month").assertIsDisplayed()
-        ui.onNode(hasScrollAction()).performTouchInput { swipeUp(startY = height * .75f, endY = height * .25f) }
+        ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performTouchInput { swipeUp(startY = height * .75f, endY = height * .25f) }
         ui.onNodeWithContentDescription("Previous month").assertIsNotDisplayed()
-        ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
+        ui.onNodeWithText("Manage").assertIsDisplayed()
         ui.onNodeWithContentDescription("Add transaction").assertIsDisplayed()
         ui.onNode(hasText("Overview") and isSelected()).assertIsDisplayed()
-        ui.onNode(hasScrollAction()).performTouchInput { swipeDown(startY = height * .25f, endY = height * .75f) }
-        ui.onNode(hasScrollAction()).performTouchInput { swipeDown(startY = height * .25f, endY = height * .75f) }
+        ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performTouchInput { swipeDown(startY = height * .25f, endY = height * .75f) }
+        ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performTouchInput { swipeDown(startY = height * .25f, endY = height * .75f) }
         ui.onNodeWithContentDescription("Previous month").assertIsDisplayed()
-        ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
+        ui.onNodeWithText("Manage").assertIsDisplayed()
     }
 
     @Test fun settingsKeepsBackPinnedWhileTitleCollapsesAndBackStillReturns() {
         ready()
-        ui.onNodeWithContentDescription("Settings").performClick()
+        ui.onNodeWithText("Manage").performClick()
+        ui.onNodeWithText("Settings and backups").performClick()
         ui.onNodeWithContentDescription("Back").assertIsDisplayed()
-        ui.onNode(hasScrollAction()).performTouchInput { swipeUp(startY = height * .75f, endY = height * .25f) }
+        ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performTouchInput { swipeUp(startY = height * .75f, endY = height * .25f) }
         ui.onNodeWithContentDescription("Back").assertIsDisplayed()
-        ui.onNode(hasScrollAction()).performTouchInput { swipeDown(startY = height * .25f, endY = height * .75f) }
+        ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performTouchInput { swipeDown(startY = height * .25f, endY = height * .75f) }
         ui.onNodeWithContentDescription("Back").assertIsDisplayed().performClick()
-        ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
-        ui.onNodeWithText("Monthly balance").assertIsDisplayed()
+        ui.onNodeWithText("Settings and backups").assertExists()
+    }
+
+    @Test fun widgetAndCategoryNotificationRoutesRemainSupported() {
+        ready()
+        fun launch(intent: android.content.Intent) {
+            ui.runOnUiThread {
+                // Keep ActivityScenario's launch identity while delivering the external route extras.
+                val delivered = android.content.Intent(ui.activity.intent).apply {
+                    removeExtra("ledger_route")
+                    removeExtra(CategoryNotifications.EXTRA_ENTRY_ID)
+                    intent.extras?.let { putExtras(it) }
+                }
+                InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(ui.activity, delivered)
+            }
+            ui.waitForIdle()
+        }
+        launch(android.content.Intent(ui.activity, MainActivity::class.java).putExtra("ledger_route", "budget"))
+        ui.waitUntil(10000) { ui.onAllNodesWithText("Budget remaining").fetchSemanticsNodes().isNotEmpty() }
+        ui.onNode(hasText("Budgets") and isSelected()).assertIsSelected()
+        launch(android.content.Intent(ui.activity, MainActivity::class.java).putExtra("ledger_route", "expense"))
+        ui.onNodeWithText("Spent this month").assertExists()
+        ui.onNodeWithContentDescription("Back").performClick()
+        launch(android.content.Intent(ui.activity, MainActivity::class.java).putExtra("ledger_route", "income"))
+        ui.onNodeWithText("Income this month").assertExists()
+        ui.onNodeWithContentDescription("Back").performClick()
+        val repo = (ui.activity.application as LedgerApp).repo
+        val entry = kotlinx.coroutines.runBlocking {
+            val account = repo.dao.allAccounts().first()
+            Entry(java.util.UUID.randomUUID().toString(), account.id, type = "EXPENSE", amount = 12345,
+                date = System.currentTimeMillis(), payee = "Synthetic notification review").also { repo.save(it) }
+        }
+        try {
+            launch(android.content.Intent(ui.activity, MainActivity::class.java).putExtra(CategoryNotifications.EXTRA_ENTRY_ID, entry.id))
+            ui.waitUntil(10000) { ui.onAllNodesWithText("Transaction", substring = false).fetchSemanticsNodes().isNotEmpty() }
+            ui.onNodeWithContentDescription("Payee or description").assertTextContains("Synthetic notification review")
+            ui.onNodeWithText("Cancel").performClick()
+            ui.onNode(hasText("Activity") and isSelected()).assertIsSelected()
+        } finally { kotlinx.coroutines.runBlocking { repo.delete(entry) } }
     }
 }

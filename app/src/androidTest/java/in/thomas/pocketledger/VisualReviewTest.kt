@@ -47,7 +47,7 @@ class VisualReviewTest {
             ui.setContent {
                 PocketTheme { FoldAwareWindow { Ledger(repo) } }
             }
-            ui.waitUntil(10000) { ui.onAllNodesWithText("Monthly balance").fetchSemanticsNodes().isNotEmpty() }
+            ui.waitUntil(10000) { ui.onAllNodesWithText("Spent").fetchSemanticsNodes().isNotEmpty() }
             fun capture(name: String) {
                 ui.waitForIdle()
                 // Allow the physical display to present the frame after Compose becomes idle.
@@ -62,9 +62,9 @@ class VisualReviewTest {
                 }
                 val prefix = "${mode.lowercase()}-${scale.toInt()}x"
                 ui.onNode(hasText("Overview") and isSelectable()).performClick()
-                ui.onNode(hasScrollAction()).performScrollToIndex(0)
+                ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToIndex(0)
                 capture("$prefix-overview")
-                ui.onNode(hasScrollAction()).performScrollToNode(hasText("Groceries", substring = false))
+                ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasText("Groceries", substring = false))
                 capture("$prefix-breakdown")
                 ui.onNode(hasText("Activity") and isSelectable()).performClick()
                 capture("$prefix-activity")
@@ -73,24 +73,29 @@ class VisualReviewTest {
                 ui.onNodeWithText("Cancel").performClick()
                 ui.onNode(hasText("Budgets") and isSelectable()).performClick()
                 capture("$prefix-budgets")
-                ui.onNode(hasScrollAction()).performScrollToNode(hasText("Utilities"))
+                ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasText("Utilities"))
                 capture("$prefix-budget-rows")
-                ui.onNode(hasText("More") and isSelectable()).performClick()
+                ui.onNodeWithText("Manage").performClick()
                 capture("$prefix-more")
                 ui.onNodeWithText("Accounts", substring = false).performClick()
                 capture("$prefix-accounts")
                 ui.onNodeWithContentDescription("Back").performClick()
-                ui.onNodeWithText("Graphs").performClick()
+                ui.onNodeWithContentDescription("Back").performClick()
+                ui.onNode(hasText("Overview") and isSelectable()).performClick()
+                ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasText("Insights", substring = false))
+                ui.onNodeWithText("Insights").performClick()
                 ui.waitUntil(10000) { ui.onAllNodesWithText("Where it goes").fetchSemanticsNodes().isNotEmpty() }
                 capture("$prefix-graphs")
-                ui.onNode(hasScrollAction()).performScrollToNode(hasText("Home maintenance and repairs"))
+                ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasText("Home maintenance and repairs"))
                 capture("$prefix-graph-categories")
                 ui.onNodeWithContentDescription("Back").performClick()
                 ui.onNodeWithText("Inbox").performClick()
                 capture("$prefix-inbox")
                 ui.onNode(hasText("Overview") and isSelectable()).performClick()
-                ui.onNodeWithContentDescription("Settings").performClick()
+                ui.onNodeWithText("Manage").performClick()
+                ui.onNodeWithText("Settings and backups").performClick()
                 capture("$prefix-settings")
+                ui.onNodeWithContentDescription("Back").performClick()
                 ui.onNodeWithContentDescription("Back").performClick()
                 ui.onNode(hasText("Overview") and isSelectable()).performClick()
             }

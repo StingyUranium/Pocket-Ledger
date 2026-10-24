@@ -67,3 +67,7 @@ For large-text review, launch the test separately at system font scales 1.0 and 
 `settings get system font_scale` value and restore it in `finally`, including on test failure. This
 checks modal windows as well as the main composition. Portrait checks do not cover keyboard,
 landscape, foldable, TalkBack or frame-time acceptance.
+
+The spending-review redesign adds `SpendingReviewUiTest` (focused category save and explicit budget removal) and extends `RedesignUiTest` with widget-route and notification-entry routing checks. `VisualReviewTest` follows Manage and Insights rather than the former More destination. Select vertical scroll containers explicitly when a page also contains a horizontal filter list.
+
+For screenshots that must remain available after a run, build both validation APKs, verify the application ID, install those APKs, and invoke `adb shell am instrument -w` against `in.thomas.pocketledger.validation.test/androidx.test.runner.AndroidJUnitRunner` with `-e class in.thomas.pocketledger.VisualReviewTest -e ledger.visualReview true`. Pull the validation application's `files/ui-review` directory into ignored `artifacts/`. Some Gradle-managed runs remove the validation installation after collecting results. Save and restore font scale and rotation settings in `finally` when testing those configurations. Do not install an APK built without the validation property for these checks.

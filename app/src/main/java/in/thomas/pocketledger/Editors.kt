@@ -131,7 +131,8 @@ import java.time.*
 
 /** Compact centered alert: title and message, hairline, then side-by-side text buttons. */
 @Composable fun Confirm(title: String, text: String, dismiss: () -> Unit, confirm: () -> Unit) {
-    val destructive = title.startsWith("Delete")
+    val destructive = title.startsWith("Delete") || title.startsWith("Remove")
+    val confirmLabel = if (title.startsWith("Remove")) "Remove" else if (destructive) "Delete" else "Confirm"
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     androidx.compose.ui.window.Dialog(onDismissRequest = dismiss) {
         Surface(Modifier.widthIn(max = 300.dp).fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
@@ -144,7 +145,7 @@ import java.time.*
                 Row(Modifier.height(IntrinsicSize.Min)) {
                     AlertButton("Cancel", MaterialTheme.colorScheme.primary, FontWeight.SemiBold, dismiss, Modifier.weight(1f))
                     VerticalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
-                    AlertButton(if (destructive) "Delete" else "Confirm", if (destructive) rust else MaterialTheme.colorScheme.primary, FontWeight.Normal, {
+                    AlertButton(confirmLabel, if (destructive) rust else MaterialTheme.colorScheme.primary, FontWeight.Normal, {
                         if (destructive) haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
                         confirm()
                     }, Modifier.weight(1f))
@@ -170,6 +171,8 @@ import java.time.*
     var date by rememberSaveable { mutableStateOf(dayText(initial.date)) }
     var time by rememberSaveable { mutableStateOf(if (initial.dateOnly) "" else Instant.ofEpochMilli(initial.date).atZone(india).toLocalTime().withNano(0).toString()) }
     var payee by rememberSaveable { mutableStateOf(initial.payee) }
+    var showSource by rememberSaveable { mutableStateOf(false) }
+    var showDetails by rememberSaveable { mutableStateOf(false) }
     val expenseCategory = rememberSaveable { mutableStateOf(if (initial.type == "EXPENSE") initial.category else "Uncategorized") }
     val incomeCategory = rememberSaveable { mutableStateOf(if (initial.type == "INCOME") initial.category else "Uncategorized") }
     var category by if (type == "INCOME") incomeCategory else expenseCategory
@@ -223,16 +226,20 @@ import java.time.*
             }
             DateField(date, { date = it }, "Date", grouped = true)
             GroupedDivider()
+            GroupedRow("Details", subtitle = "Optional time and note", onClick = { showDetails = !showDetails })
+            if (showDetails) {
             GroupedField("Time \u00b7 HH:MM:SS, optional (IST)", time, { time = it })
             GroupedDivider()
             GroupedField("Note, optional", note, { note = it }, imeAction = ImeAction.Done)
+            }
         }
         if (type != "TRANSFER") GroupedSection(footer = "Use this category for future ${if (type == "INCOME") "income" else "spending"} alerts from this payee.") {
             GroupedRow("Remember category", trailing = { PocketSwitch(rememberMerchant, "Remember category") { rememberMerchant = it } })
         }
         sms?.let {
             GroupedSection("Original bank message") {
-                GroupedItem { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { Text(it.sender, style = MaterialTheme.typography.titleSmall); Text(it.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                GroupedRow(if (showSource) "Hide original message" else "View original message", onClick = { showSource = !showSource })
+                if (showSource) GroupedItem { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { Text(it.sender, style = MaterialTheme.typography.titleSmall); Text(it.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             }
         }
         delete?.let {
@@ -273,7 +280,7 @@ import java.time.*
     }
 }
 
-@Composable fun BudgetEditor(b: Budget, dismiss: () -> Unit, knownEntries: List<Entry> = emptyList(), save: (Budget) -> Unit) {
+@Composable fun BudgetEditor(b: Budget, dismiss: () -> Unit, knownEntries: List<Entry> = emptyList(), remove: (() -> Unit)? = null, save: (Budget) -> Unit) {
     var category by rememberSaveable { mutableStateOf(b.category) }
     var amount by rememberSaveable { mutableStateOf(if (b.amount > 0) amountText(b.amount) else "") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
@@ -281,14 +288,15 @@ import java.time.*
     LedgerSheet("Category budget", dismiss, "Save", {
         try {
             val p = paise(amount)
-            require(p >= 0 && category.isNotBlank()) { "Enter a category and a non-negative limit" }
+            require(p > 0 && category.isNotBlank()) { "Enter a category and a positive limit" }
             save(b.copy(category = category.trim(), amount = p))
         } catch (e: Exception) { error = e.message }
     }) {
+        remove?.let { action -> GroupedSection { GroupedItem(onClick = action) { Text("Remove budget", color = MaterialTheme.colorScheme.error) } } }
         IconTile("budgets", MaterialTheme.colorScheme.tertiary, 56)
         Text("A plan that carries forward.", style = MaterialTheme.typography.headlineMedium)
         Text("Choose a category and set its limit for every month.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        GroupedSection(footer = "Set the limit to 0 to remove this budget. Transfers are excluded from spending.") {
+        GroupedSection(footer = "Transfers are excluded from spending. Removing a limit preserves transactions.") {
             Pick("Category", category, ((savedCategories ?: expenseCategories) + category).distinct(), { it }, grouped = true) { category = it }
             GroupedDivider()
             GroupedField("Category name", category, { category = it })
@@ -325,5 +333,20 @@ import java.time.*
             }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    }
+}
+
+@Composable fun CategoryReviewSheet(entry: Entry, entries: List<Entry>, dismiss: () -> Unit, save: (String, Boolean) -> Unit) {
+    var category by rememberSaveable(entry.id) { mutableStateOf(entry.category) }
+    var rememberPayee by rememberSaveable(entry.id) { mutableStateOf(false) }
+    val options by backgroundCalculation(entries, entry.type, cacheKey = "review-category-options") { categoryOptions(entry.type, entries) }
+    LedgerSheet("Choose category", dismiss, "Save", { save(category, rememberPayee) }) {
+        Text(entry.payee.ifBlank { "Transaction" }, style = MaterialTheme.typography.titleMedium)
+        Text(money(entry.amount), style = MaterialTheme.typography.headlineMedium)
+        GroupedSection {
+            Pick("Category", category, options ?: categoriesForType(entry.type), { it }, grouped = true) { category = it }
+            GroupedField("Category name", category, { category = it })
+            GroupedRow("Remember for this payee", trailing = { PocketSwitch(rememberPayee, "Remember for this payee") { rememberPayee = it } })
+        }
     }
 }

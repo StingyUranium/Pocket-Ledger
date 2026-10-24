@@ -323,4 +323,25 @@ class RepositoryTest {
         assertEquals("REVIEW", refreshed.status)
         assertTrue(db.dao().allEntries().isEmpty())
     }
+
+    @Test fun categoryUpdatePreservesLatestCorrectionAndRemembersCurrentPayee() = runBlocking {
+        repo.trust("VM-AXISBK", "AXIS"); repo.ingest(listOf(candidate()))
+        val original = db.dao().allEntries().single()
+        val corrected = original.copy(amount = 12345, payee = "CORRECTED PAYEE", note = "Manual correction")
+        repo.save(corrected)
+        repo.updateCategory(original.id, "Food", true)
+        assertEquals(corrected.copy(category = "Food"), db.dao().entry(original.id))
+        assertTrue(db.dao().allRules().any { it.merchant == "CORRECTED PAYEE" && it.category == "Food" })
+        repo.delete(corrected)
+        try { repo.updateCategory(original.id, "Travel"); fail("Deleted entry must not be categorized") } catch (_: IllegalArgumentException) { }
+        assertTrue(db.dao().entry(original.id)!!.deleted)
+    }
+    @Test fun removingBudgetPreservesEntriesAndCategories() = runBlocking {
+        repo.trust("VM-AXISBK", "AXIS"); repo.ingest(listOf(candidate()))
+        val entries = db.dao().allEntries()
+        repo.saveBudget(Budget("Food", 10000))
+        repo.removeBudget("Food")
+        assertTrue(db.dao().allBudgets().isEmpty())
+        assertEquals(entries, db.dao().allEntries())
+    }
 }

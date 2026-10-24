@@ -4,7 +4,7 @@ The redesign keeps financial storage, backup formats, category budgets and SMS i
 
 Implemented:
 
-- Compact Overview / Activity / Budgets / More navigation, with Accounts, Inbox and Graphs in More; navigation rail at 600dp; independent destination scroll/filter state.
+- Compact Overview / Activity / Budgets / Inbox navigation, with Accounts and Income plan in Manage and Insights from Overview; navigation rail at 600dp; independent destination scroll/filter state.
 - At 840dp and ordinary font scaling, transaction editing moves beside the ledger. Movable content preserves the draft when changing presentation. Large fonts use a single pane.
 - Dynamic color, static fallback, light/dark appearance, high contrast and reduced-motion preferences; 48dp icon controls; scalable transaction rows; tonal summary cards and a static header that avoids per-scroll header remeasurement.
 - Material modal sheets, standard list stretch/fling, seekable predictive back and a shared income/spending container. Root tabs do not push onto each other's back stack.
@@ -257,3 +257,20 @@ These tests exercise an AppWidgetHostView with configured sizes and font scales.
 launcher placement/resizing gestures, global font-setting changes, TalkBack interaction, older Android
 hosts, wallpaper contrast across launchers, or performance. Very large values can ellipsize in compact
 layouts, with full amounts available through accessibility descriptions.
+
+## Spending review redesign ? 24 October 2026
+
+The [screen and interaction specification](review-redesign.md) supersedes the earlier More navigation. Overview leads with Spent and labels income remaining explicitly. Activity provides a Needs category filter and focused category updates. Inbox leads with review messages before capture/import management. Budgets offer pinned Add and explicit removal; the 50/30/20 plan has its own management destination. Secondary destinations share the existing navigation transition and predictive-back owner. Widget layouts, persistence formats and financial calculations are unchanged.
+
+Validation evidence is recorded below after final checks; the acceptance matrix in the specification is intended coverage, not a blanket claim of device acceptance.
+
+### Validation evidence for spending review
+
+- Final `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug` passed. All 61 JVM tests passed, including stable/legacy destination restoration. Final normal build metadata identifies the personal application ID; it was not installed on the personal ledger.
+- Validation-only physical-device checks: all 31 `RepositoryTest` cases passed, including category-only updates preserving newer corrections and explicit budget removal preserving entries. `SpendingReviewUiTest` passed the focused category save, remembered rule, overspending budget and removal-confirmation journey.
+- All 12 final `RedesignUiTest` cases passed. Coverage includes primary/management navigation, separate income planning, search, transaction draft recreation, type-specific categories, collapsing/pinned controls, metric predictive-back cancellation/completion, widget income/expense/budget route extras and notification entry-ID delivery.
+- Intent regression testing found that an entry committed before its UI snapshot could lose a notification navigation request. Routing now retains the request while the live database entry is waiting for its snapshot; missing/deleted IDs are discarded. The regression passed after the fix. The intent harness preserves ActivityScenario's launch identity; it tests delivered intent handling, not Android notification permission/channel delivery.
+- Synthetic screenshot journeys passed in light/dark portrait at 100% and 200% system font scale, and light/dark landscape at 100%. Representative images were inspected for the new hierarchy, category filters, signed budget values, long account labels, editors, grouped management, charts and Inbox. Review found and corrected cramped large-text tab labels (now two rows) and unpainted dark inline-editor system-bar insets. Final landscape captures confirm the inset correction. Raw captures remain ignored in `artifacts/`.
+- Font scale and rotation settings were restored in `finally`. No benchmarks, display refresh changes or performance certification were performed. The benchmark journey selectors were updated for the renamed destinations without running profile generation.
+
+Remaining coverage limits: these journeys do not exhaustively certify every state in the design matrix, TalkBack reading order, a physical foldable/hinge, all narrow-window dimensions, every keyboard/IME, or system file-picker and notification-channel delivery. Import previews and password prompts retain their existing transient lifecycle; transaction/account/category editor drafts, budget editor state, Inbox date range, shared month and destination filters use saved state. The specification records intended states separately from measured evidence.

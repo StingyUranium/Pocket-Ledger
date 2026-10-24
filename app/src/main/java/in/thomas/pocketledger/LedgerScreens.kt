@@ -47,12 +47,12 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
 }
 
 @Composable private fun BalanceCard(total: Long, accountCount: Int) {
-    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Monthly balance", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            Text(remember(total) { money(total) }, style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            Text("Income minus spending \u00b7 selected month", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            Text("$accountCount accounts \u00b7 INR", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.fillMaxWidth().padding(LedgerSpace.margin), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Income remaining", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(remember(total) { money(total) }, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text("Income minus spending \u00b7 selected month", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text("$accountCount accounts \u00b7 INR", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -66,12 +66,12 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
                 Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                 AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(money(amount), style = MaterialTheme.typography.titleLarge)
+            Text(money(amount), style = if (income) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge)
         }
     }
 }
 
-@Composable fun Overview(accounts: List<Account>, entries: List<Entry>, messages: List<SmsRecord>, month: YearMonth, budgets: List<Budget>, report: OverviewReport?, setup: () -> Unit, review: () -> Unit, openTransactions: (String, String) -> Unit, edit: (Entry) -> Unit) {
+@Composable fun Overview(accounts: List<Account>, entries: List<Entry>, messages: List<SmsRecord>, month: YearMonth, budgets: List<Budget>, report: OverviewReport?, setup: () -> Unit, review: () -> Unit, openTransactions: (String, String) -> Unit, insights: () -> Unit = {}, edit: (Entry) -> Unit) {
     androidx.activity.compose.ReportDrawnWhen { report != null }
     val ready = report ?: run { LedgerSkeleton(); return }
     val monthly = ready.monthly
@@ -82,15 +82,12 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val largeText = LocalDensity.current.fontScale > 1.3f
     FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 10.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        item { MoneyStat("Spent", expense, false, month, Modifier.fillMaxWidth()) { openTransactions("EXPENSE", "ALL") } }
+        item { MoneyStat("Income", income, true, month, Modifier.fillMaxWidth()) { openTransactions("INCOME", "ALL") } }
         item { BalanceCard(income - expense, accounts.size) }
-        item {
-            if (LocalDensity.current.fontScale > 1.3f) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                MoneyStat("Income", income, true, month, Modifier.fillMaxWidth()) { openTransactions("INCOME", "ALL") }
-                MoneyStat("Spent", expense, false, month, Modifier.fillMaxWidth()) { openTransactions("EXPENSE", "ALL") }
-            } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MoneyStat("Income", income, true, month, Modifier.weight(1f)) { openTransactions("INCOME", "ALL") }
-                MoneyStat("Spent", expense, false, month, Modifier.weight(1f)) { openTransactions("EXPENSE", "ALL") }
-            }
+        item { GroupedSection { GroupedRow("Insights", subtitle = "Category, daily and monthly spending", chevron = true, onClick = insights) } }
+        if (monthly.any { it.category == "Uncategorized" && it.type != "TRANSFER" }) item {
+            GroupedSection { GroupedRow("Needs category", subtitle = "Review saved transactions", chevron = true, onClick = { openTransactions("ALL", "Uncategorized") }) }
         }
         if (ready.summary.budgetLimit > 0) item {
             CardBlock {
@@ -193,7 +190,7 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
     }
 }
 
-@Composable fun Transactions(entries: List<Entry>, accounts: List<Account>, month: YearMonth, initialType: String = "ALL", initialCategory: String = "ALL", leading: (@Composable () -> Unit)? = null, delete: ((Entry) -> Unit)? = null, edit: (Entry) -> Unit) {
+@Composable fun Transactions(entries: List<Entry>, accounts: List<Account>, month: YearMonth, initialType: String = "ALL", initialCategory: String = "ALL", leading: (@Composable () -> Unit)? = null, delete: ((Entry) -> Unit)? = null, categorize: ((Entry) -> Unit)? = null, edit: (Entry) -> Unit) {
     var search by rememberSaveable { mutableStateOf("") }
     var type by rememberSaveable(initialType) { mutableStateOf(initialType) }
     var account by rememberSaveable { mutableStateOf("ALL") }
@@ -214,6 +211,7 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
         item(key = "search", contentType = "search") { Box(Modifier.padding(horizontal = LedgerSpace.margin, vertical = 6.dp)) {
             TextField(search, { search = it }, label = { Text("Search transactions") }, placeholder = { Text("Payee, category or note", color = MaterialTheme.colorScheme.onSurfaceVariant) }, leadingIcon = { AppIcon("search", Modifier.size(19.dp), MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true, trailingIcon = { if (search.isNotEmpty()) IconButton(onClick = { search = "" }) { AppIcon("close", Modifier.semantics { contentDescription = "Clear search" }) } }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = fieldColors())
         } }
+        item(key = "needs-category") { TextButton(onClick = { category = if (category == "Uncategorized") "ALL" else "Uncategorized" }, modifier = Modifier.padding(horizontal = LedgerSpace.margin)) { Text(if (category == "Uncategorized") "Show all categories" else "Needs category") } }
         item(key = "filters", contentType = "filters") { FluidRow(contentPadding = PaddingValues(horizontal = LedgerSpace.margin, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             item { ChoiceChip("Type", type, listOf("ALL", "EXPENSE", "INCOME", "TRANSFER"), { if (it == "ALL") "All types" else it.lowercase().replaceFirstChar(Char::titlecase) }) { if (type != it) { type = it; category = "ALL" } } }
             item { ChoiceChip("Account", account, listOf("ALL") + accounts.map { it.id }, { value -> accounts.find { it.id == value }?.name ?: "All accounts" }) { account = it } }
@@ -233,7 +231,10 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
                     val shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
                     val row: @Composable () -> Unit = {
                         Surface(shape = shape, color = MaterialTheme.colorScheme.surface) {
-                            EntryRow(entry, accounts, divider = index < group.lastIndex) { edit(entry) }
+                            Column {
+                                EntryRow(entry, accounts, divider = index < group.lastIndex) { edit(entry) }
+                                if (entry.category == "Uncategorized" && entry.type != "TRANSFER" && categorize != null) TextButton(onClick = { categorize(entry) }, modifier = Modifier.padding(horizontal = LedgerSpace.margin)) { Text("Choose category") }
+                            }
                         }
                     }
                     Box((if (LocalReducedMotion.current) Modifier else Modifier.animateItem()).padding(horizontal = LedgerSpace.margin)) {
@@ -261,7 +262,7 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
     val bankBalances = remember(messages) { messages.filter { it.balance != null && it.status in listOf("SAVED", "LINKED") }
         .groupBy { it.bank to it.suffix }.mapValues { (_, records) -> records.maxByOrNull { it.date ?: it.received } } }
     FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 12.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        item { Text("Everything, in one place.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("Calculated balances include opening balances and recorded transactions.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (accounts.isNotEmpty()) item(key = "accounts", contentType = "accounts") {
             GroupedSection(footer = "Opening balances represent your money just before the chosen date. Bank-reported balances are shown separately.") {
                 accounts.forEachIndexed { index, a ->
@@ -270,14 +271,14 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
                         BankMark(a.bank)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(a.name, style = MaterialTheme.typography.titleMedium)
-                            if (largeText) Text(money(balances[a.id] ?: a.opening), style = MaterialTheme.typography.titleMedium)
+                            if (largeText) Text("Calculated ${money(balances[a.id] ?: a.opening)}", style = MaterialTheme.typography.titleMedium)
                             Text(if (a.bank == "CASH") "Cash account" else "Account \u2022\u2022\u2022\u2022 ${a.suffix}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("Opening ${money(a.opening)} \u00b7 from ${displayDate(a.openingDate)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             bankBalances[a.bank to a.suffix]?.let {
                                 Text("Bank reported ${money(it.balance!!)} \u00b7 ${displayDate(it.date ?: it.received)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             }
                         }
-                        if (!largeText) Text(money(balances[a.id] ?: a.opening), style = MaterialTheme.typography.titleMedium)
+                        if (!largeText) Column(horizontalAlignment = Alignment.End, modifier = Modifier.widthIn(max = 156.dp)) { Text("Calculated", style = MaterialTheme.typography.labelSmall); Text(money(balances[a.id] ?: a.opening), style = MaterialTheme.typography.titleMedium) }
                         AppIcon("right", Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -287,29 +288,25 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
     }
 }
 
-@Composable fun BudgetScreen(budgets: List<Budget>, entries: List<Entry>, month: YearMonth, save: (Budget, String?, () -> Unit) -> Unit) {
+@Composable fun BudgetScreen(budgets: List<Budget>, entries: List<Entry>, month: YearMonth, addRequest: Int = 0, remove: (String, () -> Unit) -> Unit = { _, _ -> }, save: (Budget, String?, () -> Unit) -> Unit) {
     val largeText = LocalDensity.current.fontScale > 1.3f
-    var edit by remember { mutableStateOf<Budget?>(null) }
-    var originalCategory by remember { mutableStateOf<String?>(null) }
-    var allocationView by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var edit by rememberSaveable(stateSaver = androidx.compose.runtime.saveable.Saver<Budget?, ArrayList<String>>(save = { it?.let { b -> arrayListOf(b.category, b.amount.toString()) } ?: arrayListOf() }, restore = { if (it.isEmpty()) null else Budget(it[0], it[1].toLong()) })) { mutableStateOf<Budget?>(null) }
+    var originalCategory by rememberSaveable { mutableStateOf<String?>(null) }
+    var removing by remember { mutableStateOf(false) }
+    var handledAdd by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(addRequest) { if (addRequest > handledAdd) { handledAdd = addRequest; originalCategory = null; edit = Budget("Food", 0) } }
     val current = remember(budgets) { budgets.filter { it.amount > 0 } }
     val spending by backgroundCalculation(entries, month, cacheKey = "budget-spending") { entries.filter { !it.deleted && it.type == "EXPENSE" && inMonth(it, month) }.groupBy { it.category }.mapValues { it.value.sumOf { entry -> entry.amount } } }
     val spentByCategory = spending ?: run { LedgerSkeleton(); return }
     val planned = current.sumOf { it.amount }
     val spent = current.sumOf { spentByCategory[it.category] ?: 0L }
     FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 10.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        item {
-            Segments(listOf("PLAN" to "50 / 30 / 20", "BUDGETS" to "Category budgets"),
-                if (allocationView) "PLAN" else "BUDGETS") { allocationView = it == "PLAN" }
-        }
-        if (allocationView) {
-            item { IncomeAllocationPlan(entries, month) }
-        } else {
+        run {
             item { CardBlock {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     IconTile("budgets", MaterialTheme.colorScheme.tertiary)
                     Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) { Text("Room for what matters", style = MaterialTheme.typography.titleMedium); Text("Recurring limits \u00b7 spending for this month", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    Column(Modifier.weight(1f)) { Text("Budget remaining", style = MaterialTheme.typography.titleMedium); Text("Recurring limits \u00b7 spending for this month", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
                 Text(if (planned > 0) money(planned - spent) else "Make a little room", style = MaterialTheme.typography.headlineMedium, color = if (spent > planned) rust else MaterialTheme.colorScheme.onSurface)
                 Text(if (planned > 0) "Left across your budgeted categories" else "Set a limit. Give every category a little direction.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -347,5 +344,6 @@ fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors els
             }
         }
     }
-    edit?.let { b -> BudgetEditor(b, { edit = null }, knownEntries = entries) { budget -> save(budget, originalCategory) { edit = null } } }
+    edit?.let { b -> BudgetEditor(b, { edit = null }, knownEntries = entries, remove = originalCategory?.let { { removing = true } }) { budget -> save(budget, originalCategory) { edit = null } }
+    if (removing) Confirm("Remove budget?", "Transactions and categories will be preserved.", { removing = false }) { originalCategory?.let { remove(it) { removing = false; edit = null } } } }
 }

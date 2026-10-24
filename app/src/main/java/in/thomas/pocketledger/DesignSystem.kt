@@ -196,11 +196,11 @@ val positive = Color(0xFF248A3D)
  */
 @Composable fun PocketNavigationBar(
     title: String, collapsed: () -> Float, back: (() -> Unit)?, backLabel: String,
-    settings: (() -> Unit)?, add: (() -> Unit)?
+    settings: (() -> Unit)?, add: (() -> Unit)?, addLabel: String = "Add transaction"
 ) {
     Box(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 4.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.Center).padding(horizontal = 104.dp)
+            modifier = Modifier.align(Alignment.Center).padding(start = if (back != null) 160.dp else LedgerSpace.margin, end = if (settings != null) { if (LocalDensity.current.fontScale > 1.3f) 220.dp else 148.dp } else LedgerSpace.margin)
                 .graphicsLayer { alpha = ((collapsed() - .55f) / .35f).coerceIn(0f, 1f) }
                 .clearAndSetSemantics { })
         if (back != null) {
@@ -215,8 +215,8 @@ val positive = Color(0xFF248A3D)
             }
         }
         Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
-            add?.let { BarIconButton("plus", "Add transaction", it) }
-            settings?.let { BarIconButton("settings", "Settings", it) }
+            add?.let { BarIconButton("plus", addLabel, it) }
+            settings?.let { TextButton(onClick = it) { Text("Manage") } }
         }
     }
 }
@@ -226,10 +226,7 @@ val positive = Color(0xFF248A3D)
         modifier = Modifier.fillMaxWidth().padding(start = LedgerSpace.margin, end = LedgerSpace.margin, top = 0.dp, bottom = LedgerSpace.small).semantics { heading() })
 }
 
-internal val destinationLabels = listOf("Overview", "Activity", "Accounts", "Budgets", "Inbox", "Graphs", "More")
-internal val destinationIcons = listOf("home", "entries", "accounts", "budgets", "sms", "chart", "more")
-
-@Composable fun PocketTabBar(selected: Int, pending: Int, modifier: Modifier = Modifier, haze: dev.chrisbanes.haze.HazeState? = null, change: (Int) -> Unit) {
+@Composable internal fun PocketTabBar(selected: Destination, pending: Int, modifier: Modifier = Modifier, haze: dev.chrisbanes.haze.HazeState? = null, change: (Destination) -> Unit) {
     val haptic = LocalHapticFeedback.current
     val chrome = rememberChromeStyle()
     Surface(
@@ -238,9 +235,11 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
     ) {
         Column {
             HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
-            Row(Modifier.fillMaxWidth().navigationBarsPadding().selectableGroup().padding(horizontal = LedgerSpace.small, vertical = LedgerSpace.xs)) {
-                listOf(0, 1, 3, 6).forEach { index ->
-                    val active = selected == index || (index == 6 && selected in listOf(2, 4, 5))
+            Column(Modifier.navigationBarsPadding().selectableGroup()) {
+            Destination.primary.chunked(if (LocalDensity.current.fontScale > 1.3f) 2 else 4).forEach { destinations ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = LedgerSpace.small, vertical = LedgerSpace.xs)) {
+                destinations.forEach { index ->
+                    val active = selected == index
                     val interaction = remember { MutableInteractionSource() }
                     val color by androidx.compose.animation.animateColorAsState(
                         if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -251,55 +250,44 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
                             if (selected != index) { haptic.performHapticFeedback(HapticFeedbackType.SegmentTick); change(index) }
                         }).heightIn(min = 56.dp).padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        BadgedBox(badge = { if (index == 6 && pending > 0) Badge { Text(if (pending > 99) "99+" else "$pending") } }) {
-                            AppIcon(destinationIcons[index], tint = color)
+                        BadgedBox(badge = { if (index == Destination.Inbox && pending > 0) Badge { Text(if (pending > 99) "99+" else "$pending") } }) {
+                            AppIcon(index.icon, tint = color)
                         }
-                        Text(destinationLabels[index], style = MaterialTheme.typography.labelMedium, color = color,
-                            maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        Text(index.title, style = MaterialTheme.typography.labelMedium, color = color,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2, softWrap = true, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium)
                     }
                 }
             }
+            }
+            }
         }
     }
 }
 
-@Composable fun PocketNavigationRail(selected: Int, pending: Int, change: (Int) -> Unit, settings: () -> Unit) {
+@Composable internal fun PocketNavigationRail(selected: Destination, pending: Int, change: (Destination) -> Unit, settings: () -> Unit) {
     NavigationRail(Modifier.fillMaxHeight(), containerColor = MaterialTheme.colorScheme.surface) {
         Spacer(Modifier.height(16.dp))
-        listOf(0, 1, 2, 3, 4, 5).forEach { index ->
+        Destination.primary.forEach { index ->
             NavigationRailItem(selected = selected == index, onClick = { change(index) },
-                icon = { BadgedBox(badge = { if (index == 4 && pending > 0) Badge { Text("$pending") } }) { AppIcon(destinationIcons[index]) } },
-                label = { Text(destinationLabels[index]) })
+                icon = { BadgedBox(badge = { if (index == Destination.Inbox && pending > 0) Badge { Text("$pending") } }) { AppIcon(index.icon) } },
+                label = { Text(index.title) })
         }
         Spacer(Modifier.weight(1f))
         NavigationRailItem(selected = false, onClick = settings,
-            icon = { AppIcon("settings") }, label = { Text("Settings") })
+            icon = { AppIcon("settings") }, label = { Text("Manage") })
     }
 }
 
-@Composable fun MoreScreen(pending: Int, open: (Int) -> Unit, settings: () -> Unit) {
-    FluidList(contentPadding = PaddingValues(LedgerSpace.content), verticalArrangement = Arrangement.spacedBy(LedgerSpace.section)) {
-        item { Text("Your ledger, at a glance", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        item {
-            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
-                Column {
-                    listOf(2, 4, 5).forEachIndexed { position, index ->
-                        val interaction = remember { MutableInteractionSource() }
-                        Surface(onClick = { open(index) }, interactionSource = interaction,
-                            modifier = Modifier.premiumPressEffect(interaction, pressedScale = .993f)) {
-                            ListItem(headlineContent = { Text(destinationLabels[index]) },
-                                supportingContent = { Text(when (index) { 2 -> "Balances and opening amounts"; 4 -> if (pending > 0) "$pending alerts need review" else "Capture and review bank alerts"; else -> "Understand your spending patterns" }) },
-                                leadingContent = { IconTile(destinationIcons[index]) },
-                                trailingContent = { AppIcon("right", tint = MaterialTheme.colorScheme.onSurfaceVariant) })
-                        }
-                        if (position < 2) HorizontalDivider(Modifier.padding(start = 76.dp),
-                            thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
-                    }
-                }
-            }
-        }
-        item { OutlinedButton(onClick = settings, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("Settings and backups") } }
+@Composable internal fun MoreScreen(pending: Int, open: (Destination) -> Unit, settings: () -> Unit) {
+    FluidList(contentPadding = PaddingValues(LedgerSpace.margin), verticalArrangement = Arrangement.spacedBy(LedgerSpace.section)) {
+        item { GroupedSection("Manage your ledger") {
+            GroupedRow("Accounts", subtitle = "Calculated and opening balances", leading = { IconTile("accounts") }, chevron = true, onClick = { open(Destination.Accounts) })
+            GroupedDivider()
+            GroupedRow("Income plan", subtitle = "Separate 50/30/20 planning targets", leading = { IconTile("budgets") }, chevron = true, onClick = { open(Destination.IncomePlan) })
+            GroupedDivider()
+            GroupedRow("Settings and backups", subtitle = "Appearance, permissions and saved rules", leading = { IconTile("settings") }, chevron = true, onClick = settings)
+        } }
         item { Text("Everything stays on this device.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }

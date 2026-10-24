@@ -159,6 +159,21 @@ class Repository(val context: Context, val db: LedgerDatabase) {
         }
         if (!needsCategoryNotification(entry)) CategoryNotifications.cancel(context, entry.id)
     }
+    suspend fun updateCategory(entryId: String, category: String, remember: Boolean = false) = mutex.withLock {
+        require(category.isNotBlank()) { "Choose a category" }
+        db.withTransaction {
+            val current = dao.entry(entryId)
+            require(current != null && !current.deleted && current.type != "TRANSFER") { "This transaction is no longer available for categorization" }
+            dao.entry(current.copy(category = category.trim()))
+            if (remember && current.payee.isNotBlank()) dao.rule(MerchantRule(current.payee.trim().uppercase(), category.trim(), current.type))
+        }
+        if (category.trim() != "Uncategorized") CategoryNotifications.cancel(context, entryId)
+    }
+
+    suspend fun removeBudget(category: String) = mutex.withLock {
+        dao.removeBudget(category)
+    }
+
     suspend fun delete(entry: Entry) = mutex.withLock {
         db.withTransaction {
             val current = dao.entry(entry.id) ?: return@withTransaction

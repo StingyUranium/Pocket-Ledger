@@ -16,9 +16,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun SmsScreen(messages: List<SmsRecord>, entries: List<Entry>, accounts: List<Account>, senders: List<TrustedSender>, permission: Boolean, capture: Boolean, from: String, to: String, setFrom: (String) -> Unit, setTo: (String) -> Unit, request: () -> Unit, toggle: (Boolean) -> Unit, scan: () -> Unit, trust: (TrustedSender) -> Unit, review: (SmsRecord) -> Unit, dismiss: (SmsRecord) -> Unit, link: (Pair<Entry, Entry>) -> Unit, refreshing: Boolean = false, refresh: () -> Unit = {}) {
+@Composable fun SmsScreen(messages: List<SmsRecord>, entries: List<Entry>, accounts: List<Account>, senders: List<TrustedSender>, permission: Boolean, capture: Boolean, from: String, to: String, setFrom: (String) -> Unit, setTo: (String) -> Unit, request: () -> Unit, toggle: (Boolean) -> Unit, scan: () -> Unit, trust: (TrustedSender) -> Unit, review: (SmsRecord) -> Unit, dismiss: (SmsRecord) -> Unit, link: (Pair<Entry, Entry>) -> Unit, refreshing: Boolean = false, refresh: () -> Unit = {}, viewActivity: () -> Unit = {}) {
     val reducedMotion = LocalReducedMotion.current
-    var showAll by remember { mutableStateOf(false) }
+    var showAll by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     val pending = remember(messages) { messages.count { it.status == "REVIEW" } }
     val senderCandidates = remember(messages, senders) { messages.map { TrustedSender(normalizedSender(it.sender), it.bank) }.distinct().filter { it !in senders } }
     val transfers by backgroundCalculation(entries, cacheKey = "transfer-candidates") {
@@ -33,43 +33,6 @@ import androidx.compose.ui.unit.dp
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = refresh, state = refreshState, modifier = Modifier.fillMaxSize(),
         indicator = { androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(state = refreshState, isRefreshing = refreshing, modifier = Modifier.align(Alignment.TopCenter).padding(top = headerInset)) }) {
     FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 12.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        item { CardBlock {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                IconTile("shield", MaterialTheme.colorScheme.tertiary, 48)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text("Less typing. More living.", style = MaterialTheme.typography.titleMedium); Text("SBM Bank India & Axis Bank", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-            Text("Turn bank alerts into everyday clarity. Processed privately on your phone.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (!permission) Button(onClick = request, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { Text("Enable SMS access") }
-        } }
-        item { GroupedSection(footer = if (capture && !permission) "Grant SMS access in Settings to resume capture." else null) {
-            GroupedRow("Automatic capture", subtitle = if (capture && permission) "Ready for your next bank alert" else "Capture new bank transactions",
-                trailing = { PocketSwitch(capture && permission, "Automatic capture", toggle) })
-        } }
-        item { SectionLabel("Bring in your history") }
-        item { CardBlock {
-            Text("Start with a date range", style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.weight(1f)) { DateField(from, setFrom, "From") }
-                Box(Modifier.weight(1f)) { DateField(to, setTo, "Through") }
-            }
-            Button(onClick = scan, enabled = permission, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { AppIcon("search", Modifier.size(17.dp), if (permission) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(8.dp)); Text("Preview bank SMS") }
-            Text("Check account opening dates and balances before importing older alerts.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } }
-        val candidates = senderCandidates
-        if (candidates.isNotEmpty()) item { SectionLabel("Confirm bank senders") }
-        items(candidates, key = { "sender-${it.bank}-${it.sender}" }, contentType = { "sender" }) { t -> CardBlock {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { BankMark(t.bank); Column(Modifier.weight(1f)) { Text(t.sender, style = MaterialTheme.typography.titleMedium); Text(t.bank, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-            messages.firstOrNull { normalizedSender(it.sender) == t.sender && it.bank == t.bank }?.let { Text(it.body, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            TextButton(onClick = { trust(t) }, contentPadding = PaddingValues(0.dp)) { Text("Review and trust sender"); Spacer(Modifier.width(5.dp)); AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.primary) }
-        } }
-        val possible = transfers.orEmpty()
-        if (possible.isNotEmpty()) item { SectionLabel("Possible transfers") }
-        items(possible, key = { "transfer-${it.first.id}-${it.second.id}" }, contentType = { "transfer" }) { (out, inc) -> CardBlock {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { IconTile("transfer"); Column(Modifier.weight(1f)) { Text(money(out.amount), style = MaterialTheme.typography.titleLarge); Text(displayDate(out.date), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-            Text("${accounts.find { it.id == out.accountId }?.name} → ${accounts.find { it.id == inc.accountId }?.name}", style = MaterialTheme.typography.bodyMedium)
-            Text("${out.payee} / ${inc.payee}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = { link(out to inc) }, contentPadding = PaddingValues(0.dp)) { Text("Link as transfer") }
-        } }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { SectionTitle("Bank messages"); Spacer(Modifier.weight(1f)); if (pending > 0) StatusPill("$pending to review") }
@@ -79,7 +42,7 @@ import androidx.compose.ui.unit.dp
         val list = messageList
         if (list.isEmpty()) item { Empty(if (showAll) "Preview your bank alerts to start building a clearer picture." else "You're all caught up. Alerts that need a closer look will appear here.", if (showAll) "Your inbox, simplified" else "A little peace of mind", "sms") }
         items(list, key = { it.key }, contentType = { "message" }) { m ->
-            var expanded by remember(m.key) { mutableStateOf(false) }
+            var expanded by androidx.compose.runtime.saveable.rememberSaveable(m.key) { mutableStateOf(false) }
             MessageSwipe(m, dismiss) {
             CardBlock {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -101,6 +64,45 @@ import androidx.compose.ui.unit.dp
             }
             }
         }
+        item { GroupedSection { GroupedRow("Saved transactions", subtitle = "Review categories in Activity", chevron = true, onClick = viewActivity) } }
+        item { CardBlock {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                IconTile("shield", MaterialTheme.colorScheme.tertiary, 48)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text("Less typing. More living.", style = MaterialTheme.typography.titleMedium); Text("SBM Bank India & Axis Bank", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            Text("Turn bank alerts into everyday clarity. Processed privately on your phone.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!permission) Button(onClick = request, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { Text("Enable SMS access") }
+        } }
+        item { GroupedSection(footer = if (capture && !permission) "Grant SMS access in Settings to resume capture." else null) {
+            GroupedRow("Automatic capture", subtitle = if (capture && permission) "Ready for your next bank alert" else "Capture new bank transactions",
+                trailing = { PocketSwitch(capture && permission, "Automatic capture", toggle) })
+        } }
+        item { SectionLabel("Bring in your history") }
+        item { CardBlock {
+            Text("Start with a date range", style = MaterialTheme.typography.titleMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(LedgerSpace.small)) {
+                DateField(from, setFrom, "From")
+                DateField(to, setTo, "Through")
+            }
+            Button(onClick = scan, enabled = permission, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { AppIcon("search", Modifier.size(17.dp), if (permission) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(8.dp)); Text("Preview bank SMS") }
+            Text("Check account opening dates and balances before importing older alerts.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } }
+        val candidates = senderCandidates
+        if (candidates.isNotEmpty()) item { SectionLabel("Confirm bank senders") }
+        items(candidates, key = { "sender-${it.bank}-${it.sender}" }, contentType = { "sender" }) { t -> CardBlock {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { BankMark(t.bank); Column(Modifier.weight(1f)) { Text(t.sender, style = MaterialTheme.typography.titleMedium); Text(t.bank, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+
+            TextButton(onClick = { trust(t) }, contentPadding = PaddingValues(0.dp)) { Text("Review and trust sender"); Spacer(Modifier.width(5.dp)); AppIcon("right", Modifier.size(12.dp), MaterialTheme.colorScheme.primary) }
+        } }
+        val possible = transfers.orEmpty()
+        if (possible.isNotEmpty()) item { SectionLabel("Possible transfers") }
+        items(possible, key = { "transfer-${it.first.id}-${it.second.id}" }, contentType = { "transfer" }) { (out, inc) -> CardBlock {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { IconTile("transfer"); Column(Modifier.weight(1f)) { Text(money(out.amount), style = MaterialTheme.typography.titleLarge); Text(displayDate(out.date), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+            Text("${accounts.find { it.id == out.accountId }?.name} → ${accounts.find { it.id == inc.accountId }?.name}", style = MaterialTheme.typography.bodyMedium)
+            Text("${out.payee} / ${inc.payee}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { link(out to inc) }, contentPadding = PaddingValues(0.dp)) { Text("Link as transfer") }
+        } }
+
     }
     }
 }

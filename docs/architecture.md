@@ -34,11 +34,11 @@ income and spending rules. Migration 2→3 infers each old rule's type from the 
 falling back to an income-only category or expense. Backup format 2 stores rule types and accepts
 format 1 restores using the same inference. Settings removes only the selected rule's type.
 
-Notifications use a dedicated channel and an explicit, immutable pending intent with a distinct entry URI. Text contains no amount or merchant. `MainActivity` waits for its initial snapshot, resolves the entry ID, opens Activity and its editor, and consumes the request. Saving a category clears the reminder. Permission denial leaves ingestion working; there is no reminder backlog replay when permission is later granted.
+Notifications use a dedicated channel and an explicit, immutable pending intent with a distinct entry URI. Text contains no amount or merchant. `MainActivity` waits for a snapshot containing the requested live entry (including a newly committed entry that has not reached the current snapshot), resolves the entry ID, opens Activity and its editor, and consumes the request. Saving a category clears the reminder. Permission denial leaves ingestion working; there is no reminder backlog replay when permission is later granted.
 
 ## UI and state
 
-Compact root destinations are Overview, Activity, Budgets, and More. More exposes Accounts, Inbox, and Graphs. Transaction detail and Settings routes animate separately from root tabs. Keep the selected month, drafts, and saved page state intact across navigation and resizing.
+Compact root destinations are Overview, Activity, Budgets, and Inbox. Overview exposes Insights; the labeled Manage action exposes Accounts, Income plan, and Settings. `Destination` uses stable names with an explicit legacy numeric restoration mapping. Transaction detail and Settings routes animate separately from root tabs. Keep the selected month, drafts, and saved page state intact across navigation and resizing.
 
 Overview and metric details share a background-computed `OverviewReport`. Navigation settling and predictive back must share one transition owner so cancellation does not leave pages overlapping. Shared metric cards and route motion use the same duration. See [UI implementation notes](ui-redesign.md) before changing these transitions.
 
@@ -89,3 +89,5 @@ shares as less than 0.1%. Large-text rows stack values, and chart totals move ou
 ## Tests and performance
 
 JVM tests cover parsing, reports, ledger behavior, and reminder eligibility. Device tests cover repository/database behavior and Compose journeys using the validation package. The benchmark module and benchmark-only app fixtures are isolated from the personal package. Functional UI results do not establish startup or frame-time performance; see [development](development.md) and [performance notes](ui-redesign.md).
+
+Category-only review resolves the current entry under the repository mutex and updates only its category and optional current-payee rule. Notifications clear after commit. Budget removal deletes only the recurring limit. See [screen specification](review-redesign.md).

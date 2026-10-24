@@ -38,7 +38,7 @@ class LedgerBenchmark {
         setupBlock = { pressHome() }
     ) {
         startActivityAndWait()
-        waitFor("Monthly balance")
+        waitFor("Income remaining")
     }
 
     @Test fun overviewToActivityAndBack() = benchmark.measureRepeated(
@@ -46,12 +46,12 @@ class LedgerBenchmark {
         metrics = listOf(FrameTimingMetric()),
         compilationMode = CompilationMode.Partial(baselineProfileMode = BaselineProfileMode.Require),
         iterations = 30,
-        setupBlock = { startActivityAndWait(); waitFor("Monthly balance") }
+        setupBlock = { startActivityAndWait(); waitFor("Income remaining") }
     ) {
         waitFor("Spent").click()
         waitFor("Spent this month")
         device.pressBack()
-        waitFor("Monthly balance")
+        waitFor("Income remaining")
     }
 }
 
@@ -70,22 +70,24 @@ class LedgerProfileGenerator {
         device.wakeUp()
         pressHome()
         startActivityAndWait()
-        waitFor("Monthly balance")
+        waitFor("Income remaining")
     }
 
     @Test fun interactions() = profile.collect(packageName = Target, maxIterations = 6, stableIterations = 2, filterPredicate = { it.contains("Lin/thomas/pocketledger/") }) {
         device.wakeUp()
         startActivityAndWait()
-        waitFor("Monthly balance")
+        waitFor("Income remaining")
         waitFor("Spent").click()
         waitFor("Spent this month")
         device.pressBack()
-        waitFor("Monthly balance")
+        waitFor("Income remaining")
         waitFor("Activity").click()
         device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4,
             device.displayWidth / 2, device.displayHeight / 3, 30)
-        waitFor("More").click()
-        waitFor("Graphs").click()
+        waitFor("Overview").click()
+        device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4,
+            device.displayWidth / 2, device.displayHeight / 3, 30)
+        waitFor("Insights").click()
         waitFor("Where it goes")
         device.findObject(By.desc("Back")).click()
         waitFor("Overview").click()

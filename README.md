@@ -6,20 +6,20 @@ Ledger **1.7.0** is an offline Android expense manager built with Kotlin and Jet
 
 - Monthly overview with Income, Spent, and Balance. A new month starts with zero activity; account balances retain their opening balances and transaction history.
 - Tap Income, Spent, or a spending category to open matching transactions for the selected month. Back returns to the original screen.
-- Graphs in More, with category spending, daily spending inspection, an accessible data list, and six months of income versus spending.
+- Insights from Overview, with category spending, daily spending inspection, an accessible data list, and six months of income versus spending.
 - Recurring category budgets shared across every month. Spending resets each month; overspending appears as a negative remaining amount.
 - Separate category lists offer 30 spending options and 15 income options, including Utilities, Education, Travel, Salary, Freelance, Interest and Refunds. Custom categories are reused by transaction type; remembered payee rules keep income and spending separate. Budgets use spending categories.
 - A separate 50/30/20 plan splits entered monthly income into needs, wants, and savings targets; it does not represent confirmed savings or change category limits.
 - A compact monthly widget switches between Income and Expenses and remembers the selection per widget. Tapping its total opens the matching transactions; the Budget widget shows recurring-limit remaining amounts.
 - Material 3 dynamic color, light/dark themes, high contrast and reduced motion; adaptive navigation, predictive back, native spring sheets and standard stretch scrolling.
-- Overview, Activity, Budgets, and More navigation on phones; a rail and optional transaction editor pane on wider windows. Inbox supports pull-to-check and swipe dismissal with Undo.
+- Overview, Activity, Budgets, and Inbox navigation on phones; a rail and optional transaction editor pane on wider windows. Inbox supports pull-to-check and swipe dismissal with Undo.
 - Local sender confirmation, duplicate detection, transfer matching, and encrypted backups.
 - Newly saved SMS transactions that need a category show an **Add a category** notification. Tapping opens the transaction editor; duplicates, matched transfers, and remembered categories do not produce reminders.
 
 ## Getting started
 
-1. In **More / Accounts**, map each bank's last four account digits. Set the opening date and balance immediately before that date. The opening date must cover transactions you intend to import.
-2. In **More / Inbox**, enable SMS access, choose a history range, and preview matching messages. The range filters receipt dates; transactions use dates extracted from alerts.
+1. In **Manage / Accounts**, map each bank's last four account digits. Set the opening date and balance immediately before that date. The opening date must cover transactions you intend to import.
+2. In **Inbox**, enable SMS access, choose a history range, and preview matching messages. The range filters receipt dates; transactions use dates extracted from alerts.
 3. Confirm sender IDs and review incomplete or conflicting messages before saving. Sender confirmation does not prove authenticity.
 4. Enable **Capture new bank alerts** for automatic capture. Allow notifications when prompted to receive category reminders. WorkManager and app resume reconcile missed alerts, subject to Android scheduling.
 5. Use **+** for manual entries and transfers. Tap transactions to edit, categorize, or delete them.
@@ -88,3 +88,5 @@ Recurring transactions, receipt attachments, cloud synchronization, and Realbyte
 See [the implementation notes](docs/ui-redesign.md) for adaptive navigation, motion, accessibility, isolated device tests, Baseline/Startup Profile generation and frame-performance gates. Performance targets require physical-device traces; a successful debug build does not certify jank or startup budgets.
 
 Category reminder validation (23 October 2026): debug build, JVM tests, and lint passed; the personal APK was installed successfully through ADB. Notification delivery and tapping have not yet been verified on a device. Messages still awaiting sender/account review do not notify until saved as transactions. If notification permission is denied, enable it in Android app settings; capture continues without reminders.
+
+Use **Choose category** on uncategorized Activity rows for a focused category update. **Manage** opens Accounts, the separate Income plan, and Settings. Budget editors offer explicit removal of the recurring limit while preserving transactions.
