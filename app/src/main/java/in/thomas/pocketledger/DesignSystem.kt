@@ -43,6 +43,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import dev.chrisbanes.haze.blur.hazeBlur
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -227,9 +228,13 @@ val positive = Color(0xFF248A3D)
 internal val destinationLabels = listOf("Overview", "Activity", "Accounts", "Budgets", "Inbox", "Graphs", "More")
 internal val destinationIcons = listOf("home", "entries", "accounts", "budgets", "sms", "chart", "more")
 
-@Composable fun PocketTabBar(selected: Int, pending: Int, change: (Int) -> Unit) {
+@Composable fun PocketTabBar(selected: Int, pending: Int, modifier: Modifier = Modifier, haze: dev.chrisbanes.haze.HazeState? = null, change: (Int) -> Unit) {
     val haptic = LocalHapticFeedback.current
-    Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = .94f), tonalElevation = 0.dp) {
+    val chrome = rememberChromeStyle()
+    Surface(
+        modifier = if (haze != null) modifier.hazeBlur(dev.chrisbanes.haze.HazeInput.Sources(haze), chrome) else modifier,
+        color = if (haze != null) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = .94f), tonalElevation = 0.dp
+    ) {
         Column {
             HorizontalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.fillMaxWidth().navigationBarsPadding().selectableGroup().padding(horizontal = LedgerSpace.small, vertical = LedgerSpace.xs)) {
@@ -391,7 +396,7 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
 @Composable fun Empty(text: String, title: String = "A little space for what's next", icon: String = "receipt") {
     Box(Modifier.fillMaxWidth().padding(horizontal = LedgerSpace.content, vertical = LedgerSpace.generous)) {
         Column(Modifier.fillMaxWidth().padding(vertical = LedgerSpace.content), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            IconTile(icon, size = 56)
+            AppIcon(icon, Modifier.size(32.dp), MaterialTheme.colorScheme.onSurfaceVariant)
             Text(title, style = MaterialTheme.typography.titleMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.widthIn(max = 290.dp))
         }

@@ -140,3 +140,32 @@ functional checks; no visual matrix, refresh-rate matrix or frame-time benchmark
 The scroll-header debug build, all 52 JVM tests and lint passed. The personal package ID was
 verified and `artifacts/Ledger-scrolling-header.apk` was installed successfully with `adb install -r`.
 Existing app data was preserved. Lint reports zero errors; device tests used only the validation package.
+
+## iOS-style redesign (23 October 2026)
+
+This pass changed presentation only; storage, backups, SMS identities and destinations are untouched.
+
+- **Tokens:** an iOS-like type scale (Large Title 34 down to Caption 12), an 8/12/20dp radius scale, a
+  16dp `LedgerSpace.margin`, black-based dark surfaces (`#1C1C1E`/`#2C2C2E` groups) and a grouped
+  `#F2F2F7` light background. Dynamic color stays on by default with the static fallback. No font is bundled.
+- **Navigation chrome:** large collapsing titles with a pinned compact bar and a hairline that appears
+  once the title has collapsed; a translucent tab bar without a pill indicator.
+- **Grouped lists:** `GroupedSection`, `GroupedRow`, `GroupedItem`, `GroupedField` and `GroupedDivider`
+  replace stacks of cards on Overview, Accounts, Budgets, Graphs, Inbox, Settings and the editors.
+  Sheets sit on the grouped background so groups stand out.
+- **Interaction:** custom controls use the shared scale/opacity press effect with no ripple (Material
+  buttons keep theirs). Confirmations are a compact centered alert with a red destructive action and a
+  light confirm haptic. Transaction rows swipe to request deletion; the confirmation dialog still decides,
+  and a custom accessibility action offers the same request.
+- **Motion:** non-metric push/pop routes slide horizontally with a quarter-width parallax on the parent.
+  The Income/Spent card-to-header move is unchanged. Reduced motion removes both.
+- **States:** a failed first read shows a centered message with Retry; empty states use a quiet icon,
+  one line of context and, where relevant, one action.
+
+Decisions that differ from the original brief: dynamic color remains on; the historical scroll-performance
+rules in `AGENTS.md` were set aside for this pass at the user's request, so blur and the overlay header are
+accepted costs. Context menus on rows and a bundled font were not added.
+
+Validation: the debug build, JVM tests, lint and the isolated device journeys pass on the Motorola Edge 70.
+Header tests now expect back, add and settings to stay pinned while the title and month collapse. These are
+functional checks; there is no visual matrix and no frame-time evidence for blur or the overlay header.

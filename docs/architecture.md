@@ -34,9 +34,14 @@ Compact root destinations are Overview, Activity, Budgets, and More. More expose
 
 Overview and metric details share a background-computed `OverviewReport`. Navigation settling and predictive back must share one transition owner so cancellation does not leave pages overlapping. Shared metric cards and route motion use the same duration. See [UI implementation notes](ui-redesign.md) before changing these transitions.
 
-The title/actions and month picker share `ScrollingLedgerHeader`, driven by Material enter-always
-nested scrolling. Status-bar padding stays fixed. Destination changes reveal controls without
-resetting lists; reduced motion and touch exploration pin the header.
+`ScrollingLedgerHeader` is an overlay, not a Scaffold top bar. A pinned compact bar (back, inline title,
+add/settings) sits above a collapsible large title and month picker, driven by Material
+exit-until-collapsed nested scrolling; the title and picker return only at the top of a list. Pages
+reserve the header's full height through `LocalLedgerHeaderInset` (and the tab bar's through
+`LocalLedgerBottomInset`), which `FluidList` adds to its content padding, so scrolling never resizes a
+list's viewport. Both bars blur the page beneath them with Haze (`hazeSource` on the page, `hazeBlur` on
+the bars) and fall back to a translucent fill. Destination changes reveal controls without resetting
+lists; reduced motion and touch exploration pin the header.
 
 Room flows feed `ledgerSnapshots`; calculations and I/O belong off the main thread. `LedgerApp` observes entries and budgets to refresh installed widgets.
 

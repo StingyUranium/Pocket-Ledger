@@ -14,6 +14,11 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -34,6 +39,23 @@ internal fun rememberHeaderPinned(): Boolean {
 /** Space the page content reserves under the overlaid header: status bar plus full header height. */
 val LocalLedgerHeaderInset = compositionLocalOf { 0.dp }
 
+/** Space reserved at the bottom for the overlaid tab bar. */
+val LocalLedgerBottomInset = compositionLocalOf { 0.dp }
+
+/** Translucent, blurred chrome shared by the header and the tab bar. */
+@Composable internal fun rememberChromeStyle(): HazeBlurStyle {
+    val background = MaterialTheme.colorScheme.background
+    return remember(background) {
+        HazeBlurStyle {
+            blurRadius(20.dp)
+            noiseFactor(0f)
+            backgroundColor(background)
+            colorEffects(listOf(HazeColorEffect.tint(background.copy(alpha = .72f))))
+            fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = .94f)))
+        }
+    }
+}
+
 /**
  * Large-title header. A compact bar stays pinned (back, inline title, actions) while the large
  * title and any controls below it collapse under Material's exit-until-collapsed behavior, which
@@ -49,6 +71,7 @@ internal fun ScrollingLedgerHeader(
     pinned: Boolean,
     modifier: Modifier = Modifier,
     onInset: (Dp) -> Unit,
+    haze: HazeState? = null,
     bar: @Composable (collapsed: () -> Float) -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -58,11 +81,12 @@ internal fun ScrollingLedgerHeader(
     var barPx by remember { mutableIntStateOf(0) }
     var fullPx by remember { mutableIntStateOf(0) }
     val background = MaterialTheme.colorScheme.background.copy(alpha = .94f)
+    val chrome = rememberChromeStyle()
     val hairline = MaterialTheme.colorScheme.outlineVariant
     val collapsed: () -> Float = { if (pinned) 0f else state.collapsedFraction }
     fun report() = reportInset(with(density) { (statusTop + barPx + fullPx).toDp() })
     Column(
-        modifier.fillMaxWidth().background(background).drawWithContent {
+        modifier.fillMaxWidth().then(if (haze != null) Modifier.hazeBlur(HazeInput.Sources(haze), chrome) else Modifier.background(background)).drawWithContent {
             drawContent()
             // The hairline appears only once content scrolls beneath the compact bar.
             val alpha = ((collapsed() - .9f) * 10f).coerceIn(0f, 1f)

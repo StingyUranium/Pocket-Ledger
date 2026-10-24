@@ -184,7 +184,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     }
 }
 
-@Composable fun Transactions(entries: List<Entry>, accounts: List<Account>, month: YearMonth, initialType: String = "ALL", initialCategory: String = "ALL", leading: (@Composable () -> Unit)? = null, edit: (Entry) -> Unit) {
+@Composable fun Transactions(entries: List<Entry>, accounts: List<Account>, month: YearMonth, initialType: String = "ALL", initialCategory: String = "ALL", leading: (@Composable () -> Unit)? = null, delete: ((Entry) -> Unit)? = null, edit: (Entry) -> Unit) {
     var search by rememberSaveable { mutableStateOf("") }
     var type by rememberSaveable(initialType) { mutableStateOf(initialType) }
     var account by rememberSaveable { mutableStateOf("ALL") }
@@ -220,10 +220,14 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
                 itemsIndexed(group, key = { _, entry -> entry.id }, contentType = { _, _ -> "entry" }) { index, entry ->
                     val top = if (index == 0) 12.dp else 0.dp
                     val bottom = if (index == group.lastIndex) 12.dp else 0.dp
-                    Surface(modifier = (if (LocalReducedMotion.current) Modifier else Modifier.animateItem()).padding(horizontal = LedgerSpace.margin),
-                        shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom),
-                        color = MaterialTheme.colorScheme.surface) {
-                        EntryRow(entry, accounts, divider = index < group.lastIndex) { edit(entry) }
+                    val shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
+                    val row: @Composable () -> Unit = {
+                        Surface(shape = shape, color = MaterialTheme.colorScheme.surface) {
+                            EntryRow(entry, accounts, divider = index < group.lastIndex) { edit(entry) }
+                        }
+                    }
+                    Box((if (LocalReducedMotion.current) Modifier else Modifier.animateItem()).padding(horizontal = LedgerSpace.margin)) {
+                        if (delete != null) EntrySwipe(entry, shape, delete, row) else row()
                     }
                 }
             }

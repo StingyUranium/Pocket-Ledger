@@ -26,6 +26,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.layout.onSizeChanged
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -204,7 +207,7 @@ private sealed interface LedgerRoute {
     }
     val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val calculationCache = remember { CalculationCache() }
-    val lastHeaderInset = remember { floatArrayOf(0f) }
+    val lastHeaderInset = remember { floatArrayOf(0f, 0f) }
     val titles = destinationLabels
     // Keep the shared card data ready while detail pages are open, including during back previews.
     val overviewReport by backgroundCalculation(entries, budgets, month) { calculateOverviewReport(entries, budgets, month) }
@@ -233,11 +236,10 @@ private sealed interface LedgerRoute {
                 if (forward) fadeIn(ledgerNavigationTween()) togetherWith ExitTransition.None
                 else EnterTransition.None togetherWith fadeOut(ledgerNavigationTween())
             } else if (forward) {
-                (fadeIn(ledgerNavigationTween()) + slideInVertically(ledgerNavigationTween()) { it / 12 }) togetherWith
-                    (fadeOut(ledgerNavigationTween()) + slideOutVertically(ledgerNavigationTween()) { -it / 24 })
+                // Push: the new page slides in from the trailing edge while the parent drifts back a quarter width.
+                slideInHorizontally(ledgerNavigationTween()) { it } togetherWith slideOutHorizontally(ledgerNavigationTween()) { -it / 4 }
             } else {
-                (fadeIn(ledgerNavigationTween()) + slideInVertically(ledgerNavigationTween()) { -it / 24 }) togetherWith
-                    (fadeOut(ledgerNavigationTween()) + slideOutVertically(ledgerNavigationTween()) { it / 12 })
+                slideInHorizontally(ledgerNavigationTween()) { -it / 4 } togetherWith slideOutHorizontally(ledgerNavigationTween()) { it }
             }
             // Keep the detail page above its parent while returning or seeking back.
             transform.apply { targetContentZIndex = if (forward) 1f else 0f }.using(null)
@@ -263,6 +265,10 @@ private sealed interface LedgerRoute {
     }
     // The header overlays the page; pages reserve its full height so scrolling never resizes a list.
     var headerInset by remember { mutableStateOf(lastHeaderInset[0].dp) }
+    var bottomInset by remember { mutableStateOf(lastHeaderInset[1].dp) }
+    val hazeState = remember { HazeState() }
+    val showTabBar = !wide && shownRoute == LedgerRoute.Tabs
+    val density = LocalDensity.current
     val headerTitle = when (val current = shownRoute) {
         LedgerRoute.Settings -> "Settings"
         LedgerRoute.Tabs -> titles[tab]
@@ -270,14 +276,14 @@ private sealed interface LedgerRoute {
     }
     Scaffold(
         modifier = Modifier.weight(1f).nestedScroll(headerScroll.nestedScrollConnection),
-        contentWindowInsets = ScaffoldDefaults.contentWindowInsets.exclude(WindowInsets.statusBars),
-        bottomBar = { if (!wide && shownRoute == LedgerRoute.Tabs) PocketTabBar(tab, pending) { tab = it } },
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets.exclude(WindowInsets.statusBars).let { if (showTabBar) it.exclude(WindowInsets.navigationBars) else it },
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snack) }
+        snackbarHost = { SnackbarHost(snack, Modifier.padding(bottom = if (showTabBar) bottomInset else 0.dp)) }
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             ScrollingLedgerHeader(headerState, pinned = headerPinned, modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).zIndex(1f),
                 onInset = { inset -> if (inset != headerInset) { headerInset = inset; lastHeaderInset[0] = inset.value } },
+                haze = hazeState,
                 bar = { collapsed ->
                     PocketNavigationBar(
                         title = headerTitle, collapsed = collapsed,
@@ -296,8 +302,8 @@ private sealed interface LedgerRoute {
                 MonthPicker(month) { month = it }
             }
             }
-            readState.error?.let { error ->
-                Surface(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).zIndex(1f), color = MaterialTheme.colorScheme.errorContainer) {
+            if (snapshot != null) readState.error?.let { error ->
+                Surface(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).zIndex(1f).padding(bottom = if (showTabBar) bottomInset else 0.dp), color = MaterialTheme.colorScheme.errorContainer) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Text(error, Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
                         TextButton(onClick = { readAttempt++ }) { Text("Retry") }
@@ -306,19 +312,24 @@ private sealed interface LedgerRoute {
             }
             if (busy && shownRoute == LedgerRoute.Tabs && snapshot != null) {
                 Text("Updating ledger...", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart).zIndex(1f).padding(horizontal = 16.dp, vertical = 8.dp))
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart).zIndex(1f).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp + (if (showTabBar) bottomInset else 0.dp)))
             }
-            CompositionLocalProvider(LocalLedgerHeaderInset provides headerInset) {
-            Column(Modifier.fillMaxSize()) {
+            if (showTabBar) PocketTabBar(tab, pending,
+                Modifier.align(androidx.compose.ui.Alignment.BottomCenter).zIndex(1f).onSizeChanged { size ->
+                    val inset = with(density) { size.height.toDp() }
+                    if (inset != bottomInset) { bottomInset = inset; lastHeaderInset[1] = inset.value }
+                }, hazeState) { tab = it }
+            CompositionLocalProvider(LocalLedgerHeaderInset provides headerInset, LocalLedgerBottomInset provides (if (showTabBar) bottomInset else 0.dp)) {
+            Column(Modifier.fillMaxSize().hazeSource(hazeState)) {
             if (shownRoute == LedgerRoute.Settings) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     SettingsDialog(capture, permission, senders, rules, { passwordMode = "export" }, { chooseRestore.launch(arrayOf("*/*")) }, { work { dao.untrust(it.sender, it.bank) } }, { work { dao.removeRule(it.merchant) } }, { repo.context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${repo.context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
                 }
             } else if (shownRoute is LedgerRoute.Transactions) {
-                Transactions(entries, accounts, month, shownRoute.type, shownRoute.category,
+                Transactions(entries, accounts, month, shownRoute.type, shownRoute.category, delete = { deleteCandidate = it },
                     leading = if (shownRoute.category == "ALL") ({ MetricDetailHeader(shownRoute.type, month, overviewReport?.summary) }) else null) { editor = it }
             } else if (snapshot == null) {
-                if (readState.error == null) LedgerSkeleton()
+                if (readState.error == null) LedgerSkeleton() else ReadErrorState(readState.error!!) { readAttempt++ }
             } else Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
                 val page = tab
@@ -328,7 +339,7 @@ private sealed interface LedgerRoute {
                 when (page) {
                     6 -> MoreScreen(pending, { tab = it }, { settings = true })
                     0 -> Overview(accounts, entries, messages, month, budgets, overviewReport, { tab = 2 }, { tab = 4 }, openTransactions) { editor = it }
-                    1 -> Transactions(entries, accounts, month) { editor = it }
+                    1 -> Transactions(entries, accounts, month, delete = { deleteCandidate = it }) { editor = it }
                     2 -> AccountsScreen(accounts, entries, messages, { accountEditor = it }, { accountEditor = Account(UUID.randomUUID().toString(), "", "CASH", "", openingDate = dayMillis(LocalDate.now(india).withDayOfMonth(1).toString())) })
                     3 -> BudgetScreen(budgets, entries, month) { budget, saved -> work { dao.budget(budget); withContext(Dispatchers.Main) { saved() } } }
                     5 -> GraphsScreen(entries, month, { month = it }, openTransactions)

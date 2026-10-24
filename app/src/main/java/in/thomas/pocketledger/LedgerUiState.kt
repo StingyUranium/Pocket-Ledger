@@ -69,3 +69,13 @@ fun <T> backgroundCalculation(vararg inputs: Any?, cacheKey: String? = null, cal
         }
     }
 }
+
+/** Designed read failure: one line of explanation and one clear action. */
+@Composable fun ReadErrorState(message: String, retry: () -> Unit) {
+    Column(Modifier.fillMaxSize().padding(top = LocalLedgerHeaderInset.current).padding(32.dp),
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp, androidx.compose.ui.Alignment.CenterVertically)) {
+        Text("Couldn\u2019t open your ledger", style = MaterialTheme.typography.titleMedium)
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Button(onClick = retry, shape = MaterialTheme.shapes.medium) { Text("Retry") }
+    }
+}

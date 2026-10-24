@@ -162,13 +162,13 @@ class RedesignUiTest {
         ready()
         ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
         ui.onNodeWithContentDescription("Previous month").assertIsDisplayed()
-        ui.onNode(hasScrollAction()).performTouchInput { swipeUp() }
+        ui.onNode(hasScrollAction()).performTouchInput { swipeUp(startY = height * .75f, endY = height * .25f) }
         ui.onNodeWithContentDescription("Previous month").assertIsNotDisplayed()
         ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
         ui.onNodeWithContentDescription("Add transaction").assertIsDisplayed()
         ui.onNode(hasText("Overview") and isSelected()).assertIsDisplayed()
-        ui.onNode(hasScrollAction()).performTouchInput { swipeDown() }
-        ui.onNode(hasScrollAction()).performTouchInput { swipeDown() }
+        ui.onNode(hasScrollAction()).performTouchInput { swipeDown(startY = height * .25f, endY = height * .75f) }
+        ui.onNode(hasScrollAction()).performTouchInput { swipeDown(startY = height * .25f, endY = height * .75f) }
         ui.onNodeWithContentDescription("Previous month").assertIsDisplayed()
         ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
     }
@@ -177,9 +177,9 @@ class RedesignUiTest {
         ready()
         ui.onNodeWithContentDescription("Settings").performClick()
         ui.onNodeWithContentDescription("Back").assertIsDisplayed()
-        ui.onNode(hasScrollAction()).performTouchInput { swipeUp() }
+        ui.onNode(hasScrollAction()).performTouchInput { swipeUp(startY = height * .75f, endY = height * .25f) }
         ui.onNodeWithContentDescription("Back").assertIsDisplayed()
-        ui.onNode(hasScrollAction()).performTouchInput { swipeDown() }
+        ui.onNode(hasScrollAction()).performTouchInput { swipeDown(startY = height * .25f, endY = height * .75f) }
         ui.onNodeWithContentDescription("Back").assertIsDisplayed().performClick()
         ui.onNodeWithContentDescription("Settings").assertIsDisplayed()
         ui.onNodeWithText("Monthly balance").assertIsDisplayed()

@@ -77,10 +77,11 @@ fun Modifier.motionSurface(active: Boolean = false): Modifier = composed {
     content: LazyListScope.() -> Unit
 ) {
     val inset = LocalLedgerHeaderInset.current
+    val bottomInset = LocalLedgerBottomInset.current
     val direction = LocalLayoutDirection.current
-    val padding = if (inset == 0.dp) contentPadding else PaddingValues(
+    val padding = if (inset == 0.dp && bottomInset == 0.dp) contentPadding else PaddingValues(
         start = contentPadding.calculateStartPadding(direction), top = contentPadding.calculateTopPadding() + inset,
-        end = contentPadding.calculateEndPadding(direction), bottom = contentPadding.calculateBottomPadding()
+        end = contentPadding.calculateEndPadding(direction), bottom = contentPadding.calculateBottomPadding() + bottomInset
     )
     LazyColumn(modifier, contentPadding = padding,
         verticalArrangement = verticalArrangement, content = content)
