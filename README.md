@@ -8,7 +8,7 @@ Ledger **1.7.0** is an offline Android expense manager built with Kotlin and Jet
 - Tap Income, Spent, or a spending category to open matching transactions for the selected month. Back returns to the original screen.
 - Graphs in More, with category spending, daily spending inspection, an accessible data list, and six months of income versus spending.
 - Recurring category budgets shared across every month. Spending resets each month; overspending appears as a negative remaining amount.
-- Categories include Uber/Bus, Rent, Fuel, Food, Groceries, Transport, Bills, Health, Shopping, and Investment. Custom categories and remembered merchant rules are supported.
+- Separate category lists offer 30 spending options and 15 income options, including Utilities, Education, Travel, Salary, Freelance, Interest and Refunds. Custom categories are reused by transaction type; remembered payee rules keep income and spending separate. Budgets use spending categories.
 - A separate 50/30/20 plan splits entered monthly income into needs, wants, and savings targets; it does not represent confirmed savings or change category limits.
 - A compact monthly widget switches between Income and Expenses and remembers the selection per widget. Tapping its total opens the matching transactions; the Budget widget shows recurring-limit remaining amounts.
 - Material 3 dynamic color, light/dark themes, high contrast and reduced motion; adaptive navigation, predictive back, native spring sheets and standard stretch scrolling.
@@ -26,6 +26,10 @@ Ledger **1.7.0** is an offline Android expense manager built with Kotlin and Jet
 6. In **Budgets**, set category limits once. The same limits apply to all months; changing a limit updates every month's comparison. Budget remaining measures spending in categories with active limits.
 7. Add widgets through **Settings → Home screen**, or long-press your launcher and choose **Widgets → Ledger**. Resize widgets to fit your home screen.
 8. Save an encrypted backup through **Settings**. Keep its password; it cannot be recovered.
+
+Category separation preserves existing transactions and category names. Backups now use format 2
+for separate income/spending payee rules; format 1 backups still restore. Older app versions cannot
+restore format 2 backups.
 
 ## Bank SMS support
 

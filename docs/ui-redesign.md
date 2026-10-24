@@ -169,3 +169,59 @@ accepted costs. Context menus on rows and a bundled font were not added.
 Validation: the debug build, JVM tests, lint and the isolated device journeys pass on the Motorola Edge 70.
 Header tests now expect back, add and settings to stay pinned while the title and month collapse. These are
 functional checks; there is no visual matrix and no frame-time evidence for blur or the overlay header.
+
+## Fast downward gestures in editors (24 October 2026)
+
+Scrollable `LedgerSheet` forms now share their scroll state with the Material sheet. Sheet dragging
+is disabled while the form is below its top, and stays disabled through a gesture/fling that began
+below the top. After the form settles at the top, Material swipe dismissal is available again.
+Cancel, back and outside-tap dismissal remain available. Native form scrolling and sheet physics
+are retained; there is no custom pointer detector or replacement fling animation.
+
+Device validation on the Motorola Edge 70: three isolated sheet tests pass, covering repeated fast
+downward flings to the form top, preventing a sheet drag while scrolled, and swipe dismissal at the
+top. The drag-while-scrolled regression fails with the gesture gate disabled. Debug assembly, all
+52 JVM tests and lint pass. All ten existing isolated navigation/editor UI journeys also pass.
+The personal APK was rebuilt without the validation property and its application ID verified;
+`artifacts/Ledger-sheet-fling-fix.apk` is the local delivery. These functional checks do not establish
+frame-time performance.
+
+## Separate income and spending categories (24 October 2026)
+
+The transaction editor offers 30 spending and 15 income suggestions, with separate saveable category
+drafts when changing type. Existing names remain editable, and custom category suggestions follow
+the type of their saved entries. Transaction filters follow the selected type and reset the category
+when type changes; budgets offer spending categories. Transfers retain their own category.
+Payee rules are independent by type, shown as Income/Spending in Settings; Room schema 3 and backup
+format 2 preserve this distinction. Existing records are not recategorized; old databases and format 1
+backups infer an old rule's type from its latest matching correction, with a category-based fallback.
+
+Device validation: all 35 isolated tests pass on the Motorola Edge 70, including migration validation,
+old-backup restore, typed rule ingestion/backup/removal, category selection and activity recreation,
+and the existing navigation and sheet regressions. These are functional checks, not frame-time evidence.
+Host validation: debug assembly, all 55 JVM tests, lint and benchmark-variant Kotlin compilation pass;
+no benchmark was run. The personal package ID was verified and `artifacts/Ledger-categories.apk`
+was installed successfully as an update with `adb install -r`, preserving existing app data.
+
+## Visual review and data bars (24 October 2026)
+
+The spending breakdown continues to show share of total monthly spending, as requested. Each row
+now labels that share explicitly, separately from its budget remaining text. Continuous data bars
+replace loading-style indicators in the breakdown, budgets and six-month view. Zero values have no
+colored dot, and tiny positive categories are labeled `<0.1%` rather than `0%`. Dark charts use a
+brighter palette. Large text stacks account balances, grouped values, budget amounts and editor
+choices; chart totals move below the doughnut. Tab labels ellipsize rather than leaving a final
+letter on its own line, and bank abbreviation artwork retains its icon size.
+
+Reviewed 48 final physical-device captures on the Motorola Edge 70, using a synthetic ledger in the
+validation package: light/dark at system font scales 1.0 and 2.0, covering Overview, Activity, Budgets,
+More, Accounts, Graphs, Inbox, Settings, the transaction editor and selected scrolled rows. Earlier
+captures exposed squeezed account names, split doughnut totals, split editor choices and clipped bank
+artwork; the final captures verify those fixes. The original font-scale setting was restored in
+`finally`. Raw captures and logs remain ignored. This portrait review does not cover the full keyboard,
+landscape, foldable or accessibility matrix and does not establish frame-time performance.
+
+Validation: debug assembly, lint and all 56 JVM tests pass. The final isolated instrumentation run
+passes all 36 functional tests, including pixel checks for proportional fill, a continuous track and
+zero-value bars; the opt-in visual fixture is skipped in that run and was run separately for the two
+font scales. The complete run reports 37 tests including that assumption-skipped fixture.

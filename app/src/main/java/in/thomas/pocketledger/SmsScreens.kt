@@ -184,7 +184,7 @@ import androidx.compose.ui.unit.dp
         GroupedSection("Remembered categories", footer = if (rules.isEmpty()) "Remember a payee's category when editing a transaction to use it for future alerts." else null) {
             rules.forEachIndexed { index, rule ->
                 if (index > 0) GroupedDivider()
-                GroupedRow(rule.merchant, subtitle = rule.category, trailing = { TextButton(onClick = { removeRule(rule) }) { Text("Remove", color = rust, style = MaterialTheme.typography.bodyMedium) } })
+                GroupedRow(rule.merchant, subtitle = "${if (rule.type == "INCOME") "Income" else "Spending"} \u00b7 ${rule.category}", trailing = { TextButton(onClick = { removeRule(rule) }) { Text("Remove", color = rust, style = MaterialTheme.typography.bodyMedium) } })
             }
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) { Text("Ledger", style = MaterialTheme.typography.titleSmall); Text("Version $version · Built for your everyday", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }

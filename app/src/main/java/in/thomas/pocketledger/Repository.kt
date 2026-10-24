@@ -15,7 +15,7 @@ import java.util.UUID
 
 class LedgerApp : Application() {
     private val widgetScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val db by lazy { Room.databaseBuilder(this, LedgerDatabase::class.java, "ledger.db").addMigrations(MIGRATION_1_2).build() }
+    val db by lazy { Room.databaseBuilder(this, LedgerDatabase::class.java, "ledger.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build() }
     val repo by lazy { Repository(this, db) }
     override fun onCreate() {
         super.onCreate()
@@ -102,7 +102,7 @@ class Repository(val context: Context, val db: LedgerDatabase) {
     }
     private suspend fun saveParsed(m: SmsRecord, a: Account) {
         if (dao.entryForSms(m.key) != null) return
-        val rule = dao.allRules().find { it.merchant == m.payee.uppercase() }
+        val rule = dao.allRules().find { it.merchant == m.payee.trim().uppercase() && it.type == m.direction }
         dao.entry(Entry(UUID.randomUUID().toString(), a.id, type = requireNotNull(m.direction), amount = requireNotNull(m.amount), date = requireNotNull(m.date), dateOnly = m.dateOnly, payee = m.payee, category = rule?.category ?: "Uncategorized", smsKey = m.key))
         dao.message(m.copy(status = "SAVED", reason = ""))
     }
@@ -147,7 +147,7 @@ class Repository(val context: Context, val db: LedgerDatabase) {
         db.withTransaction {
             entry.smsKey?.let { key -> require(dao.entryForSms(key)?.let { it.id == entry.id } != false) { "This SMS already has a transaction. Edit it from Entries." } }
             dao.entry(entry)
-            if (remember && entry.payee.isNotBlank() && entry.type != "TRANSFER") dao.rule(MerchantRule(entry.payee.trim().uppercase(), entry.category))
+            if (remember && entry.payee.isNotBlank() && entry.type != "TRANSFER") dao.rule(MerchantRule(entry.payee.trim().uppercase(), entry.category, entry.type))
             entry.smsKey?.let { key -> dao.message(key)?.let { dao.message(it.copy(status = "SAVED", reason = "")) } }
         }
         if (!needsCategoryNotification(entry)) CategoryNotifications.cancel(context, entry.id)

@@ -11,6 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -48,6 +50,8 @@ private data class GraphReport(
     val expenseColor = rust
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val primary = MaterialTheme.colorScheme.primary
+    val largeText = LocalDensity.current.fontScale > 1.3f
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
 
     FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 10.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { CardBlock {
@@ -62,14 +66,18 @@ private data class GraphReport(
                         var start = -90f
                         categories.forEachIndexed { index, (_, amount) ->
                             val sweep = (amount.toDouble() / total * 360).toFloat()
-                            drawArc(categoryColor(index), start, sweep, false, Offset(width / 2, width / 2), Size(size.width - width, size.height - width), style = Stroke(width))
+                            drawArc(categoryColor(index, dark), start, sweep, false, Offset(width / 2, width / 2), Size(size.width - width, size.height - width), style = Stroke(width))
                             start += sweep
                         }
                     }
-                    Column(Modifier.width(154.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (!largeText) Column(Modifier.width(154.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Total spent", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(money(total), style = MaterialTheme.typography.titleLarge)
                     }
+                }
+                if (largeText) Column(verticalArrangement = Arrangement.spacedBy(LedgerSpace.xs)) {
+                    Text("Total spent", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(money(total), style = MaterialTheme.typography.titleLarge)
                 }
             }
         } }
@@ -77,8 +85,8 @@ private data class GraphReport(
             GroupedSection("Categories") {
                 categories.forEachIndexed { index, (category, amount) ->
                     if (index > 0) GroupedDivider(inset = 36.dp)
-                    GroupedRow(category, subtitle = String.format(locale, "%.1f%%", amount.toDouble() / total * 100),
-                        leading = { Box(Modifier.size(9.dp).background(categoryColor(index), CircleShape)) },
+                    GroupedRow(category, subtitle = spendingShareText(amount, total, locale),
+                        leading = { Box(Modifier.size(9.dp).background(categoryColor(index, dark), CircleShape)) },
                         value = money(amount), chevron = true, onClickLabel = "View $category transactions", onClick = { openTransactions("EXPENSE", category) })
                 }
             }
@@ -102,8 +110,8 @@ private data class GraphReport(
                 GroupedItem(onClick = { changeMonth(period) }, onClickLabel = "View ${period.format(monthYearFormat)}") {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(period.format(shortMonthYearFormat), style = MaterialTheme.typography.titleSmall)
-                        LinearProgressIndicator(progress = { (summary.income.toDouble() / scale).toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = incomeColor, trackColor = trackColor, drawStopIndicator = {})
-                        LinearProgressIndicator(progress = { (summary.spent.toDouble() / scale).toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = expenseColor, trackColor = trackColor, drawStopIndicator = {})
+                        ProportionBar(progress = (summary.income.toDouble() / scale).toFloat(), modifier = Modifier.fillMaxWidth().height(6.dp), color = incomeColor, trackColor = trackColor)
+                        ProportionBar(progress = (summary.spent.toDouble() / scale).toFloat(), modifier = Modifier.fillMaxWidth().height(6.dp), color = expenseColor, trackColor = trackColor)
                         Text("Income ${money(summary.income)}  \u00b7  Spent ${money(summary.spent)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

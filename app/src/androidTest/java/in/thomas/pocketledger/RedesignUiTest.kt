@@ -134,6 +134,25 @@ class RedesignUiTest {
         ui.onNodeWithText("123.45").assertExists()
         ui.onNodeWithText("Cancel").performClick()
     }
+    @Test fun transactionTypeHasSeparateCategoriesAndRemembersSelections() {
+        ready()
+        ui.onNodeWithContentDescription("Add transaction").performClick()
+        ui.onNode(hasText("Income", substring = false) and isSelectable()).performClick()
+        ui.onNodeWithText("Category", substring = false).performScrollTo().performClick()
+        ui.onNodeWithText("Salary").assertIsDisplayed().performClick()
+        ui.onNode(hasText("Expense", substring = false) and isSelectable()).performScrollTo().performClick()
+        ui.onNodeWithText("Category", substring = false).performScrollTo().performClick()
+        ui.onNodeWithText("Food").assertIsDisplayed()
+        ui.onNodeWithText("Salary").assertDoesNotExist()
+        ui.onNodeWithText("Groceries").performClick()
+        ui.onNode(hasText("Income", substring = false) and isSelectable()).performScrollTo().performClick()
+        ui.onNodeWithText("Salary").performScrollTo().assertIsDisplayed()
+        ui.activityRule.scenario.recreate()
+        ui.onNodeWithText("Salary").performScrollTo().assertIsDisplayed()
+        ui.onNode(hasText("Expense", substring = false) and isSelectable()).performScrollTo().performClick()
+        ui.onNodeWithText("Groceries").performScrollTo().assertIsDisplayed()
+        ui.onNodeWithText("Cancel").performClick()
+    }
     @Test fun budgetSegmentsSettleAndRetainSelectionAcrossTabs() {
         ready()
         ui.onNodeWithText("Budgets").performClick()

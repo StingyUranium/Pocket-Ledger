@@ -81,6 +81,40 @@ class RepositoryTest {
         repo.ingest(listOf(candidate(sms.replace("628728128503", "628728128504"))))
         assertTrue(db.dao().allEntries().all { it.category == "Food" })
     }
+    @Test fun rememberedCategoriesAreIndependentForIncomeAndSpending() = runBlocking {
+        val credit = candidate(sms.replace("debited", "credited").replace("628728128503", "628728128505"))
+        repo.trust("VM-AXISBK", "AXIS")
+        repo.ingest(listOf(candidate()))
+        val expense = db.dao().allEntries().single()
+        repo.save(expense.copy(category = "Groceries"), true)
+        repo.ingest(listOf(credit))
+        val income = db.dao().allEntries().single { it.type == "INCOME" }
+        assertEquals("Uncategorized", income.category)
+        repo.save(income.copy(category = "Salary"), true)
+        repo.ingest(listOf(candidate(sms.replace("628728128503", "628728128506")),
+            candidate(credit.body.replace("628728128505", "628728128507"))))
+        assertTrue(db.dao().allEntries().filter { it.type == "EXPENSE" }.all { it.category == "Groceries" })
+        assertTrue(db.dao().allEntries().filter { it.type == "INCOME" }.all { it.category == "Salary" })
+        val password = "test-password".toCharArray()
+        val backup = Backup.export(db, password)
+        db.dao().clearRules()
+        Backup.restore(repo, backup, password)
+        assertEquals(setOf("INCOME", "EXPENSE"), db.dao().allRules().map { it.type }.toSet())
+        db.dao().removeRule(expense.payee.uppercase(), "INCOME")
+        assertEquals("EXPENSE", db.dao().allRules().single().type)
+    }
+
+    @Test fun oldBackupRestoresUntypedRulesWithoutChangingEntries() = runBlocking {
+        val e = Entry("manual-income", "axis", type = "INCOME", amount = 100, date = dayMillis("2026-10-20"), payee = "Employer", category = "Salary")
+        repo.save(e, true)
+        val password = "test-password".toCharArray()
+        val root = org.json.JSONObject(String(BackupCrypto.decrypt(Backup.export(db, password), password), Charsets.UTF_8))
+        root.put("version", 1)
+        root.getJSONArray("rules").getJSONObject(0).remove("type")
+        Backup.restore(repo, BackupCrypto.encrypt(root.toString().toByteArray(), password), password)
+        assertEquals(e, db.dao().allEntries().single())
+        assertEquals("INCOME", db.dao().allRules().single().type)
+    }
     @Test fun backupRestoresAllDataAndTombstonesAtomically() = runBlocking {
         repo.trust("VM-AXISBK", "AXIS"); repo.ingest(listOf(candidate()))
         val entry = db.dao().allEntries().single(); repo.save(entry.copy(category = "Food"), true); repo.delete(entry)

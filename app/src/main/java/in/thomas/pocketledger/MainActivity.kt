@@ -213,7 +213,7 @@ private sealed interface LedgerRoute {
     val overviewReport by backgroundCalculation(entries, budgets, month) { calculateOverviewReport(entries, budgets, month) }
     val pending = remember(messages) { messages.count { it.status == "REVIEW" } }
     val expandedEditor = LocalLedgerWindowWidth.current >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.3f
-    val editorContent by rememberUpdatedState<@Composable (Entry) -> Unit> { current -> EntryEditor(current, accounts, messages.find { it.key == current.smsKey }, { editor = null }, { entry, remember -> work { repo.save(entry, remember); withContext(Dispatchers.Main) { editor = null } } }, if (allEntries.any { it.id == current.id }) { { deleteCandidate = current } } else null) }
+    val editorContent by rememberUpdatedState<@Composable (Entry) -> Unit> { current -> EntryEditor(current, accounts, messages.find { it.key == current.smsKey }, { editor = null }, { entry, remember -> work { repo.save(entry, remember); withContext(Dispatchers.Main) { editor = null } } }, if (allEntries.any { it.id == current.id }) { { deleteCandidate = current } } else null, knownEntries = entries) }
     val presentEntry = remember { movableContentOf<Entry> { current -> key(current.id) { editorContent(current) } } }
     CompositionLocalProvider(LocalCalculationCache provides calculationCache, LocalLedgerBusy provides busy,LocalLedgerOperationError provides operationError, LocalLedgerClearError provides { operationError = null }) {
     SharedTransitionLayout {
@@ -323,7 +323,7 @@ private sealed interface LedgerRoute {
             Column(Modifier.fillMaxSize().hazeSource(hazeState)) {
             if (shownRoute == LedgerRoute.Settings) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                    SettingsDialog(capture, permission, senders, rules, { passwordMode = "export" }, { chooseRestore.launch(arrayOf("*/*")) }, { work { dao.untrust(it.sender, it.bank) } }, { work { dao.removeRule(it.merchant) } }, { repo.context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${repo.context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
+                    SettingsDialog(capture, permission, senders, rules, { passwordMode = "export" }, { chooseRestore.launch(arrayOf("*/*")) }, { work { dao.untrust(it.sender, it.bank) } }, { work { dao.removeRule(it.merchant, it.type) } }, { repo.context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${repo.context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
                 }
             } else if (shownRoute is LedgerRoute.Transactions) {
                 Transactions(entries, accounts, month, shownRoute.type, shownRoute.category, delete = { deleteCandidate = it },

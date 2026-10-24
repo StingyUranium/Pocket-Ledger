@@ -51,3 +51,17 @@ Benchmarks, profile generation, and refresh-mode matrix runs are opt-in. Target 
 - `docs/ui-redesign.md`: UI decisions and dated validation evidence.
 
 Record what was actually run, the scope of device checks, and remaining limitations. An installed APK proves installation, not notification delivery or UI correctness. Keep personal device identifiers, SMS, financial amounts, and backups out of committed documentation.
+
+## Optional visual review
+
+`VisualReviewTest` is skipped by default. Enable it with the instrumentation argument
+`ledger.visualReview=true`, using only the validation package. It creates an in-memory synthetic
+ledger and captures the main destinations, editor and scrolled breakdown/budget/category rows in
+light and dark mode. Screenshots go to the validation app's external `files/ui-review` directory;
+pull them into ignored `artifacts/` before removing that installation. Review the images themselves;
+successful capture alone is not visual acceptance.
+
+For large-text review, launch the test separately at system font scales 1.0 and 2.0. Save the original
+`settings get system font_scale` value and restore it in `finally`, including on test failure. This
+checks modal windows as well as the main composition. Portrait checks do not cover keyboard,
+landscape, foldable, TalkBack or frame-time acceptance.

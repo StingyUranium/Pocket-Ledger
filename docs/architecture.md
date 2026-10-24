@@ -26,6 +26,14 @@ All Kotlin filenames below are relative to `app/src/main/java/in/thomas/pocketle
 5. After commit, newly created, live, non-transfer SMS entries with `Uncategorized` produce reminders. This also covers reconciliation and review processing; historical alerts can notify when they become saved transactions. Existing entries do not notify again during rescans.
 6. `SmsWorker` periodically reconciles provider messages and recovers missed deliveries. App startup/resume also reconciles; Android scheduling can delay background work.
 
+`Categories.kt` owns separate income and expense suggestions. Editors retain a draft category for
+each type; filters include saved custom/legacy categories only for the selected type, while budgets
+offer expense categories. Category discovery runs off-thread. Existing entries are never relabeled.
+Remembered payee rules use `(merchant, type)` as the Room v3 key, so the same payee can have independent
+income and spending rules. Migration 2→3 infers each old rule's type from the latest matching entry,
+falling back to an income-only category or expense. Backup format 2 stores rule types and accepts
+format 1 restores using the same inference. Settings removes only the selected rule's type.
+
 Notifications use a dedicated channel and an explicit, immutable pending intent with a distinct entry URI. Text contains no amount or merchant. `MainActivity` waits for its initial snapshot, resolves the entry ID, opens Activity and its editor, and consumes the request. Saving a category clears the reminder. Permission denial leaves ingestion working; there is no reminder backlog replay when permission is later granted.
 
 ## UI and state
@@ -44,6 +52,17 @@ the bars) and fall back to a translucent fill. Destination changes reveal contro
 lists; reduced motion and touch exploration pin the header.
 
 Room flows feed `ledgerSnapshots`; calculations and I/O belong off the main thread. `LedgerApp` observes entries and budgets to refresh installed widgets.
+
+`LedgerSheet` shares its form scroll state with `FluidModalSheet`. A scrolled form retains gesture
+ownership through its fling, including reaching the top, so a fast downward reversal cannot start
+dragging the sheet. Material sheet dragging becomes available again once the form settles at the top;
+Cancel, back and outside-tap dismissal remain available while the form is scrolled.
+
+Overview's breakdown bars show each category's share of total monthly expense spending, with an
+explicit percentage label; the budget text beneath them remains a separate limit comparison.
+`ProportionBar.kt` draws continuous proportional data bars for breakdowns, budgets and history,
+without loading-indicator gaps or a minimum-size zero-value dot. `Percentage.kt` labels tiny positive
+shares as less than 0.1%. Large-text rows stack values, and chart totals move outside the doughnut.
 
 ## Data invariants
 

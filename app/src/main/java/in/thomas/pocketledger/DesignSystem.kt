@@ -14,6 +14,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -254,6 +255,7 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
                             AppIcon(destinationIcons[index], tint = color)
                         }
                         Text(destinationLabels[index], style = MaterialTheme.typography.labelMedium, color = color,
+                            maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium)
                     }
                 }
@@ -373,13 +375,15 @@ internal val destinationIcons = listOf("home", "entries", "accounts", "budgets",
     value: String? = null, trailing: (@Composable () -> Unit)? = null, chevron: Boolean = false,
     titleColor: Color = MaterialTheme.colorScheme.onSurface, onClick: (() -> Unit)? = null, onClickLabel: String? = null
 ) {
+    val stackValue = LocalDensity.current.fontScale > 1.3f
     GroupedItem(modifier, onClick, onClickLabel) {
         leading?.invoke()
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
             subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (stackValue) value?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
-        value?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (!stackValue) value?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         trailing?.invoke()
         if (chevron) AppIcon("right", Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -450,6 +454,7 @@ val LocalInlineSheet = staticCompositionLocalOf { false }
 @Composable fun LedgerSheet(title: String, dismiss: () -> Unit, actionLabel: String = "Done", action: () -> Unit = dismiss, closeLabel: String = "Cancel", scrollContent: Boolean = true, actionEnabled: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
     val clearError = LocalLedgerClearError.current
     LaunchedEffect(Unit) { clearError() }
+    val scroll = rememberScrollState()
     val body: @Composable (() -> Unit) -> Unit = { close ->
         CompositionLocalProvider(LocalInlineSheet provides false) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(.94f).imePadding()) {
@@ -462,11 +467,11 @@ val LocalInlineSheet = staticCompositionLocalOf { false }
             LocalLedgerOperationError.current?.let { error ->
                 Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
             }
-            val contentModifier = Modifier.weight(1f).then(if (scrollContent) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(20.dp).padding(bottom = 24.dp)
+            val contentModifier = Modifier.weight(1f).then(if (scrollContent) Modifier.verticalScroll(scroll) else Modifier).padding(20.dp).padding(bottom = 24.dp)
             Column(contentModifier, verticalArrangement = Arrangement.spacedBy(18.dp), content = content)
         }
         }
     }
     if (LocalInlineSheet.current) Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { body(dismiss) }
-    else FluidModalSheet(dismiss, body)
+    else FluidModalSheet(dismiss, formScroll = scroll.takeIf { scrollContent }, content = body)
 }

@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 @Entity data class SmsRecord(@PrimaryKey val key: String, val sender: String, val body: String, val received: Long, val bank: String, val suffix: String?, val amount: Long?, val direction: String?, val date: Long?, val dateOnly: Boolean, val payee: String, val reference: String?, val balance: Long?, val complete: Boolean, val status: String = "REVIEW", val reason: String = "Confirm sender and account")
 @Entity(primaryKeys = ["sender", "bank"]) data class TrustedSender(val sender: String, val bank: String)
 @Entity data class Budget(@PrimaryKey val category: String, val amount: Long)
-@Entity data class MerchantRule(@PrimaryKey val merchant: String, val category: String)
+@Entity(primaryKeys = ["merchant", "type"]) data class MerchantRule(val merchant: String, val category: String, val type: String = "EXPENSE")
 fun SmsRecord.parsed() = ParsedSms(bank, suffix, amount, direction, date, dateOnly, payee, reference, balance, complete)
 @Dao interface LedgerDao {
     @Query("SELECT * FROM Account ORDER BY name") fun accounts(): Flow<List<Account>>
@@ -33,7 +33,7 @@ fun SmsRecord.parsed() = ParsedSms(bank, suffix, amount, direction, date, dateOn
     @Upsert suspend fun budget(v: Budget)
     @Upsert suspend fun rule(v: MerchantRule)
     @Query("DELETE FROM TrustedSender WHERE sender = :sender AND bank = :bank") suspend fun untrust(sender: String, bank: String)
-    @Query("DELETE FROM MerchantRule WHERE merchant = :merchant") suspend fun removeRule(merchant: String)
+    @Query("DELETE FROM MerchantRule WHERE merchant = :merchant AND type = :type") suspend fun removeRule(merchant: String, type: String)
     @Query("DELETE FROM Entry") suspend fun clearEntries()
     @Query("DELETE FROM SmsRecord") suspend fun clearMessages()
     @Query("DELETE FROM Account") suspend fun clearAccounts()
@@ -49,7 +49,20 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         db.execSQL("ALTER TABLE Budget_new RENAME TO Budget")
     }
 }
-@Database(entities = [Account::class, Entry::class, SmsRecord::class, TrustedSender::class, Budget::class, MerchantRule::class], version = 2, exportSchema = true)
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE MerchantRule_new (merchant TEXT NOT NULL, category TEXT NOT NULL, type TEXT NOT NULL, PRIMARY KEY(merchant, type))")
+        val incomeOnly = incomeCategories.filter { it !in expenseCategories }.joinToString(",") { "'${it.replace("'", "''")}'" }
+        db.execSQL("""INSERT INTO MerchantRule_new (merchant, category, type)
+            SELECT r.merchant, r.category, COALESCE(
+                (SELECT e.type FROM Entry e WHERE UPPER(TRIM(e.payee)) = UPPER(TRIM(r.merchant))
+                 AND e.category = r.category AND e.type IN ('INCOME', 'EXPENSE') ORDER BY e.date DESC LIMIT 1),
+                CASE WHEN r.category IN ($incomeOnly) THEN 'INCOME' ELSE 'EXPENSE' END)
+            FROM MerchantRule r""")
+        db.execSQL("DROP TABLE MerchantRule")
+        db.execSQL("ALTER TABLE MerchantRule_new RENAME TO MerchantRule")
+    }
+}
+@Database(entities = [Account::class, Entry::class, SmsRecord::class, TrustedSender::class, Budget::class, MerchantRule::class], version = 3, exportSchema = true)
 abstract class LedgerDatabase : RoomDatabase() { abstract fun dao(): LedgerDao }
 fun balance(account: Account, entries: List<Entry>): Long = entries.filter { !it.deleted && it.date >= account.openingDate }.fold(account.opening) { sum, e -> sum + when { e.type == "TRANSFER" && e.destinationId == account.id -> e.amount; e.accountId != account.id -> 0; e.type == "INCOME" -> e.amount; else -> -e.amount } }
-val defaultCategories = listOf("Uncategorized", "Food", "Groceries", "Transport", "Uber/Bus", "Fuel", "Rent", "Shopping", "Bills", "Health", "Entertainment", "Salary", "Investment", "Other")

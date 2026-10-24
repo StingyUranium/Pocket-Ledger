@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -78,6 +79,8 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
     val expense = ready.summary.spent
     val pending = remember(messages) { messages.count { it.status == "REVIEW" } }
     val totals = ready.spendingByCategory
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val largeText = LocalDensity.current.fontScale > 1.3f
     FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 10.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { BalanceCard(income - expense, accounts.size) }
         item {
@@ -120,19 +123,24 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
             item { GroupedSection("Spending breakdown") {} }
             item { Empty("Add an expense to see where your money goes.", "Every little detail, in focus", "chart") }
         } else item {
-            GroupedSection("Spending breakdown", footer = "${totals.size} ${if (totals.size == 1) "category" else "categories"}") {
+            GroupedSection("Spending breakdown", footer = "Share of total spending \u00b7 ${totals.size} ${if (totals.size == 1) "category" else "categories"}") {
                 totals.forEachIndexed { index, (category, amount) ->
                     if (index > 0) GroupedDivider()
-                    val color = categoryColor(index)
+                    val color = categoryColor(index, dark)
+                    val share = remember(amount, expense) { spendingShareText(amount, expense) }
                     GroupedItem(onClick = { openTransactions("EXPENSE", category) }, onClickLabel = "View $category transactions") {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                                 Box(Modifier.size(8.dp).background(color, CircleShape))
-                                Text(category, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                                Text(money(amount), style = MaterialTheme.typography.titleSmall)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LedgerSpace.xs)) {
+                                    Text(category, style = MaterialTheme.typography.bodyLarge)
+                                    if (largeText) Text(money(amount), style = MaterialTheme.typography.titleSmall)
+                                }
+                                if (!largeText) Text(money(amount), style = MaterialTheme.typography.titleSmall)
                                 AppIcon("right", Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            LinearProgressIndicator(progress = { if (expense == 0L) 0f else (amount.toDouble() / expense).toFloat() }, modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape), color = color, trackColor = color.copy(alpha = .12f), drawStopIndicator = {})
+                            Text("$share of spending", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            ProportionBar(progress = if (expense == 0L) 0f else (amount.toDouble() / expense).toFloat(), modifier = Modifier.fillMaxWidth().height(LedgerSpace.xs), color = color, trackColor = color.copy(alpha = .12f))
                             budgets.find { it.category == category && it.amount > 0 }?.let {
                                 Text("${money(it.amount - amount)} left of ${money(it.amount)}", style = MaterialTheme.typography.bodySmall, color = if (amount > it.amount) rust else MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -151,7 +159,8 @@ fun displayDate(date: Long): String = Instant.ofEpochMilli(date).atZone(india).f
 }
 
 private val categoryColors = listOf(Color(0xFF005AC1), Color(0xFF8540B0), Color(0xFF9A5700), Color(0xFF006B87), Color(0xFF146C2E), Color(0xFFAC325B))
-fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
+private val darkCategoryColors = listOf(Color(0xFF64ADFF), Color(0xFFC58AF9), Color(0xFFFFB74D), Color(0xFF4DD0E1), Color(0xFF66BB6A), Color(0xFFF48FB1))
+fun categoryColor(index: Int, dark: Boolean) = (if (dark) darkCategoryColors else categoryColors).let { it[index % it.size] }
 
 @Composable fun EntryRow(e: Entry, accounts: List<Account>, divider: Boolean = false, click: () -> Unit) {
     val tint = when (e.type) { "INCOME" -> MaterialTheme.colorScheme.tertiary; "TRANSFER" -> MaterialTheme.colorScheme.primary; else -> MaterialTheme.colorScheme.onSurface }
@@ -197,7 +206,8 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
     }
     androidx.activity.compose.ReportDrawnWhen { result != null }
     val groups = result.orEmpty()
-    val categoryOptions = remember(entries) { (defaultCategories + entries.map { it.category }).distinct() }
+    val savedCategories by backgroundCalculation(entries, type, cacheKey = "filter-categories-$type") { categoryOptions(type, entries) }
+    val categoryOptions = savedCategories ?: categoriesForType(type)
     // Search and filters live in the list so the overlaid page header never leaves a gap above them.
     FluidList(contentPadding = PaddingValues(bottom = 28.dp)) {
         leading?.let { header -> item(key = "leading", contentType = "leading") { header() } }
@@ -205,7 +215,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
             TextField(search, { search = it }, label = { Text("Search transactions") }, placeholder = { Text("Payee, category or note", color = MaterialTheme.colorScheme.onSurfaceVariant) }, leadingIcon = { AppIcon("search", Modifier.size(19.dp), MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true, trailingIcon = { if (search.isNotEmpty()) IconButton(onClick = { search = "" }) { AppIcon("close", Modifier.semantics { contentDescription = "Clear search" }) } }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = fieldColors())
         } }
         item(key = "filters", contentType = "filters") { FluidRow(contentPadding = PaddingValues(horizontal = LedgerSpace.margin, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { ChoiceChip("Type", type, listOf("ALL", "EXPENSE", "INCOME", "TRANSFER"), { if (it == "ALL") "All types" else it.lowercase().replaceFirstChar(Char::titlecase) }) { type = it } }
+            item { ChoiceChip("Type", type, listOf("ALL", "EXPENSE", "INCOME", "TRANSFER"), { if (it == "ALL") "All types" else it.lowercase().replaceFirstChar(Char::titlecase) }) { if (type != it) { type = it; category = "ALL" } } }
             item { ChoiceChip("Account", account, listOf("ALL") + accounts.map { it.id }, { value -> accounts.find { it.id == value }?.name ?: "All accounts" }) { account = it } }
             item { ChoiceChip("Category", category, listOf("ALL") + categoryOptions, { if (it == "ALL") "All categories" else it }) { category = it } }
         } }
@@ -239,11 +249,13 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
 @Composable fun BankMark(bank: String) {
     val color = when (bank) { "AXIS" -> Color(0xFF951E4A); "SBM" -> Color(0xFF1263B1); else -> Color(0xFF248A3D) }
     Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(color), contentAlignment = Alignment.Center) {
-        if (bank == "CASH") AppIcon("wallet", tint = Color.White) else Text(if (bank == "AXIS") "AX" else "SBM", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White, letterSpacing = .5.sp)
+        // The bank abbreviation is logo artwork, like AppIcon, rather than scalable body copy.
+        if (bank == "CASH") AppIcon("wallet", tint = Color.White) else Text(if (bank == "AXIS") "AX" else "SBM", fontSize = with(LocalDensity.current) { 12.dp.toSp() }, fontWeight = FontWeight.Bold, color = Color.White, letterSpacing = with(LocalDensity.current) { .5.dp.toSp() })
     }
 }
 
 @Composable fun AccountsScreen(accounts: List<Account>, entries: List<Entry>, messages: List<SmsRecord>, edit: (Account) -> Unit, add: () -> Unit) {
+    val largeText = LocalDensity.current.fontScale > 1.3f
     val calculatedBalances by backgroundCalculation(accounts, entries, cacheKey = "balances") { accounts.associate { it.id to balance(it, entries) } }
     val balances = calculatedBalances ?: run { LedgerSkeleton(); return }
     val bankBalances = remember(messages) { messages.filter { it.balance != null && it.status in listOf("SAVED", "LINKED") }
@@ -258,13 +270,14 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
                         BankMark(a.bank)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(a.name, style = MaterialTheme.typography.titleMedium)
+                            if (largeText) Text(money(balances[a.id] ?: a.opening), style = MaterialTheme.typography.titleMedium)
                             Text(if (a.bank == "CASH") "Cash account" else "Account \u2022\u2022\u2022\u2022 ${a.suffix}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("Opening ${money(a.opening)} \u00b7 from ${displayDate(a.openingDate)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             bankBalances[a.bank to a.suffix]?.let {
                                 Text("Bank reported ${money(it.balance!!)} \u00b7 ${displayDate(it.date ?: it.received)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             }
                         }
-                        Text(money(balances[a.id] ?: a.opening), style = MaterialTheme.typography.titleMedium)
+                        if (!largeText) Text(money(balances[a.id] ?: a.opening), style = MaterialTheme.typography.titleMedium)
                         AppIcon("right", Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -275,6 +288,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
 }
 
 @Composable fun BudgetScreen(budgets: List<Budget>, entries: List<Entry>, month: YearMonth, save: (Budget, () -> Unit) -> Unit) {
+    val largeText = LocalDensity.current.fontScale > 1.3f
     var edit by remember { mutableStateOf<Budget?>(null) }
     var allocationView by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     val current = remember(budgets) { budgets.filter { it.amount > 0 } }
@@ -298,7 +312,7 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
                 }
                 Text(if (planned > 0) money(planned - spent) else "Make a little room", style = MaterialTheme.typography.headlineMedium, color = if (spent > planned) rust else MaterialTheme.colorScheme.onSurface)
                 Text(if (planned > 0) "Left across your budgeted categories" else "Set a limit. Give every category a little direction.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (planned > 0) LinearProgressIndicator(progress = { (spent.toDouble() / planned).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = if (spent > planned) rust else MaterialTheme.colorScheme.tertiary, trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
+                if (planned > 0) ProportionBar(progress = (spent.toDouble() / planned).toFloat(), modifier = Modifier.fillMaxWidth().height(6.dp), color = if (spent > planned) rust else MaterialTheme.colorScheme.tertiary, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                 Button(onClick = { edit = Budget("Food", 0) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.medium) { AppIcon("plus", Modifier.size(17.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(7.dp)); Text("Set a budget") }
             } }
             if (current.isEmpty()) {
@@ -312,12 +326,18 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
                         val over = amount > b.amount
                         GroupedItem(onClick = { edit = b }, onClickLabel = "Edit ${b.category} budget") {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (largeText) Column(verticalArrangement = Arrangement.spacedBy(LedgerSpace.xs)) {
+                                    Text(b.category, style = MaterialTheme.typography.bodyLarge)
+                                    StatusPill(if (over) "Over budget" else "${((amount.toDouble() / b.amount) * 100).toInt()}% used", if (over) rust else MaterialTheme.colorScheme.primary)
+                                } else Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(b.category, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                                     StatusPill(if (over) "Over budget" else "${((amount.toDouble() / b.amount) * 100).toInt()}% used", if (over) rust else MaterialTheme.colorScheme.primary)
                                 }
-                                Row(verticalAlignment = Alignment.Bottom) { Text(money(amount), style = MaterialTheme.typography.titleMedium); Text(" / ${money(b.amount)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                                LinearProgressIndicator(progress = { (amount.toDouble() / b.amount).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape), color = if (over) rust else MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
+                                if (largeText) Column(verticalArrangement = Arrangement.spacedBy(LedgerSpace.xs)) {
+                                    Text(money(amount), style = MaterialTheme.typography.titleMedium)
+                                    Text("Budget ${money(b.amount)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                } else Row(verticalAlignment = Alignment.Bottom) { Text(money(amount), style = MaterialTheme.typography.titleMedium); Text(" / ${money(b.amount)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                ProportionBar(progress = (amount.toDouble() / b.amount).toFloat(), modifier = Modifier.fillMaxWidth().height(LedgerSpace.xs), color = if (over) rust else MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.surfaceVariant)
                                 Text("${money(b.amount - amount)} remaining", style = MaterialTheme.typography.bodySmall, color = if (over) rust else MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
@@ -326,5 +346,5 @@ fun categoryColor(index: Int) = categoryColors[index % categoryColors.size]
             }
         }
     }
-    edit?.let { b -> BudgetEditor(b, { edit = null }) { budget -> save(budget) { edit = null } } }
+    edit?.let { b -> BudgetEditor(b, { edit = null }, knownEntries = entries) { budget -> save(budget) { edit = null } } }
 }

@@ -32,7 +32,7 @@ class SeedActivity : Activity() {
                                 type = if (index % 10 == 0) "INCOME" else "EXPENSE",
                                 amount = 1_000L + index * 17L,
                                 date = start.plusDays((index % 730).toLong()).atStartOfDay(india).toInstant().toEpochMilli(),
-                                payee = "Synthetic merchant ${index % 120}", category = defaultCategories[index % defaultCategories.size]
+                                payee = "Synthetic merchant ${index % 120}", category = categoriesForType(if (index % 10 == 0) "INCOME" else "EXPENSE").let { it[index % it.size] }
                             ))
                         }
                         db.dao().budget(Budget("Food", 100_000))

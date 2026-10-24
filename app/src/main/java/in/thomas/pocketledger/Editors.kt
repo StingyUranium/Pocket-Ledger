@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -97,9 +98,16 @@ import java.time.*
 
 @Composable fun Pick(label: String, value: String, options: List<String>, display: (String) -> String = { it.lowercase().replaceFirstChar(Char::titlecase) }, grouped: Boolean = false, change: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val largeText = LocalDensity.current.fontScale > 1.3f
     if (grouped) GroupedItem(onClick = { open = true }) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Text(display(value).ifBlank { "Choose" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        if (largeText) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LedgerSpace.xs)) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(display(value).ifBlank { "Choose" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge,
+                maxLines = 3, overflow = TextOverflow.Ellipsis)
+        } else {
+            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Text(display(value).ifBlank { "Choose" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        }
         AppIcon("down", Modifier.size(13.dp), MaterialTheme.colorScheme.onSurfaceVariant)
     } else Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().ledgerClickable { open = true }) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp).heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -154,7 +162,7 @@ import java.time.*
     }
 }
 
-@Composable fun EntryEditor(initial: Entry, accounts: List<Account>, sms: SmsRecord?, dismiss: () -> Unit, save: (Entry, Boolean) -> Unit, delete: (() -> Unit)?) {
+@Composable fun EntryEditor(initial: Entry, accounts: List<Account>, sms: SmsRecord?, dismiss: () -> Unit, save: (Entry, Boolean) -> Unit, delete: (() -> Unit)?, knownEntries: List<Entry> = emptyList()) {
     var type by rememberSaveable { mutableStateOf(initial.type) }
     var account by rememberSaveable { mutableStateOf(initial.accountId) }
     var target by rememberSaveable { mutableStateOf(initial.destinationId ?: accounts.firstOrNull { it.id != account }?.id.orEmpty()) }
@@ -162,11 +170,17 @@ import java.time.*
     var date by rememberSaveable { mutableStateOf(dayText(initial.date)) }
     var time by rememberSaveable { mutableStateOf(if (initial.dateOnly) "" else Instant.ofEpochMilli(initial.date).atZone(india).toLocalTime().withNano(0).toString()) }
     var payee by rememberSaveable { mutableStateOf(initial.payee) }
-    var category by rememberSaveable { mutableStateOf(initial.category) }
+    val expenseCategory = rememberSaveable { mutableStateOf(if (initial.type == "EXPENSE") initial.category else "Uncategorized") }
+    val incomeCategory = rememberSaveable { mutableStateOf(if (initial.type == "INCOME") initial.category else "Uncategorized") }
+    var category by if (type == "INCOME") incomeCategory else expenseCategory
     var note by rememberSaveable { mutableStateOf(initial.note) }
     var rememberMerchant by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
-    var customCategory by rememberSaveable { mutableStateOf(initial.category !in defaultCategories) }
+    val expenseCustom = rememberSaveable { mutableStateOf(initial.type == "EXPENSE" && initial.category !in expenseCategories) }
+    val incomeCustom = rememberSaveable { mutableStateOf(initial.type == "INCOME" && initial.category !in incomeCategories) }
+    var customCategory by if (type == "INCOME") incomeCustom else expenseCustom
+    val savedCategories by backgroundCalculation(type, knownEntries, cacheKey = "editor-categories-$type") { categoryOptions(type, knownEntries) }
+    val categories = savedCategories ?: categoriesForType(type)
     fun submit() {
         try {
             val p = paise(amount)
@@ -201,7 +215,7 @@ import java.time.*
             GroupedField("Payee or description", payee, { payee = it })
             GroupedDivider()
             if (type != "TRANSFER") {
-                Pick("Category", category, (defaultCategories + category + "Add category\u2026").distinct(), { it }, grouped = true) {
+                Pick("Category", category, (categories + category + "Add category\u2026").filter { it.isNotBlank() }.distinct(), { it }, grouped = true) {
                     if (it == "Add category\u2026") customCategory = true else { category = it; customCategory = false }
                 }
                 GroupedDivider()
@@ -213,7 +227,7 @@ import java.time.*
             GroupedDivider()
             GroupedField("Note, optional", note, { note = it }, imeAction = ImeAction.Done)
         }
-        if (type != "TRANSFER") GroupedSection(footer = "Use this category for future alerts from this payee.") {
+        if (type != "TRANSFER") GroupedSection(footer = "Use this category for future ${if (type == "INCOME") "income" else "spending"} alerts from this payee.") {
             GroupedRow("Remember category", trailing = { PocketSwitch(rememberMerchant, "Remember category") { rememberMerchant = it } })
         }
         sms?.let {
@@ -259,10 +273,11 @@ import java.time.*
     }
 }
 
-@Composable fun BudgetEditor(b: Budget, dismiss: () -> Unit, save: (Budget) -> Unit) {
+@Composable fun BudgetEditor(b: Budget, dismiss: () -> Unit, knownEntries: List<Entry> = emptyList(), save: (Budget) -> Unit) {
     var category by rememberSaveable { mutableStateOf(b.category) }
     var amount by rememberSaveable { mutableStateOf(if (b.amount > 0) amountText(b.amount) else "") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    val savedCategories by backgroundCalculation(knownEntries, cacheKey = "budget-category-options") { categoryOptions("EXPENSE", knownEntries) }
     LedgerSheet("Category budget", dismiss, "Save", {
         try {
             val p = paise(amount)
@@ -274,7 +289,7 @@ import java.time.*
         Text("A plan that carries forward.", style = MaterialTheme.typography.headlineMedium)
         Text("Choose a category and set its limit for every month.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         GroupedSection(footer = "Set the limit to 0 to remove this budget. Transfers are excluded from spending.") {
-            Pick("Category", category, (defaultCategories + category).distinct(), { it }, grouped = true) { category = it }
+            Pick("Category", category, ((savedCategories ?: expenseCategories) + category).distinct(), { it }, grouped = true) { category = it }
             GroupedDivider()
             GroupedField("Category name", category, { category = it })
             GroupedDivider()
