@@ -18,7 +18,7 @@ Ledger **1.7.0** is an offline Android expense manager built with Kotlin and Jet
 
 ## Getting started
 
-1. In **Manage / Accounts**, map each bank's last four account digits. Set the opening date and balance immediately before that date. The opening date must cover transactions you intend to import.
+1. In **Manage / Accounts**, map each bank's last four account digits. (A local build can pre-seed them from the git-ignored `app/src/main/assets/local-accounts.properties`; without it only Cash is created.) Set the opening date and balance immediately before that date. The opening date must cover transactions you intend to import.
 2. In **Inbox**, enable SMS access, choose a history range, and preview matching messages. The range filters receipt dates; transactions use dates extracted from alerts.
 3. Confirm sender IDs and review incomplete or conflicting messages before saving. Sender confirmation does not prove authenticity.
 4. Enable **Capture new bank alerts** for automatic capture. Allow notifications when prompted to receive category reminders. WorkManager and app resume reconcile missed alerts, subject to Android scheduling.
@@ -42,7 +42,7 @@ Deposit-account refunds and reversals are included. Credit cards, OTPs, failed p
 
 Automatic saving requires a confirmed sender, mapped account, positive amount, direction, date, and usable reference. Incomplete selected alerts remain in review. Missing references, account-less debits, interest, and wallet top-ups can require manual confirmation. SMS-reported balances are displayed separately from ledger calculations.
 
-Amounts use integer paise in INR; dates use Asia/Kolkata. Transfers and deleted entries are excluded from income and spending reports. Missing alerts and cash activity require manual entries. Widgets use the current month and refresh when ledger data changes and during periodic Android updates. Both widgets use frosted surfaces that follow the device theme. Monthly summary keeps its Income/Expenses selection per widget; taller widgets reveal month context, and Budget also reveals usage details. Monthly summary needs at least 112dp height for its touch targets. Frosting uses translucent gradients and highlights; it does not blur the launcher wallpaper. Very large amounts may shorten on compact widgets; accessibility descriptions retain the full values.
+Amounts use integer paise in INR; dates use Asia/Kolkata. Transfers and deleted entries are excluded from income and spending reports. Missing alerts and cash activity require manual entries. Widgets use the current month and refresh when ledger data changes, around Asia/Kolkata midnight, after date, time or timezone changes, after a night-mode or font-scale change while the app process is alive, and during periodic Android updates. If a refresh fails they show the cached month as not updated, or a can't-load state. Both widgets use frosted surfaces that follow the device theme. Monthly summary keeps its Income/Expenses selection per widget; taller widgets reveal month context, and Budget also reveals usage details. Monthly summary needs at least 112dp height for its touch targets. Frosting uses translucent gradients and highlights; it does not blur the launcher wallpaper. Very large amounts may shorten on compact widgets; accessibility descriptions retain the full values.
 
 ## Privacy, backups, and upgrades
 
@@ -50,7 +50,7 @@ Ledger has no internet permission, analytics, cloud sync, or account service. Fi
 
 Encrypted `.plbackup` files include accounts, transactions, financial SMS, budgets, rules, and import history. Encryption uses PBKDF2-HMAC-SHA256 and AES-256-GCM. Restoring validates the backup before replacing data and disables automatic capture until enabled again.
 
-The package remains `in.thomas.pocketledger`, including upgrades from Pocket Ledger. Room database version 2 migrates old monthly budgets into recurring limits by keeping the latest saved limit per category. Older encrypted backups remain readable. Deleted-entry and dismissed-message identities survive rescans and backups.
+The package remains `in.thomas.pocketledger`, including upgrades from Pocket Ledger. The Room database is at version 4: version 2 migrated old monthly budgets into recurring limits, and version 4 adds SMS and date indices and replaces the text of saved, linked and dismissed bank messages with a hash (identities and parsed fields are kept, so the original message is no longer viewable for those). Older encrypted backups remain readable; new ones use header `PKTLGR02`, which records the key-derivation iteration count, and each export is read back to verify it. Restoring writes an encrypted safety copy of the current data first. Deleted-entry and dismissed-message identities survive rescans and backups.
 
 ## Build and install
 
@@ -64,7 +64,7 @@ adb shell am start -n in.thomas.pocketledger/.MainActivity
 
 Version 1.7.0 uses versionCode **8**. Keep the same signing key when upgrading. Development APKs use debug signing; uninstalling removes app data.
 
-Gradle configuration and local build caches are enabled. Use `assembleDebug` for routine builds and avoid `clean` unless diagnosing stale outputs. Dependency versions are pinned in the Gradle files; the wrapper verifies its distribution checksum.
+Gradle configuration and local build caches are enabled. Use `assembleDebug` for routine builds and avoid `clean` unless diagnosing stale outputs. Dependency versions are pinned in `gradle/libs.versions.toml`; the wrapper verifies its distribution checksum. Release builds shrink resources with `app/proguard-rules.pro` and are unsigned unless an ignored `keystore.properties` is present.
 
 ## Development and validation
 

@@ -39,7 +39,7 @@ The metadata application ID must be `in.thomas.pocketledger`. Use `adb -s <seria
 - Release signing reads `keystore.properties` (ignored) at the repository root with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. Without it the release APK is unsigned. Never commit keystores, passwords or `*.mapping.txt` (ignored; keep the mapping file from each shipped release outside the repository to decode stack traces).
 - `LedgerFrameTracker` and `androidx.metrics` are compiled only into debug and benchmark builds (`app/src/tracking/java`); `app/src/release/java` holds a no-op stub with the same API. `ui-tooling` and `ui-tooling-preview` are `debugImplementation`.
 - Dependency versions live in `gradle/libs.versions.toml`; `app` and `benchmark` consume it.
-- `app/build.gradle.kts` has a `lint {}` block pointing at `app/lint-baseline.xml`. The baseline has not been generated yet: run `.\gradlew.bat :app:lintDebug` once (the first run writes the baseline and reports a failure), review it, then commit it. New issues beyond the baseline fail lint.
+- `app/build.gradle.kts` has a `lint {}` block pointing at `app/lint-baseline.xml`. The committed baseline records the 27 warnings that existed on 24 October 2026; new issues beyond it fail lint. To regenerate it, delete `app/lint-baseline.xml`, run `.\gradlew.bat :app:lintDebug` (the first run writes the file and reports a failure on purpose), review the result, rerun, and commit it. `kotlinx-serialization-core` is pinned to 1.8.1 on `debugImplementation` because Room's `MigrationTestHelper` needs it and the debug runtime otherwise resolves 1.7.3; lint's newer-version notice for it is baselined.
 
 ### Minified release backup round trip
 
@@ -65,8 +65,10 @@ Benchmarks, profile generation, and refresh-mode matrix runs are opt-in. Target 
 
 - `README.md`: user behavior, setup, supported formats, and limitations.
 - `AGENTS.md`: contributor constraints and safe commands.
-- `docs/architecture.md`: ownership, data flow, and invariants.
+- `docs/architecture.md`: ownership, data flow, invariants and dated behavior changes.
 - `docs/ui-redesign.md`: UI decisions and dated validation evidence.
+- `docs/review-redesign.md`: intended screen design and acceptance checklist (not evidence).
+- `docs/audit-2026-10-24.md`: the October 2026 audit, its findings and follow-up status.
 
 Record what was actually run, the scope of device checks, and remaining limitations. An installed APK proves installation, not notification delivery or UI correctness. Keep personal device identifiers, SMS, financial amounts, and backups out of committed documentation.
 
@@ -90,10 +92,16 @@ The spending-review redesign adds `SpendingReviewUiTest` (focused category save 
 
 For screenshots that must remain available after a run, build both validation APKs, verify the application ID, install those APKs, and invoke `adb shell am instrument -w` against `in.thomas.pocketledger.validation.test/androidx.test.runner.AndroidJUnitRunner` with `-e class in.thomas.pocketledger.VisualReviewTest -e ledger.visualReview true`. Pull the validation application's `files/ui-review` directory into ignored `artifacts/`. Some Gradle-managed runs remove the validation installation after collecting results. Save and restore font scale and rotation settings in `finally` when testing those configurations. Do not install an APK built without the validation property for these checks.
 
-## Database v4, local seed accounts, and backup safety (unmeasured until run on a device)
+## Database v4, local seed accounts, and backup safety
 
 - Schema 4 adds a unique index on `Entry.smsKey` (NULLs allowed), indices on `Entry.date` and `Entry.accountId`, and purges stored SMS text for SAVED, DISMISSED and LINKED messages (`body` becomes `purged:<sha256 of sender + normalized body>`; identity keys, parsed fields and tombstones are unchanged). Migration 3 to 4 first detaches duplicate `smsKey` entries (keeps live, then transfer, then categorized, then oldest) and soft-deletes the extras instead of removing them. Dismissed rows keep their text until the next launch so undo works. After building, commit the generated `app/schemas/.../4.json`.
-- Migration tests live in `LedgerMigrationTest` (androidTest, `room-testing`, schemas as test assets). Run only with `-Pledger.testApplicationId=in.thomas.pocketledger.validation`.
+- Migration tests live in `LedgerMigrationTest` (androidTest, `room-testing`, schemas as test assets). Run only with `-Pledger.testApplicationId=in.thomas.pocketledger.validation`. They passed on a physical device on 24 October 2026 (v1 to v4 straight, one version at a time, and v3 to v4 with purged bodies).
 - Seeded SBM/Axis suffixes are no longer in source. First run reads the git-ignored `app/src/main/assets/local-accounts.properties` (`sbm.suffix=`, `axis.suffix=`); without it only Cash is created and bank accounts are added in Accounts.
 - Backups are verified by reading the written file back (`Backup.writeVerified`). Restore first writes an encrypted safety copy of the current data to `files/backup-safety/pre-restore.plbackup` (same password as the restore file) and aborts if that fails.
 - The 15-minute SMS reconcile is scheduled only while capture is enabled (`ReconcileWork`, kept in sync by a preference listener). Bulk imports of more than three uncategorized entries post one summary notification with no financial text.
+
+## Widget and device-test notes
+
+- `WidgetRenderingTest` renders at 100% font scale only; the former 200% case was removed on request, so widget text-fit and clipping checks at large font scales are now manual (see the optional visual review above).
+- RemoteViews cannot call `setSelected`; widget colours are set directly at render time. Keep the `WidgetRenderingTest` assertions in step with `LedgerWidgets.monthlyViews` and `budgetViews`.
+- `WidgetLogic.kt` holds the pure widget helpers (`showContext`, `monthTitle`, `progress`, `overspent`, `nextBoundary`, `buckets`) and is covered by `WidgetLogicTest` on the JVM.

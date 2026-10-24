@@ -1,10 +1,10 @@
 # Spending review design specification
 
 ## Navigation and inventory
-Overview ? Insights ? category/type transaction list ? editor. Primary tabs are Overview, Activity, Budgets, Inbox. Management opens Accounts, Income plan and Settings. Accounts retains account editing and transaction transfer creation. Widget income/expense/budget routes and notification entry IDs retain their meaning. Legacy numeric destinations restore through an explicit mapping.
+Overview → Insights → category/type transaction list → editor. Primary tabs are Overview, Activity, Budgets, Inbox. Management opens Accounts, Income plan and Settings. Accounts retains account editing and transaction transfer creation. Widget income/expense/budget routes and notification entry IDs retain their meaning. Legacy numeric destinations restore through an explicit mapping.
 
 ## Annotated layouts
-Overview: selected month in collapsing header; full-width Spent metric; secondary Income metric and Income remaining (income minus spending); review actions; budget remaining; Insights link; category shares; recent activity. Synthetic example: income ?50,000, spending ?32,000, income remaining ?18,000; this is never labeled account balance.
+Overview: selected month in collapsing header; full-width Spent metric; secondary Income metric and Income remaining (income minus spending); review actions; budget remaining; Insights link; category shares; recent activity. Synthetic example: income ₹50,000, spending ₹32,000, income remaining ₹18,000; this is never labeled account balance.
 Activity: scrolling search; type/account/category chips and Needs category action; date sections; transaction rows. Row tap opens full editing; an independent Choose category action opens a focused picker with optional remembered payee rule. Save stays open on failure.
 Transaction editor: type, amount, account/destination, payee, category and date first; expandable Details contains optional time and note. Remember category and original source follow; deletion requires confirmation.
 Budgets: remaining across budgeted categories, spent/limit comparisons, signed remaining per category; pinned Add; category editor with rename, positive limit and explicit Remove budget confirmation. Removal affects only the recurring limit.
@@ -19,7 +19,7 @@ Use PocketTheme typography/shapes, LedgerSpace, LedgerMotion, AppIcon, GroupedSe
 Loading uses skeletons; initial read failure offers Retry; stale snapshot failure preserves content and offers Retry. Empty Activity offers filter reset; empty budgets offer Add; empty Inbox confirms no pending reviews. Denied capture permission offers explanation/settings without blocking manual entry. Unresolved alerts show their reason. Overspending retains a signed negative remaining amount and textual Over budget indicator. Failed mutations retain drafts and show the operation error.
 
 ## Coverage checklist and acceptance matrix
-For every destination above and all supporting sheets inspect light/dark, loading/empty/error, uncategorized and permission denial where applicable. Use synthetic data only. Inspect narrow portrait, landscape/adaptive, long labels, large amounts, keyboard and 200% fonts; require 48dp actions and spoken action labels. Exercise categorization, editor recreation, dismissal/Undo, import, budget rename/removal, backup and launch routes. Preserve selected month, per-destination filters/list position and drafts across tab changes/recreation/resizing. Home widgets keep existing design.
+For every destination above and all supporting sheets inspect light/dark, loading/empty/error, uncategorized and permission denial where applicable. Use synthetic data only. Inspect narrow portrait, landscape/adaptive, long labels, large amounts, keyboard and 200% fonts; require 48dp actions and spoken action labels. Exercise categorization, editor recreation, dismissal/Undo, import, budget rename/removal, backup and launch routes. Preserve selected month, per-destination filters/list position and drafts across tab changes/recreation/resizing. Home widgets follow the widget notes in architecture.md (night-aware colours, IST rollover refresh, stale and error states).
 
 This is the intended design and acceptance checklist, not evidence that every state/device combination has passed. Record actual validation separately in ui-redesign.md.
 
@@ -42,3 +42,5 @@ This is the intended design and acceptance checklist, not evidence that every st
 | Permission and backups | Explain local processing; protected backup password | Denial leaves manual entry available; wrong password preserves data | Restore replaces validated data and disables capture; confirmations use compact alert |
 
 The same state layouts inherit both theme palettes and reduced motion. Raw screenshot evidence uses synthetic ledger data and stays ignored.
+
+Automated coverage note (24 October 2026): the widget rendering test no longer exercises 200% font scale, and no automated landscape or rotation test exists; those checks in the matrix above are manual.

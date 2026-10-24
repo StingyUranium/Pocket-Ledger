@@ -283,3 +283,7 @@ Remaining coverage limits: these journeys do not exhaustively certify every stat
 - Warning colour is a `warning` token (a darker amber in light mode, lighter in dark); `rust` is renamed `danger`.
 - `ChoiceSheet` rows expose selected and radio semantics, `GroupedField` focuses from the whole row and exposes errors, and the back control reads "Back to <screen>".
 - Evidence: unit tests, lint and 55 of 56 isolated device tests passed on the Motorola Edge 70 validation package; no frame-rate or jank measurements were taken for these changes.
+
+## Widget test matrix change (24 October 2026)
+
+The widget rendering test (`renderWidgetsAcrossSizesAndThemes`) now covers 100% font scale in light and dark; the 200% case recorded in the widget validation notes above was removed on request and is no longer automated. There are no landscape or rotation device tests. The 23 October evidence above describes the earlier matrix and is kept as dated history.

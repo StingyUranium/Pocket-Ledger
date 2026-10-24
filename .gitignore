@@ -80,3 +80,7 @@ lint-results*.xml
 
 # Local-only seed accounts (bank suffixes); see docs/development.md
 app/src/main/assets/local-accounts.properties
+
+# Local assistant state and lint SARIF output
+.claude/
+*.sarif
