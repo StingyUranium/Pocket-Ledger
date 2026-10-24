@@ -3,7 +3,6 @@ package `in`.thomas.pocketledger
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -20,7 +19,6 @@ object LedgerSpace {
     val content = 16.dp
     val section = 20.dp
     val generous = 24.dp
-    val large = 32.dp
     val touch = 48.dp
     /** Standard horizontal screen margin. */
     val margin = 16.dp
@@ -33,7 +31,12 @@ object LedgerMotion {
     fun <T> gentle(): SpringSpec<T> = spring(dampingRatio = 1f, stiffness = 400f)
 }
 
-/** For custom rows and surfaces; Material buttons keep their built-in interaction handling. */
+/**
+ * For custom rows and surfaces; Material buttons keep their built-in interaction handling.
+ * TODO: migrate the composed {} modifiers in Interaction.kt, FluidMotion.kt and MetricTransition.kt to
+ * Modifier.Node implementations. composed {} allocates per-instance state during composition and
+ * cannot be skipped; the migration needs its own focused device validation, so it is not done here.
+ */
 fun Modifier.ledgerClickable(
     enabled: Boolean = true,
     onClickLabel: String? = null,

@@ -31,6 +31,8 @@ keystore.properties
 *.apks
 *.idsig
 /artifacts/
+*.mapping.txt
+app/release/
 
 # Private device data, financial backups, and captures
 *.db
@@ -71,3 +73,10 @@ Desktop.ini
 # Python tooling cache
 __pycache__/
 *.pyc
+
+# Generated lint reports (the committed baseline is app/lint-baseline.xml)
+lint-results*.html
+lint-results*.xml
+
+# Local-only seed accounts (bank suffixes); see docs/development.md
+app/src/main/assets/local-accounts.properties

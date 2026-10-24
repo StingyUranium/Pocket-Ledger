@@ -51,7 +51,7 @@ list's viewport. Both bars blur the page beneath them with Haze (`hazeSource` on
 the bars) and fall back to a translucent fill. Destination changes reveal controls without resetting
 lists; reduced motion and touch exploration pin the header.
 
-Room flows feed `ledgerSnapshots`; calculations and I/O belong off the main thread, including the selected-month income-plan summary. The calculation cache retains at most 32 call-site results, evicting the least recently used result so visiting many custom categories cannot retain every historical input snapshot. `LedgerApp` observes entries and budgets to refresh installed widgets.
+Room flows feed `ledgerSnapshots`; calculations and I/O belong off the main thread, including the selected-month income-plan summary. The calculation cache retains at most 32 call-site results, evicting the least recently used result so visiting many custom categories cannot retain every historical input snapshot. `LedgerApp` observes the current month's entries and budgets to refresh installed widgets while any exist.
 
 Widgets remain Android RemoteViews, with shared light/dark frosted drawable resources and resource
 spacing/shape tokens. `LedgerWidgets` builds compact or expanded views from launcher-provided dp
@@ -71,6 +71,25 @@ explicit percentage label; the budget text beneath them remains a separate limit
 `ProportionBar.kt` draws continuous proportional data bars for breakdowns, budgets and history,
 without loading-indicator gaps or a minimum-size zero-value dot. `Percentage.kt` labels tiny positive
 shares as less than 0.1%. Large-text rows stack values, and chart totals move outside the doughnut.
+
+## Recent behavior changes
+
+- Incomplete SMS messages are identified by sender plus normalized body only (`SmsParser.stableBodyKey` excludes received time), so the live receiver and the Inbox scan agree and dismissal tombstones hold across both paths.
+- SMS bodies longer than 1000 characters are capped before parsing.
+- `Repository.saveAccount` validates and saves an account under the ingestion mutex in a transaction, then runs `processReview()`; UI code must not write accounts directly.
+- `Backup.parse` validates enums, ranges and link consistency before any data is replaced, and wraps failures in a friendly error.
+- Backup header `PKTLGR02` stores the PBKDF2 iteration count so it can be raised later; `PKTLGR01` backups (fixed iterations) remain readable.
+- `LedgerViewModel` holds the latest snapshot and the `CalculationCache`, so rotation and resume do not flash an empty ledger or discard cached results.
+- Launch extras (route, category-entry request) are honoured only on a fresh start (`savedInstanceState == null`) and are consumed afterwards.
+- Room migration 3->4 adds a unique index on `Entry.smsKey` (NULLs allowed) and indices on `date` and `accountId`. Duplicate keys keep every row: one live row keeps the key, the others are marked deleted with a null key, so no money rows are lost.
+- Stored SMS bodies are replaced by `purged:` plus a hash of sender and normalized body once a message is saved, linked or dismissed (dismissed rows at the next launch, so undo still works). Keys, parsed fields and tombstones are unchanged; `SmsRecord.semanticKey()` gives the same identity before and after a purge, and the editor hides "Original bank message" for purged rows.
+- Ingest and transfer matching use targeted queries and join by reference instead of loading whole tables. More than three new uncategorized entries post one summary reminder with no amounts; the notification channel is created once in `LedgerApp.onCreate`.
+- `LedgerApp` collects only the current month for widgets (debounced, distinct) and only while widgets exist; the periodic reconcile worker is scheduled only while capture is enabled.
+- Backup export is read back and verified after writing, and restore first writes an encrypted safety copy to `files/backup-safety/pre-restore.plbackup`.
+- Seeded bank account suffixes come from the git-ignored asset `local-accounts.properties`; without it only Cash is seeded.
+- Widgets: `MonthlyWidgetProvider` alone handles date, time and timezone broadcasts and an inexact alarm fired just after Asia/Kolkata midnight (which also covers month boundaries). Tab taps re-render only their own widget. Text colours are resolved when rendering because RemoteViews cannot call `setSelected`, so an application `ComponentCallbacks` re-renders after a font-scale or night-mode change while the process is alive; otherwise the next update picks it up. The budget widget stacks two progress bars with fixed tints and shows the red one when overspent. Failed loads show the cached month as "Not updated" or a "Can't load data" state. Pure helpers live in `WidgetLogic.kt`.
+- Overview's report is computed only while Overview, or a metric detail opened from it, is the visible root, so a cold Overview briefly shows its skeleton. After a month change Overview and Transactions keep the previous result until the new one is ready.
+- `monthlySummary` delegates to a single-pass `monthlySummaries` that buckets entries by epoch bounds in Asia/Kolkata; results match the previous per-entry implementation.
 
 ## Data invariants
 

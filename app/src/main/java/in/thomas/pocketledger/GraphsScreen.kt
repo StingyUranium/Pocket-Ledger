@@ -4,12 +4,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.luminance
@@ -19,9 +17,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import java.time.Instant
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+
+private val shortMonthFormat = DateTimeFormatter.ofPattern("MMM")
 
 private data class GraphReport(
     val total: Long, val categories: List<Pair<String, Long>>, val daily: Map<Int, Long>,
@@ -31,13 +30,11 @@ private data class GraphReport(
 @Composable fun GraphsScreen(entries: List<Entry>, month: YearMonth, changeMonth: (YearMonth) -> Unit, openTransactions: (String, String) -> Unit) {
     val locale = LocalConfiguration.current.locales[0]
     val report by backgroundCalculation(entries, month, cacheKey = "graphs") {
-        val expenses = entries.filter { !it.deleted && it.type == "EXPENSE" && inMonth(it, month) }
-        GraphReport(
-            expenses.sumOf { it.amount },
-            expenses.groupBy { it.category }.mapValues { it.value.sumOf { entry -> entry.amount } }.toList().sortedByDescending { it.second },
-            expenses.groupBy { Instant.ofEpochMilli(it.date).atZone(india).dayOfMonth }.mapValues { it.value.sumOf { entry -> entry.amount } },
-            (-5..0).map { month.plusMonths(it.toLong()) }.map { it to monthlySummary(entries, emptyList(), it) }
-        )
+        // Shared report functions keep these totals identical to the Overview and widgets.
+        val overview = calculateOverviewReport(entries, emptyList(), month)
+        val months = (-5..0).map { month.plusMonths(it.toLong()) }
+        val summaries = monthlySummaries(entries, emptyList(), months)
+        GraphReport(overview.summary.spent, overview.spendingByCategory, dailySpending(entries, month), months.map { it to summaries.getValue(it) })
     }
     val ready = report ?: run { LedgerSkeleton(); return }
     val total = ready.total
@@ -47,14 +44,14 @@ private data class GraphReport(
     val history = ready.history
     val scale = remember(history) { history.maxOf { maxOf(it.second.income, it.second.spent) }.coerceAtLeast(1) }
     val incomeColor = MaterialTheme.colorScheme.tertiary
-    val expenseColor = rust
+    val expenseColor = danger
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val primary = MaterialTheme.colorScheme.primary
     val largeText = LocalDensity.current.fontScale > 1.3f
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
 
     FluidList(contentPadding = PaddingValues(LedgerSpace.margin, 10.dp, LedgerSpace.margin, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        item { CardBlock {
+        item(key = "category-chart", contentType = "chart") { GroupedBlock {
             SectionTitle("Where it goes")
             Text("Spending by category", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (total == 0L) {
@@ -91,16 +88,16 @@ private data class GraphReport(
                 }
             }
         }
-        item { CardBlock {
+        item(key = "daily-chart", contentType = "chart") { GroupedBlock {
             SectionTitle("Day by day")
-            Text(peak?.let { "Highest spending: ${money(it.value)} on ${it.key} ${month.format(DateTimeFormatter.ofPattern("MMM"))}" } ?: "No daily spending recorded", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(peak?.let { "Highest spending: ${money(it.value)} on ${it.key} ${month.format(shortMonthFormat)}" } ?: "No daily spending recorded", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             DailySpendingChart(month, daily)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 listOf(1, month.lengthOfMonth() / 2, month.lengthOfMonth()).forEach { Text("$it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             TextButton(onClick = { openTransactions("EXPENSE", "ALL") }, modifier = Modifier.align(Alignment.End)) { Text("View spending"); AppIcon("right", Modifier.size(12.dp), primary) }
         } }
-        item { GroupedSection("Six-month view", footer = "Tap a month to open it.") {
+        item(key = "history", contentType = "history") { GroupedSection("Six-month view", footer = "Tap a month to open it.") {
             Row(Modifier.padding(horizontal = LedgerSpace.margin, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Box(Modifier.size(8.dp).background(incomeColor, CircleShape)); Text("Income", style = MaterialTheme.typography.bodySmall) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Box(Modifier.size(8.dp).background(expenseColor, CircleShape)); Text("Spent", style = MaterialTheme.typography.bodySmall) }

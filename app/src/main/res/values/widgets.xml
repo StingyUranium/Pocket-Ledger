@@ -21,6 +21,9 @@
     <color name="widget_secondary">#53535B</color>
     <color name="widget_expense">#B93728</color>
     <color name="widget_accent">#0066CC</color>
+    <string name="widget_stale">Not updated · tap to open</string>
+    <string name="widget_unavailable">Can\'t load data · tap to open</string>
+    <string name="widget_unavailable_amount">—</string>
     <string name="widget_tab_accessibility">%1$s, %2$s</string>
     <string name="widget_selected_label">selected</string>
     <string name="widget_not_selected_label">not selected</string>

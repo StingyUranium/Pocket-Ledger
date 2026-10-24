@@ -15,6 +15,9 @@ import androidx.compose.ui.preferredFrameRate
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -122,9 +125,17 @@ private val LocalSheetExited = staticCompositionLocalOf<() -> Unit> { {} }
             onDismissRequest = dismiss,
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
         ) {
-            Box(Modifier.fillMaxSize().statusBarsPadding(), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
-                Surface(Modifier.widthIn(max = 640.dp).fillMaxWidth().navigationBarsPadding(),
-                    shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.background) { content(dismiss) }
+            // The scrim covers the window, so a tap outside the sheet dismisses it like the animated sheet does.
+            val scrimInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = .32f))
+                .clickable(interactionSource = scrimInteraction, indication = null, onClickLabel = "Dismiss", onClick = dismiss)
+                .statusBarsPadding(), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+                // Taps on the sheet itself must not reach the scrim.
+                Surface(Modifier.widthIn(max = 640.dp).fillMaxWidth().navigationBarsPadding()
+                    .pointerInput(Unit) { detectTapGestures { } },
+                    shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.background) {
+                    CompositionLocalProvider(LocalLedgerHeaderInset provides 0.dp, LocalLedgerBottomInset provides 0.dp) { content(dismiss) }
+                }
             }
         }
         return
@@ -157,10 +168,10 @@ private val LocalSheetExited = staticCompositionLocalOf<() -> Unit> { {} }
         // Keep fast reversals and flings with the form until it has settled at the top.
         sheetGesturesEnabled = formScroll?.let { !it.canScrollBackward && !formOwnsGesture } ?: true,
         sheetMaxWidth = 640.dp,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        shape = MaterialTheme.shapes.extraLarge.copy(bottomStart = androidx.compose.foundation.shape.ZeroCornerSize, bottomEnd = androidx.compose.foundation.shape.ZeroCornerSize),
         containerColor = MaterialTheme.colorScheme.background,
         tonalElevation = 0.dp
     ) {
-        content(close)
+        CompositionLocalProvider(LocalLedgerHeaderInset provides 0.dp, LocalLedgerBottomInset provides 0.dp) { content(close) }
     }
 }

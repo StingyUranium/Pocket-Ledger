@@ -4,8 +4,17 @@ import androidx.compose.runtime.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 
@@ -26,9 +35,38 @@ fun ledgerSnapshots(dao: LedgerDao): Flow<LedgerReadState> {
     return combine(records, config) { a, b -> LedgerSnapshot(a.first, a.second, a.third, b.first, b.second, b.third) }
         .map<LedgerSnapshot, Result<LedgerSnapshot>> { Result.success(it) }
         .catch { emit(Result.failure(it)) }
-        .runningFold(LedgerReadState()) { previous, result ->
-            result.fold({ LedgerReadState(data = it) }, { previous.copy(error = "Could not read your ledger. Retry to reload it.") })
+        .let { upstream ->
+            // No seed emission: a re-subscribed or recreated collector must keep showing the last snapshot.
+            flow {
+                var previous = LedgerReadState()
+                upstream.collect { result ->
+                    previous = result.fold({ LedgerReadState(data = it) }, { previous.copy(error = "Could not read your ledger. Retry to reload it.") })
+                    emit(previous)
+                }
+            }
         }.flowOn(Dispatchers.Default)
+}
+
+/**
+ * Owns the ledger snapshot and the calculation cache across configuration changes, so rotation and
+ * resume show the last data immediately instead of an empty frame.
+ */
+class LedgerViewModel(private val dao: LedgerDao) : ViewModel() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val attempt = MutableStateFlow(0)
+    val calculationCache = CalculationCache()
+    /** Set once startup reconciliation has completed, so recreation does not repeat it. */
+    @Volatile var startupComplete = false
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val state: StateFlow<LedgerReadState> = attempt.flatMapLatest { ledgerSnapshots(dao) }
+        .stateIn(scope, SharingStarted.WhileSubscribed(5_000), LedgerReadState())
+    fun retry() { attempt.value++ }
+    override fun onCleared() { scope.cancel() }
+
+    class Factory(private val dao: LedgerDao) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T = LedgerViewModel(dao) as T
+    }
 }
 
 /** Latest result per call site, so revisiting a root tab with unchanged inputs paints immediately. */
@@ -47,25 +85,32 @@ val LocalCalculationCache = staticCompositionLocalOf<CalculationCache?> { null }
 /**
  * Cancel obsolete reports and never show the previous month's values as current. A [cacheKey]
  * reuses the last result only when every input is equal, which avoids a skeleton flash on tab switches.
+ * With [keepPrevious] the last value stays visible while a changed input is recomputed
+ * (stale-while-revalidate), which avoids tearing down a screen or its editors mid-edit.
+ * The calculation runs on [Dispatchers.Default] and may call ensureActive() to stop early.
+ * While [enabled] is false nothing is computed and the last value (if any) is kept, so only the
+ * visible destination pays for its report.
  */
 @Composable
-fun <T> backgroundCalculation(vararg inputs: Any?, cacheKey: String? = null, calculation: () -> T): State<T?> {
+fun <T> backgroundCalculation(vararg inputs: Any?, cacheKey: String? = null, keepPrevious: Boolean = false, enabled: Boolean = true, calculation: suspend CoroutineScope.() -> T): State<T?> {
     val dependencies = inputs.toList()
     val cache = LocalCalculationCache.current
-    val result = remember(dependencies, cacheKey, cache) { mutableStateOf<T?>(cacheKey?.let { cache?.find<T>(it, dependencies) }) }
-    LaunchedEffect(dependencies, cacheKey, cache) {
-        if (result.value == null) {
-            val value = withContext(Dispatchers.Default) { calculation() }
-            result.value = value
-            if (cacheKey != null && value != null) cache?.store(cacheKey, dependencies, value)
-        }
+    val cached = remember(dependencies, cacheKey, cache) { cacheKey?.let { cache?.find<T>(it, dependencies) } }
+    val result = if (keepPrevious) remember(cacheKey, cache) { mutableStateOf<T?>(cached) }
+    else remember(dependencies, cacheKey, cache) { mutableStateOf<T?>(cached) }
+    LaunchedEffect(dependencies, cacheKey, cache, enabled) {
+        if (!enabled) return@LaunchedEffect
+        if (cached != null) { result.value = cached; return@LaunchedEffect }
+        val value = withContext(Dispatchers.Default) { calculation(this) }
+        result.value = value
+        if (cacheKey != null && value != null) cache?.store(cacheKey, dependencies, value)
     }
     return result
 }
 
 @Composable fun LedgerSkeleton() {
-    Column(Modifier.fillMaxSize().padding(top = LocalLedgerHeaderInset.current).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Loading your ledger", style = MaterialTheme.typography.bodyLarge)
+    Column(Modifier.fillMaxSize().padding(top = LocalLedgerHeaderInset.current).padding(LedgerSpace.margin), verticalArrangement = Arrangement.spacedBy(LedgerSpace.margin)) {
+        Text("Loading your ledger", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
         repeat(4) { index ->
             Surface(Modifier.fillMaxWidth().height(if (index == 0) 144.dp else 72.dp),
                 shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerHighest) {}

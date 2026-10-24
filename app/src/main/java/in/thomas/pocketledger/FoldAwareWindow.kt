@@ -22,8 +22,10 @@ val LocalLedgerWindowWidth = staticCompositionLocalOf { 0.dp }
         else WindowInfoTracker.getOrCreate(activity).windowLayoutInfo(activity)
     }
     val layout by info.collectAsStateWithLifecycle(initialValue = null)
-    val hinge = layout?.displayFeatures.orEmpty().filterIsInstance<FoldingFeature>().firstOrNull {
-        it.isSeparating || it.occlusionType == FoldingFeature.OcclusionType.FULL
+    val hinge = remember(layout) {
+        layout?.displayFeatures.orEmpty().filterIsInstance<FoldingFeature>().firstOrNull {
+            it.isSeparating || it.occlusionType == FoldingFeature.OcclusionType.FULL
+        }
     }
     var origin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() }) {

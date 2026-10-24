@@ -1,4 +1,4 @@
-plugins { id("com.android.test") }
+plugins { alias(libs.plugins.android.test) }
 
 android {
     namespace = "in.thomas.pocketledger.benchmark"
@@ -29,7 +29,7 @@ val isolated = providers.gradleProperty("ledger.testApplicationId").orNull == "i
 androidComponents.beforeVariants { it.enable = isolated && it.buildType == "benchmark" }
 
 dependencies {
-    implementation("androidx.benchmark:benchmark-macro-junit4:1.5.0")
-    implementation("androidx.test.ext:junit:1.3.0")
-    implementation("androidx.test.uiautomator:uiautomator:2.4.0")
+    implementation(libs.benchmark.macro.junit4)
+    implementation(libs.androidx.test.ext.junit)
+    implementation(libs.uiautomator)
 }

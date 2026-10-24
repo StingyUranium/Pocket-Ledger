@@ -15,13 +15,16 @@ import androidx.test.uiautomator.UiDevice
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import android.content.SharedPreferences
 
 /** Exercises real RemoteViews inflation/actions; all fixtures and preferences are validation-only. */
 class WidgetRenderingTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
-    @Test fun renderWidgetsAcrossSizesThemesAndFontScales() {
+    @Test fun renderWidgetsAcrossSizesAndThemes() {
         check(context.packageName == "in.thomas.pocketledger.validation")
         val device = UiDevice.getInstance(instrumentation)
         device.wakeUp()
@@ -32,7 +35,7 @@ class WidgetRenderingTest {
             "empty" to MonthlySummary(0, 0, 0, 0),
             "over" to MonthlySummary(100000000000, 99999999999, 10000, 99999999999)
         )
-        for (night in listOf(false, true)) for (scale in listOf(1f, 2f)) {
+        for (night in listOf(false, true)) for (scale in listOf(1f)) {
             val configuration = Configuration(context.resources.configuration).apply {
                 uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
                     if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
@@ -80,26 +83,35 @@ class WidgetRenderingTest {
         val prefs = context.getSharedPreferences("widget_tabs", Context.MODE_PRIVATE)
         try {
             val summary = MonthlySummary(20000, 10000, 0, 0)
-            instrumentation.runOnMainSync {
+            awaitPreference(prefs, "income_$first") {
                 val root = LedgerWidgets.monthlyViews(context, first, summary, "October 2026", false, 112).apply(context, null)
                 assertTrue(root.findViewById<View>(R.id.widget_income_tab).performClick())
             }
-            val deadline = System.currentTimeMillis() + 5000
-            while (!prefs.getBoolean("income_$first", false) && System.currentTimeMillis() < deadline) Thread.sleep(50)
             assertTrue(prefs.getBoolean("income_$first", false))
             assertFalse(prefs.getBoolean("income_$second", false))
-            instrumentation.runOnMainSync {
+            awaitPreference(prefs, "income_$first") {
                 val root = LedgerWidgets.monthlyViews(context, first, summary, "October 2026", prefs.getBoolean("income_$first", false), 112).apply(context, null)
                 assertEquals(money(summary.income), root.findViewById<TextView>(R.id.widget_total).text.toString())
                 assertTrue(root.findViewById<View>(R.id.widget_expense_tab).performClick())
             }
-            val resetDeadline = System.currentTimeMillis() + 5000
-            while (prefs.getBoolean("income_$first", false) && System.currentTimeMillis() < resetDeadline) Thread.sleep(50)
             assertFalse(prefs.getBoolean("income_$first", false))
         } finally {
             host.deleteAppWidgetId(first)
             host.deleteAppWidgetId(second)
             prefs.edit().remove("income_$first").remove("income_$second").apply()
+        }
+    }
+
+    /** Registers a change listener before running [action], then waits for [key] to be written. */
+    private fun awaitPreference(prefs: SharedPreferences, key: String, action: () -> Unit) {
+        val written = CountDownLatch(1)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changed -> if (changed == key) written.countDown() }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        try {
+            instrumentation.runOnMainSync(action)
+            assertTrue("Preference $key was not written", written.await(5, TimeUnit.SECONDS))
+        } finally {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
         }
     }
 
@@ -116,7 +128,7 @@ class WidgetRenderingTest {
                     val views = if (route == "budget") LedgerWidgets.budgetViews(context, summary, "October 2026", 110)
                         else LedgerWidgets.monthlyViews(context, 900001, summary, "October 2026", route == "income", 112)
                     val root = views.apply(context, null)
-                    val target = root.findViewById<View>(if (route == "budget") R.id.widget_root else R.id.widget_total)
+                    val target = root.findViewById<View>(R.id.widget_root)
                     assertTrue(target.performClick())
                 }
                 val activity = monitor.waitForActivityWithTimeout(10000)

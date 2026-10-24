@@ -25,9 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
@@ -37,6 +37,10 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -52,14 +56,36 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 val pine = Color(0xFF007AFF)
-val rust: Color
+/** Negative amounts, overspending and destructive actions. */
+val danger: Color
     @Composable get() = MaterialTheme.colorScheme.error
 val cream = Color(0xFFF2F2F7)
 val positive = Color(0xFF248A3D)
+private val warningLight = Color(0xFFAC6500)
+// 0xFFAC6500 is only about 3.8:1 on the #1C1C1E groups, so dark mode uses a lighter amber.
+private val warningDark = Color(0xFFFFB74D)
+/** Attention that is not an error, such as a message waiting for review. */
+val warning: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < .5f) warningDark else warningLight
+
+/**
+ * Appearance preferences are loaded once on a background thread at launch, so the later
+ * synchronous reads in [PocketTheme] and Settings hit memory instead of the disk.
+ */
+internal object AppearancePreferences {
+    private const val Name = "appearance"
+    @Volatile private var cached: android.content.SharedPreferences? = null
+    fun get(context: android.content.Context): android.content.SharedPreferences =
+        cached ?: context.applicationContext.getSharedPreferences(Name, android.content.Context.MODE_PRIVATE).also { cached = it }
+    fun preload(context: android.content.Context) {
+        val app = context.applicationContext
+        Thread({ get(app).all }, "appearance-preload").start()
+    }
+}
 
 @Composable fun PocketTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val preferences = remember { context.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE) }
+    val preferences = remember { AppearancePreferences.get(context) }
     var appearance by remember { mutableStateOf(preferences.getString("mode", "SYSTEM") ?: "SYSTEM") }
     var dynamic by remember { mutableStateOf(preferences.getBoolean("dynamic", true)) }
     var contrast by remember { mutableStateOf(preferences.getBoolean("contrast", false)) }
@@ -147,35 +173,64 @@ val positive = Color(0xFF248A3D)
     }
 }
 
+private class IconGeometry(val stroke: Path, val fill: Path)
+private val iconGeometries = HashMap<String, IconGeometry>()
+
+/** Several semantic names share one glyph; unknown names fall back to the receipt glyph. */
+private fun iconKey(name: String) = when (name) {
+    "transfer" -> "entries"
+    "accounts" -> "wallet"
+    "chart" -> "budgets"
+    "home", "entries", "wallet", "budgets", "sms", "settings", "more", "plus", "close", "left", "right", "down",
+    "income", "expense", "check", "search", "lock", "shield", "calendar", "backup" -> name
+    else -> "receipt"
+}
+
+/** Glyph geometry in a 24-unit grid, built once per glyph and drawn with the caller's tint. */
+private fun buildIcon(key: String): IconGeometry {
+    val stroke = Path()
+    val fill = Path()
+    fun line(x: Float, y: Float, xx: Float, yy: Float) { stroke.moveTo(x, y); stroke.lineTo(xx, yy) }
+    fun box(x: Float, y: Float, w: Float, h: Float, radius: Float = 3f) { stroke.addRoundRect(RoundRect(x, y, x + w, y + h, radius, radius)) }
+    fun ring(cx: Float, cy: Float, r: Float) { stroke.addOval(Rect(cx - r, cy - r, cx + r, cy + r)) }
+    fun dot(cx: Float, cy: Float, r: Float) { fill.addOval(Rect(cx - r, cy - r, cx + r, cy + r)) }
+    fun arc(x: Float, y: Float, w: Float, h: Float, start: Float, sweep: Float) { stroke.arcTo(Rect(x, y, x + w, y + h), start, sweep, true) }
+    when (key) {
+        "home" -> { box(3f, 3f, 7f, 7f, 2f); box(14f, 3f, 7f, 7f, 2f); box(3f, 14f, 7f, 7f, 2f); box(14f, 14f, 7f, 7f, 2f) }
+        "entries" -> { line(7f, 3f, 7f, 19f); line(3f, 7f, 7f, 3f); line(11f, 7f, 7f, 3f); line(17f, 21f, 17f, 5f); line(13f, 17f, 17f, 21f); line(21f, 17f, 17f, 21f) }
+        "wallet" -> { box(3f, 5f, 18f, 15f); line(5f, 5f, 17f, 2f); box(15f, 10f, 7f, 6f, 2f); dot(18f, 13f, 1f) }
+        "budgets" -> { arc(3f, 3f, 18f, 18f, -90f, 275f); line(12f, 12f, 12f, 3f); line(12f, 12f, 20f, 15f) }
+        "sms" -> { box(3f, 4f, 18f, 14f, 4f); line(7f, 18f, 7f, 22f); line(7f, 22f, 12f, 18f); line(7f, 9f, 17f, 9f); line(7f, 13f, 13f, 13f) }
+        "settings" -> { ring(12f, 12f, 7f); ring(12f, 12f, 2.5f); repeat(8) { val angle = it * Math.PI / 4; line(12 + cos(angle).toFloat() * 7, 12 + sin(angle).toFloat() * 7, 12 + cos(angle).toFloat() * 9.5f, 12 + sin(angle).toFloat() * 9.5f) } }
+        "more" -> repeat(3) { dot(5f + it * 7f, 12f, 1.8f) }
+        "plus" -> { line(12f, 5f, 12f, 19f); line(5f, 12f, 19f, 12f) }
+        "close" -> { line(6f, 6f, 18f, 18f); line(18f, 6f, 6f, 18f) }
+        "left" -> { line(15f, 5f, 8f, 12f); line(8f, 12f, 15f, 19f) }
+        "right" -> { line(9f, 5f, 16f, 12f); line(16f, 12f, 9f, 19f) }
+        "down" -> { line(5f, 9f, 12f, 16f); line(12f, 16f, 19f, 9f) }
+        "income" -> { line(18f, 6f, 6f, 18f); line(6f, 8f, 6f, 18f); line(6f, 18f, 16f, 18f) }
+        "expense" -> { line(6f, 18f, 18f, 6f); line(8f, 6f, 18f, 6f); line(18f, 6f, 18f, 16f) }
+        "check" -> { line(5f, 12f, 10f, 17f); line(10f, 17f, 20f, 7f) }
+        "search" -> { ring(10f, 10f, 6.5f); line(15f, 15f, 21f, 21f) }
+        "lock" -> { box(5f, 10f, 14f, 11f, 3f); arc(8f, 2f, 8f, 14f, 180f, 180f); line(12f, 14f, 12f, 17f) }
+        "shield" -> {
+            stroke.moveTo(12f, 2f); stroke.lineTo(21f, 6f); stroke.lineTo(20f, 14f); stroke.quadraticTo(18f, 20f, 12f, 23f)
+            stroke.quadraticTo(6f, 20f, 4f, 14f); stroke.lineTo(3f, 6f); stroke.close()
+            line(8f, 12f, 11f, 15f); line(11f, 15f, 16f, 9f)
+        }
+        "calendar" -> { box(3f, 5f, 18f, 16f); line(3f, 10f, 21f, 10f); line(8f, 2f, 8f, 7f); line(16f, 2f, 16f, 7f); dot(8f, 14f, 1f); dot(12f, 14f, 1f); dot(16f, 14f, 1f); dot(8f, 18f, 1f) }
+        "backup" -> { arc(3f, 3f, 18f, 18f, -120f, 300f); line(3f, 3f, 3f, 9f); line(3f, 9f, 9f, 9f); line(12f, 7f, 12f, 12f); line(12f, 12f, 16f, 14f) }
+        else -> { box(5f, 2f, 14f, 20f, 2f); line(9f, 7f, 15f, 7f); line(9f, 11f, 15f, 11f); line(9f, 15f, 13f, 15f) }
+    }
+    return IconGeometry(stroke, fill)
+}
+
 @Composable fun AppIcon(name: String, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onSurface) {
+    val geometry = remember(name) { val key = iconKey(name); iconGeometries.getOrPut(key) { buildIcon(key) } }
     Canvas(modifier.size(22.dp)) {
         withTransform({ scale(size.width / 24, size.height / 24, Offset.Zero) }) {
-            val stroke = Stroke(1.7f, cap = StrokeCap.Round)
-            fun line(x: Float, y: Float, xx: Float, yy: Float) = drawLine(tint, Offset(x, y), Offset(xx, yy), 1.7f, StrokeCap.Round)
-            fun box(x: Float, y: Float, w: Float, h: Float, radius: Float = 3f) = drawRoundRect(tint, Offset(x, y), Size(w, h), CornerRadius(radius), style = stroke)
-            when (name) {
-                "home" -> { box(3f, 3f, 7f, 7f, 2f); box(14f, 3f, 7f, 7f, 2f); box(3f, 14f, 7f, 7f, 2f); box(14f, 14f, 7f, 7f, 2f) }
-                "entries", "transfer" -> { line(7f, 3f, 7f, 19f); line(3f, 7f, 7f, 3f); line(11f, 7f, 7f, 3f); line(17f, 21f, 17f, 5f); line(13f, 17f, 17f, 21f); line(21f, 17f, 17f, 21f) }
-                "wallet", "accounts" -> { box(3f, 5f, 18f, 15f); line(5f, 5f, 17f, 2f); box(15f, 10f, 7f, 6f, 2f); drawCircle(tint, 1f, Offset(18f, 13f)) }
-                "budgets", "chart" -> { drawArc(tint, -90f, 275f, false, Offset(3f, 3f), Size(18f, 18f), style = stroke); line(12f, 12f, 12f, 3f); line(12f, 12f, 20f, 15f) }
-                "sms" -> { box(3f, 4f, 18f, 14f, 4f); line(7f, 18f, 7f, 22f); line(7f, 22f, 12f, 18f); line(7f, 9f, 17f, 9f); line(7f, 13f, 13f, 13f) }
-                "settings" -> { drawCircle(tint, 7f, Offset(12f, 12f), style = stroke); drawCircle(tint, 2.5f, Offset(12f, 12f), style = stroke); repeat(8) { val angle = it * Math.PI / 4; line(12 + cos(angle).toFloat() * 7, 12 + sin(angle).toFloat() * 7, 12 + cos(angle).toFloat() * 9.5f, 12 + sin(angle).toFloat() * 9.5f) } }
-                "more" -> { repeat(3) { drawCircle(tint, 1.8f, Offset(5f + it * 7f, 12f)) } }
-                "plus" -> { line(12f, 5f, 12f, 19f); line(5f, 12f, 19f, 12f) }
-                "close" -> { line(6f, 6f, 18f, 18f); line(18f, 6f, 6f, 18f) }
-                "left" -> { line(15f, 5f, 8f, 12f); line(8f, 12f, 15f, 19f) }
-                "right" -> { line(9f, 5f, 16f, 12f); line(16f, 12f, 9f, 19f) }
-                "down" -> { line(5f, 9f, 12f, 16f); line(12f, 16f, 19f, 9f) }
-                "income" -> { line(18f, 6f, 6f, 18f); line(6f, 8f, 6f, 18f); line(6f, 18f, 16f, 18f) }
-                "expense" -> { line(6f, 18f, 18f, 6f); line(8f, 6f, 18f, 6f); line(18f, 6f, 18f, 16f) }
-                "check" -> { line(5f, 12f, 10f, 17f); line(10f, 17f, 20f, 7f) }
-                "search" -> { drawCircle(tint, 6.5f, Offset(10f, 10f), style = stroke); line(15f, 15f, 21f, 21f) }
-                "lock" -> { box(5f, 10f, 14f, 11f, 3f); drawArc(tint, 180f, 180f, false, Offset(8f, 2f), Size(8f, 14f), style = stroke); line(12f, 14f, 12f, 17f) }
-                "shield" -> { val path = Path().apply { moveTo(12f, 2f); lineTo(21f, 6f); lineTo(20f, 14f); quadraticTo(18f, 20f, 12f, 23f); quadraticTo(6f, 20f, 4f, 14f); lineTo(3f, 6f); close() }; drawPath(path, tint, style = stroke); line(8f, 12f, 11f, 15f); line(11f, 15f, 16f, 9f) }
-                "calendar" -> { box(3f, 5f, 18f, 16f); line(3f, 10f, 21f, 10f); line(8f, 2f, 8f, 7f); line(16f, 2f, 16f, 7f); drawCircle(tint, 1f, Offset(8f, 14f)); drawCircle(tint, 1f, Offset(12f, 14f)); drawCircle(tint, 1f, Offset(16f, 14f)); drawCircle(tint, 1f, Offset(8f, 18f)) }
-                "backup" -> { drawArc(tint, -120f, 300f, false, Offset(3f, 3f), Size(18f, 18f), style = stroke); line(3f, 3f, 3f, 9f); line(3f, 9f, 9f, 9f); line(12f, 7f, 12f, 12f); line(12f, 12f, 16f, 14f) }
-                else -> { box(5f, 2f, 14f, 20f, 2f); line(9f, 7f, 15f, 7f); line(9f, 11f, 15f, 11f); line(9f, 15f, 13f, 15f) }
-            }
+            drawPath(geometry.stroke, tint, style = Stroke(1.7f, cap = StrokeCap.Round))
+            if (!geometry.fill.isEmpty) drawPath(geometry.fill, tint)
         }
     }
 }
@@ -198,23 +253,26 @@ val positive = Color(0xFF248A3D)
     title: String, collapsed: () -> Float, back: (() -> Unit)?, backLabel: String,
     settings: (() -> Unit)?, add: (() -> Unit)?, addLabel: String = "Add transaction"
 ) {
-    Box(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.Center).padding(start = if (back != null) 160.dp else LedgerSpace.margin, end = if (settings != null) { if (LocalDensity.current.fontScale > 1.3f) 220.dp else 148.dp } else LedgerSpace.margin)
-                .graphicsLayer { alpha = ((collapsed() - .55f) / .35f).coerceIn(0f, 1f) }
-                .clearAndSetSemantics { })
+    val largeText = LocalDensity.current.fontScale > 1.3f
+    // Laid out as a row so the title takes whatever the back label and actions leave, at any font scale.
+    Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = LedgerSpace.xs), verticalAlignment = Alignment.CenterVertically) {
         if (back != null) {
             val interaction = remember { MutableInteractionSource() }
-            Row(Modifier.align(Alignment.CenterStart).heightIn(min = LedgerSpace.touch).premiumPressEffect(interaction)
+            Row(Modifier.heightIn(min = LedgerSpace.touch).premiumPressEffect(interaction)
                 .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = back)
-                .semantics(mergeDescendants = true) { contentDescription = "Back" }.padding(start = 4.dp, end = 12.dp),
+                .semantics(mergeDescendants = true) { contentDescription = "Back to $backLabel" }.padding(start = LedgerSpace.xs, end = LedgerSpace.medium),
                 verticalAlignment = Alignment.CenterVertically) {
                 AppIcon("left", tint = MaterialTheme.colorScheme.primary)
                 Text(backLabel, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 120.dp))
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = if (largeText) 180.dp else 120.dp))
             }
-        }
-        Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
+        } else Spacer(Modifier.width(LedgerSpace.small))
+        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.weight(1f).padding(horizontal = LedgerSpace.xs)
+                .graphicsLayer { alpha = ((collapsed() - .55f) / .35f).coerceIn(0f, 1f) }
+                .clearAndSetSemantics { })
+        Row(verticalAlignment = Alignment.CenterVertically) {
             add?.let { BarIconButton("plus", addLabel, it) }
             settings?.let { TextButton(onClick = it) { Text("Manage") } }
         }
@@ -292,12 +350,6 @@ val positive = Color(0xFF248A3D)
     }
 }
 
-@Composable fun CardBlock(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.padding(LedgerSpace.section), verticalArrangement = Arrangement.spacedBy(LedgerSpace.medium), content = content)
-    }
-}
-
 @Composable fun SectionTitle(text: String) { Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() }) }
 @Composable fun SectionLabel(text: String) { Text(text.uppercase(), style = MaterialTheme.typography.labelMedium, letterSpacing = .8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, top = 4.dp).semantics { heading() }) }
 
@@ -309,13 +361,20 @@ val positive = Color(0xFF248A3D)
     Column(modifier.fillMaxWidth()) {
         header?.let {
             Text(it.uppercase(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = LedgerSpace.margin, bottom = 6.dp).semantics { heading() })
+                modifier = Modifier.padding(start = LedgerSpace.margin, bottom = LedgerSpace.small).semantics { heading() })
         }
         Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) { Column(content = content) }
         footer?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = LedgerSpace.margin, end = LedgerSpace.margin, top = 6.dp))
+                modifier = Modifier.padding(start = LedgerSpace.margin, end = LedgerSpace.margin, top = LedgerSpace.small))
         }
+    }
+}
+
+/** Free-form content (text, buttons, bars) inside a grouped container, in place of a standalone card. */
+@Composable fun GroupedBlock(header: String? = null, footer: String? = null, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    GroupedSection(header, footer, modifier) {
+        GroupedItem { Column(Modifier.weight(1f).padding(vertical = LedgerSpace.xs), verticalArrangement = Arrangement.spacedBy(LedgerSpace.medium), content = content) }
     }
 }
 
@@ -340,7 +399,9 @@ val positive = Color(0xFF248A3D)
     isError: Boolean = false, trailing: (@Composable () -> Unit)? = null
 ) {
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
-    GroupedItem(modifier) {
+    val requester = remember { androidx.compose.ui.focus.FocusRequester() }
+    // Tapping anywhere in the row, including its padding, focuses the field.
+    GroupedItem(modifier.pointerInput(requester) { detectTapGestures { requester.requestFocus() } }) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(label, style = MaterialTheme.typography.bodySmall, color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             androidx.compose.foundation.text.BasicTextField(value, change,
@@ -352,7 +413,10 @@ val positive = Color(0xFF248A3D)
                     imeAction = imeAction),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                     onNext = { focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }, onDone = { focus.clearFocus() }),
-                modifier = Modifier.fillMaxWidth().semantics { contentDescription = label })
+                modifier = Modifier.fillMaxWidth().focusRequester(requester).semantics {
+                    contentDescription = label
+                    if (isError) error("Check $label")
+                })
         }
         trailing?.invoke()
     }
@@ -444,7 +508,8 @@ val LocalInlineSheet = staticCompositionLocalOf { false }
     LaunchedEffect(Unit) { clearError() }
     val scroll = rememberScrollState()
     val body: @Composable (() -> Unit) -> Unit = { close ->
-        CompositionLocalProvider(LocalInlineSheet provides false) {
+        // Sheets sit above the page chrome, so the header and tab-bar insets must not leak into them.
+        CompositionLocalProvider(LocalInlineSheet provides false, LocalLedgerHeaderInset provides 0.dp, LocalLedgerBottomInset provides 0.dp) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(.94f).imePadding()) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = close) { Text(closeLabel, fontWeight = FontWeight.Normal) }

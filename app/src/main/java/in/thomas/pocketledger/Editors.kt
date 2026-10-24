@@ -4,8 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.ImeAction
@@ -20,6 +18,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
@@ -29,6 +31,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.*
+
+/** User-facing validation failure; its message is safe to show as is. */
+private class InvalidInput(message: String) : Exception(message)
+private fun need(ok: Boolean, message: String) { if (!ok) throw InvalidInput(message) }
+
+private val amountPattern = Regex("^\\d{1,12}(\\.\\d{1,2})?$")
+private val signedAmountPattern = Regex("^-?\\d{1,12}(\\.\\d{1,2})?$")
+private const val AmountHint = "Enter an amount like 250 or 250.50"
+
+/** Returns paise for plain rupee input (up to 12 digits, at most two decimals), or null when it is malformed. */
+internal fun parseAmountInput(text: String, allowNegative: Boolean = false): Long? {
+    val cleaned = text.trim().removePrefix("\u20b9").trim().replace(",", "")
+    if (!(if (allowNegative) signedAmountPattern else amountPattern).matches(cleaned)) return null
+    return paise(cleaned)
+}
+
+private fun parseDay(text: String, message: String): LocalDate = try { LocalDate.parse(text.trim()) } catch (_: Exception) { throw InvalidInput(message) }
+private fun validationMessage(e: Exception, fallback: String) = if (e is InvalidInput) e.message ?: fallback else fallback
 
 @Composable fun fieldColors(): TextFieldColors = TextFieldDefaults.colors(
     focusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -81,9 +101,10 @@ import java.time.*
     LedgerSheet(label, dismiss, closeLabel = "Cancel") {
         Column(Modifier.fillMaxWidth().padding(horizontal = LedgerSpace.margin).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             FluidList(Modifier.heightIn(max = 440.dp).clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surface)) {
-                if (options.isEmpty()) item { Text("No options available", modifier = Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                items(options.distinct(), key = { it }) { option ->
-                    Column(Modifier.fillMaxWidth().ledgerClickable { change(option); dismiss() }) {
+                if (options.isEmpty()) item(key = "empty", contentType = "empty") { Text("No options available", modifier = Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                items(options.distinct(), key = { it }, contentType = { "option" }) { option ->
+                    Column(Modifier.fillMaxWidth().semantics { selected = option == value }
+                        .ledgerClickable(role = Role.RadioButton) { change(option); dismiss() }) {
                         Row(Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = LedgerSpace.margin, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(display(option), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), color = if (option == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             if (option == value) AppIcon("check", Modifier.size(19.dp), MaterialTheme.colorScheme.primary)
@@ -96,10 +117,10 @@ import java.time.*
     }
 }
 
-@Composable fun Pick(label: String, value: String, options: List<String>, display: (String) -> String = { it.lowercase().replaceFirstChar(Char::titlecase) }, grouped: Boolean = false, change: (String) -> Unit) {
+@Composable fun Pick(label: String, value: String, options: List<String>, display: (String) -> String = { it.lowercase().replaceFirstChar(Char::titlecase) }, change: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val largeText = LocalDensity.current.fontScale > 1.3f
-    if (grouped) GroupedItem(onClick = { open = true }) {
+    GroupedItem(onClick = { open = true }) {
         if (largeText) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LedgerSpace.xs)) {
             Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(display(value).ifBlank { "Choose" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge,
@@ -109,12 +130,6 @@ import java.time.*
             Text(display(value).ifBlank { "Choose" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         }
         AppIcon("down", Modifier.size(13.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-    } else Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().ledgerClickable { open = true }) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp).heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            Text(display(value).ifBlank { "Choose" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            AppIcon("down", Modifier.size(13.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
     if (open) ChoiceSheet(label, value, options, display, { open = false }, change)
 }
@@ -129,15 +144,21 @@ import java.time.*
     if (open) ChoiceSheet(label, value, options, display, { open = false }, change)
 }
 
-/** Compact centered alert: title and message, hairline, then side-by-side text buttons. */
-@Composable fun Confirm(title: String, text: String, dismiss: () -> Unit, confirm: () -> Unit) {
-    val destructive = title.startsWith("Delete") || title.startsWith("Remove")
-    val confirmLabel = if (title.startsWith("Remove")) "Remove" else if (destructive) "Delete" else "Confirm"
+/**
+ * Compact centered alert: title and message, hairline, then side-by-side text buttons. A [destructive]
+ * confirmation is red and gives haptic feedback; the message scrolls when large text would push the buttons off screen.
+ */
+@Composable fun Confirm(
+    title: String, text: String, dismiss: () -> Unit, destructive: Boolean = false,
+    confirmLabel: String = if (destructive) "Delete" else "Confirm", confirm: () -> Unit
+) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     androidx.compose.ui.window.Dialog(onDismissRequest = dismiss) {
-        Surface(Modifier.widthIn(max = 300.dp).fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
+        Surface(Modifier.widthIn(max = 300.dp).fillMaxWidth(), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
             Column {
-                Column(Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
+                    .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = LedgerSpace.margin),
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(LedgerSpace.xs)) {
                     Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
                     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 }
@@ -145,7 +166,7 @@ import java.time.*
                 Row(Modifier.height(IntrinsicSize.Min)) {
                     AlertButton("Cancel", MaterialTheme.colorScheme.primary, FontWeight.SemiBold, dismiss, Modifier.weight(1f))
                     VerticalDivider(thickness = androidx.compose.ui.unit.Dp.Hairline, color = MaterialTheme.colorScheme.outlineVariant)
-                    AlertButton(confirmLabel, if (destructive) rust else MaterialTheme.colorScheme.primary, FontWeight.Normal, {
+                    AlertButton(confirmLabel, if (destructive) danger else MaterialTheme.colorScheme.primary, FontWeight.Normal, {
                         if (destructive) haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
                         confirm()
                     }, Modifier.weight(1f))
@@ -185,40 +206,48 @@ import java.time.*
     val savedCategories by backgroundCalculation(type, knownEntries, cacheKey = "editor-categories-$type") { categoryOptions(type, knownEntries) }
     val categories = savedCategories ?: categoriesForType(type)
     fun submit() {
-        try {
-            val p = paise(amount)
-            require(p > 0) { "Enter an amount above zero" }
-            val d = LocalDate.parse(date)
-            val millis = if (time.isBlank()) d.atStartOfDay(india).toInstant().toEpochMilli() else d.atTime(LocalTime.parse(time)).atZone(india).toInstant().toEpochMilli()
-            require(type != "TRANSFER" || target.isNotBlank() && target != account) { "Choose a different destination account" }
-            require(millis >= accounts.single { it.id == account }.openingDate) { "Date is before account opening date. Adjust the account first." }
-            if (type == "TRANSFER") require(millis >= accounts.single { it.id == target }.openingDate) { "Date is before destination account opening date" }
-            require(category.isNotBlank() || type == "TRANSFER") { "Enter a category" }
-            save(initial.copy(accountId = account, destinationId = if (type == "TRANSFER") target else null, type = type, amount = p, date = millis, dateOnly = time.isBlank(), payee = payee.trim(), category = if (type == "TRANSFER") "Transfer" else category.trim(), note = note), rememberMerchant)
-        } catch (e: Exception) { error = e.message ?: "Check the amount and date" }
+        val entry = try {
+            val p = parseAmountInput(amount) ?: throw InvalidInput(AmountHint)
+            need(p > 0, "Enter an amount above zero")
+            val d = parseDay(date, "Choose a valid date")
+            val clock = if (time.isBlank()) null else try { LocalTime.parse(time.trim()) } catch (_: Exception) { throw InvalidInput("Enter the time as HH:MM or HH:MM:SS, or leave it blank") }
+            val millis = if (clock == null) d.atStartOfDay(india).toInstant().toEpochMilli() else d.atTime(clock).atZone(india).toInstant().toEpochMilli()
+            need(type != "TRANSFER" || target.isNotBlank() && target != account, "Choose a different destination account")
+            val source = accounts.firstOrNull { it.id == account } ?: throw InvalidInput("Choose an account")
+            need(millis >= source.openingDate, "Date is before account opening date. Adjust the account first.")
+            if (type == "TRANSFER") {
+                val destination = accounts.firstOrNull { it.id == target } ?: throw InvalidInput("Choose a destination account")
+                need(millis >= destination.openingDate, "Date is before destination account opening date")
+            }
+            need(category.isNotBlank() || type == "TRANSFER", "Enter a category")
+            initial.copy(accountId = account, destinationId = if (type == "TRANSFER") target else null, type = type, amount = p, date = millis, dateOnly = clock == null, payee = payee.trim(), category = if (type == "TRANSFER") "Transfer" else category.trim(), note = note)
+        } catch (e: Exception) { error = validationMessage(e, "Check the amount, date and time"); return }
+        save(entry, rememberMerchant)
     }
     LedgerSheet(if (delete == null) "New transaction" else "Transaction", dismiss, "Save", { submit() }) {
         Segments(listOf("EXPENSE" to "Expense", "INCOME" to "Income", "TRANSFER" to "Transfer"), type) { type = it }
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            // The amount keeps a prominent size at normal scale but steps down at large font scales so it still fits.
+            val amountStyle = if (LocalDensity.current.fontScale > 1.3f) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge
             Text("AMOUNT IN INR", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextField(amount, { amount = it; error = null }, placeholder = { Text("0.00", fontSize = 40.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .45f)) }, prefix = { Text("₹ ", fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true,
-                textStyle = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp, fontWeight = FontWeight.Medium), modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = fieldColors().copy(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+            TextField(amount, { amount = it; error = null }, placeholder = { Text("0.00", style = amountStyle, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .45f)) }, prefix = { Text("\u20b9 ", style = amountStyle, color = MaterialTheme.colorScheme.onSurfaceVariant) }, singleLine = true,
+                textStyle = amountStyle.copy(fontWeight = FontWeight.Medium), modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = fieldColors().copy(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         }
         error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
         GroupedSection("Details") {
-            Pick(if (type == "TRANSFER") "From account" else "Account", account, accounts.map { it.id }, { value -> accounts.find { it.id == value }?.name.orEmpty() }, grouped = true) {
+            Pick(if (type == "TRANSFER") "From account" else "Account", account, accounts.map { it.id }, { value -> accounts.find { it.id == value }?.name.orEmpty() }) {
                 account = it
                 if (target == it) target = accounts.firstOrNull { a -> a.id != it }?.id.orEmpty()
             }
             GroupedDivider()
             if (type == "TRANSFER") {
-                Pick("To account", target, accounts.filter { it.id != account }.map { it.id }, { value -> accounts.find { it.id == value }?.name.orEmpty() }, grouped = true) { target = it }
+                Pick("To account", target, accounts.filter { it.id != account }.map { it.id }, { value -> accounts.find { it.id == value }?.name.orEmpty() }) { target = it }
                 GroupedDivider()
             }
             GroupedField("Payee or description", payee, { payee = it })
             GroupedDivider()
             if (type != "TRANSFER") {
-                Pick("Category", category, (categories + category + "Add category\u2026").filter { it.isNotBlank() }.distinct(), { it }, grouped = true) {
+                Pick("Category", category, (categories + category + "Add category\u2026").filter { it.isNotBlank() }.distinct(), { it }) {
                     if (it == "Add category\u2026") customCategory = true else { category = it; customCategory = false }
                 }
                 GroupedDivider()
@@ -236,7 +265,7 @@ import java.time.*
         if (type != "TRANSFER") GroupedSection(footer = "Use this category for future ${if (type == "INCOME") "income" else "spending"} alerts from this payee.") {
             GroupedRow("Remember category", trailing = { PocketSwitch(rememberMerchant, "Remember category") { rememberMerchant = it } })
         }
-        sms?.let {
+        sms?.takeUnless { it.bodyPurged() }?.let {
             GroupedSection("Original bank message") {
                 GroupedRow(if (showSource) "Hide original message" else "View original message", onClick = { showSource = !showSource })
                 if (showSource) GroupedItem { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { Text(it.sender, style = MaterialTheme.typography.titleSmall); Text(it.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
@@ -244,7 +273,7 @@ import java.time.*
         }
         delete?.let {
             GroupedSection {
-                GroupedItem(onClick = it) { Text("Delete transaction", color = rust, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, modifier = Modifier.weight(1f)) }
+                GroupedItem(onClick = it) { Text("Delete transaction", color = danger, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, modifier = Modifier.weight(1f)) }
             }
         }
     }
@@ -258,17 +287,20 @@ import java.time.*
     var date by rememberSaveable { mutableStateOf(dayText(a.openingDate)) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     LedgerSheet("Account details", dismiss, "Save", {
-        try {
-            require(name.isNotBlank()) { "Enter an account name" }
-            require(bank == "CASH" || suffix.matches(Regex("\\d{4}"))) { "Enter four account digits" }
-            save(a.copy(name = name.trim(), bank = bank, suffix = if (bank == "CASH") "" else suffix, opening = paise(opening), openingDate = dayMillis(date)))
-        } catch (e: Exception) { error = e.message }
+        val edited = try {
+            need(name.isNotBlank(), "Enter an account name")
+            need(bank == "CASH" || suffix.matches(Regex("\\d{4}")), "Enter four account digits")
+            val openingPaise = parseAmountInput(opening, allowNegative = true) ?: throw InvalidInput(AmountHint)
+            val openingDate = parseDay(date, "Choose a valid opening date")
+            a.copy(name = name.trim(), bank = bank, suffix = if (bank == "CASH") "" else suffix, opening = openingPaise, openingDate = openingDate.atStartOfDay(india).toInstant().toEpochMilli())
+        } catch (e: Exception) { error = validationMessage(e, "Check the details and try again"); null }
+        if (edited != null) save(edited)
     }) {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) { BankMark(bank); Column { Text(name.ifBlank { "A new account" }, style = MaterialTheme.typography.titleLarge); Text("A home for your everyday money", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         GroupedSection("Account") {
             GroupedField("Account name", name, { name = it })
             GroupedDivider()
-            Pick("Bank", bank, listOf("SBM", "AXIS", "CASH"), { when (it) { "SBM" -> "SBM Bank India"; "AXIS" -> "Axis Bank"; else -> "Cash" } }, grouped = true) { bank = it }
+            Pick("Bank", bank, listOf("SBM", "AXIS", "CASH"), { when (it) { "SBM" -> "SBM Bank India"; "AXIS" -> "Axis Bank"; else -> "Cash" } }) { bank = it }
             if (bank != "CASH") { GroupedDivider(); GroupedField("Last four account digits", suffix, { suffix = it }) }
         }
         GroupedSection("Starting point", footer = "Use the balance just before this date. Choose an earlier opening date if you plan to import older transactions.") {
@@ -280,30 +312,43 @@ import java.time.*
     }
 }
 
-@Composable fun BudgetEditor(b: Budget, dismiss: () -> Unit, knownEntries: List<Entry> = emptyList(), remove: (() -> Unit)? = null, save: (Budget) -> Unit) {
+@Composable fun BudgetEditor(b: Budget, dismiss: () -> Unit, knownEntries: List<Entry> = emptyList(), existing: List<Budget> = emptyList(), originalCategory: String? = null, remove: (() -> Unit)? = null, save: (Budget) -> Unit) {
     var category by rememberSaveable { mutableStateOf(b.category) }
     var amount by rememberSaveable { mutableStateOf(if (b.amount > 0) amountText(b.amount) else "") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    // Pending (new, old) limits waiting for the user to confirm that an existing category limit is replaced.
+    var replacing by remember { mutableStateOf<Pair<Budget, Budget>?>(null) }
     val savedCategories by backgroundCalculation(knownEntries, cacheKey = "budget-category-options") { categoryOptions("EXPENSE", knownEntries) }
+    // Another category that already has a limit would be overwritten by this save.
+    val clash = existing.firstOrNull { it.amount > 0 && it.category == category.trim() && it.category != originalCategory }
     LedgerSheet("Category budget", dismiss, "Save", {
-        try {
-            val p = paise(amount)
-            require(p > 0 && category.isNotBlank()) { "Enter a category and a positive limit" }
-            save(b.copy(category = category.trim(), amount = p))
-        } catch (e: Exception) { error = e.message }
+        val budget = try {
+            val p = parseAmountInput(amount) ?: throw InvalidInput(AmountHint)
+            need(p > 0 && category.isNotBlank(), "Enter a category and a positive limit")
+            b.copy(category = category.trim(), amount = p)
+        } catch (e: Exception) { error = validationMessage(e, "Enter a category and a positive limit"); null }
+        if (budget != null) {
+            val old = existing.firstOrNull { it.amount > 0 && it.category == budget.category && it.category != originalCategory }
+            if (old != null) replacing = budget to old else save(budget)
+        }
     }) {
-        remove?.let { action -> GroupedSection { GroupedItem(onClick = action) { Text("Remove budget", color = MaterialTheme.colorScheme.error) } } }
         IconTile("budgets", MaterialTheme.colorScheme.tertiary, 56)
         Text("A plan that carries forward.", style = MaterialTheme.typography.headlineMedium)
         Text("Choose a category and set its limit for every month.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         GroupedSection(footer = "Transfers are excluded from spending. Removing a limit preserves transactions.") {
-            Pick("Category", category, ((savedCategories ?: expenseCategories) + category).distinct(), { it }, grouped = true) { category = it }
+            Pick("Category", category, ((savedCategories ?: expenseCategories) + category).distinct(), { it }) { category = it }
             GroupedDivider()
             GroupedField("Category name", category, { category = it })
             GroupedDivider()
             GroupedField("Monthly limit (INR)", amount, { amount = it }, numeric = true)
         }
+        clash?.let { Text("${it.category} already has a limit of ${money(it.amount)}. Saving replaces it.", style = MaterialTheme.typography.bodyMedium, color = warning) }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        remove?.let { action -> GroupedSection { GroupedItem(onClick = action) { Text("Remove budget", color = danger, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, modifier = Modifier.weight(1f)) } } }
+    }
+    replacing?.let { (new, old) ->
+        Confirm("Replace existing limit?", "${old.category} already has a limit of ${money(old.amount)} a month. Saving replaces it with ${money(new.amount)}.",
+            { replacing = null }, confirmLabel = "Replace") { replacing = null; save(new) }
     }
 }
 
@@ -344,7 +389,7 @@ import java.time.*
         Text(entry.payee.ifBlank { "Transaction" }, style = MaterialTheme.typography.titleMedium)
         Text(money(entry.amount), style = MaterialTheme.typography.headlineMedium)
         GroupedSection {
-            Pick("Category", category, options ?: categoriesForType(entry.type), { it }, grouped = true) { category = it }
+            Pick("Category", category, options ?: categoriesForType(entry.type), { it }) { category = it }
             GroupedField("Category name", category, { category = it })
             GroupedRow("Remember for this payee", trailing = { PocketSwitch(rememberPayee, "Remember for this payee") { rememberPayee = it } })
         }

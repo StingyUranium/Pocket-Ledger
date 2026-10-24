@@ -77,7 +77,7 @@ See [AGENTS.md](AGENTS.md) for contributor conventions, [the architecture map](d
 
 Device tests use a separate application ID and synthetic data. Do not run instrumentation against the personal package: the runner may uninstall its target. Rebuild without the validation property before installing a personal APK.
 
-UI redesign validation: **50 JVM tests** and **22 isolated device tests** passed. The four UI journeys also passed in adaptive, locked 60Hz and locked 120Hz modes. Build and lint passed with zero lint errors; five performance-gate tooling tests passed. Baseline/Startup Profiles are included. Full startup and jank certification across the hardware matrix remains pending.
+On 24 October 2026 the tree's 111 JVM tests and lint (against `app/lint-baseline.xml`) passed, and 55 of 56 device tests passed on the isolated validation package (the 56th, `VisualReviewTest`, is opt-in and was skipped). UI redesign validation recorded for 1.7.0: 50 JVM tests and **22 isolated device tests** passed. The four UI journeys also passed in adaptive, locked 60Hz and locked 120Hz modes. Build and lint passed with zero lint errors; five performance-gate tooling tests passed. Baseline/Startup Profiles are included. Full startup and jank certification across the hardware matrix remains pending.
 
 These are recorded validation results for the 1.7.0 work, not a guarantee for later changes. The final extended benchmark run was stopped at the user's request; it is not recorded as a pass. Benchmarks and refresh-mode matrix scripts are opt-in and are not part of routine build/install commands.
 

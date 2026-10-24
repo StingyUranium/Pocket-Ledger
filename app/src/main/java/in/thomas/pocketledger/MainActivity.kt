@@ -26,6 +26,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.onSizeChanged
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -54,7 +57,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        launchRequest = intent
+        // Read the appearance preferences off the main thread before PocketTheme needs them.
+        AppearancePreferences.preload(this)
+        // Warm the capture preferences the first composition reads, so that read does not wait on the disk.
+        applicationContext.let { app -> Thread({ app.getSharedPreferences("capture", MODE_PRIVATE).all }, "capture-prefs-preload").start() }
+        // Launch extras describe a one-time navigation request; recreation must not replay them.
+        launchRequest = if (savedInstanceState == null) intent else null
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT), navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT))
         setContent {
             PocketTheme {
@@ -98,8 +106,9 @@ private fun LedgerRoute.depth(): Int = when (this) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun Ledger(repo: Repository, launchRequest: Intent? = null) {
     val dao = repo.dao
-    var readAttempt by remember { mutableIntStateOf(0) }
-    val readState by remember(dao, readAttempt) { ledgerSnapshots(dao) }.collectAsStateWithLifecycle(LedgerReadState())
+    val activity = androidx.activity.compose.LocalActivity.current as ComponentActivity
+    val ledgerModel = androidx.lifecycle.ViewModelProvider(activity, LedgerViewModel.Factory(dao))[LedgerViewModel::class.java]
+    val readState by ledgerModel.state.collectAsStateWithLifecycle()
     androidx.activity.compose.ReportDrawnWhen { readState.data != null }
     val snapshot = readState.data
     val accounts = snapshot?.accounts.orEmpty()
@@ -125,19 +134,32 @@ private fun LedgerRoute.depth(): Int = when (this) {
     var capture by remember { mutableStateOf(repo.prefs.getBoolean("enabled", false)) }
     var permission by remember { mutableStateOf(repo.hasSmsPermission()) }
     var activeWork by remember { mutableIntStateOf(0) }
+    var backgroundWork by remember { mutableIntStateOf(0) }
+    // Background reconciliation only shows progress; it must never disable Save in an open editor.
     val busy = activeWork > 0
+    val updating = busy || backgroundWork > 0
     var operationError by remember { mutableStateOf<String?>(null) }
-    var preview by remember { mutableStateOf<List<Candidate>?>(null) }
+    var preview by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = CandidateListSaver) { mutableStateOf<List<Candidate>?>(null) }
     var from by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(LocalDate.now(india).withDayOfMonth(1).toString()) }
     var to by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(LocalDate.now(india).toString()) }
-    var passwordMode by remember { mutableStateOf<String?>(null) }; var secret by remember { mutableStateOf<CharArray?>(null) }
-    var restoreUri by remember { mutableStateOf<Uri?>(null) }
-    var trustCandidate by remember { mutableStateOf<TrustedSender?>(null) }
+    var passwordMode by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }; var secret by remember { mutableStateOf<CharArray?>(null) }
+    var restoreUri by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = UriSaver) { mutableStateOf<Uri?>(null) }
+    var trustCandidate by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = TrustedSenderSaver) { mutableStateOf<TrustedSender?>(null) }
     var categoryEntry by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = EntryDraftSaver) { mutableStateOf<Entry?>(null) }
     var budgetAdd by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
-    var deleteCandidate by remember { mutableStateOf<Entry?>(null) }
-    var transferCandidate by remember { mutableStateOf<Pair<Entry, Entry>?>(null) }
-    fun work(block: suspend () -> Unit) { scope.launch { activeWork++; operationError = null; try { withContext(Dispatchers.IO) { block() } } catch (e: Exception) { if (e is CancellationException) throw e; operationError = e.message ?: "Could not complete this action"; snack.showSnackbar(operationError!!) } finally { activeWork-- } } }
+    var deleteCandidate by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = EntryDraftSaver) { mutableStateOf<Entry?>(null) }
+    var transferCandidate by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = EntryPairSaver) { mutableStateOf<Pair<Entry, Entry>?>(null) }
+    // Snackbars are launched separately: showSnackbar suspends until dismissed and must not keep work "active".
+    fun notify(message: String) { scope.launch { snack.showSnackbar(message) } }
+    fun work(background: Boolean = false, block: suspend () -> Unit) { scope.launch {
+        if (background) backgroundWork++ else { activeWork++; operationError = null }
+        try { withContext(Dispatchers.IO) { block() } } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            val message = e.message ?: "Could not complete this action"
+            if (!background) operationError = message
+            notify(message)
+        } finally { if (background) backgroundWork-- else activeWork-- }
+    } }
     val requestNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(capture) {
         if (capture && android.os.Build.VERSION.SDK_INT >= 33 &&
@@ -153,21 +175,23 @@ private fun LedgerRoute.depth(): Int = when (this) {
         if (uri != null && pass != null) work {
             try {
                 val bytes = Backup.export(repo.db, pass)
-                repo.context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: error("Cannot write this file")
-                withContext(Dispatchers.Main) { snack.showSnackbar("Encrypted backup saved") }
+                Backup.writeVerified(repo.context.contentResolver, uri, bytes, pass)
+                notify("Encrypted backup saved")
             } finally { pass.fill('\u0000') }
         } else pass?.fill('\u0000')
     }
     val chooseRestore = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) { restoreUri = uri; passwordMode = "restore" } }
     LaunchedEffect(Unit) {
+        // Recreation (rotation, resize) must not repeat startup reconciliation; the flag is set only on completion.
+        if (ledgerModel.startupComplete) return@LaunchedEffect
         // Let the usable shell render before starting reconciliation.
         withFrameNanos { }
-        work { repo.initialize(); repo.refreshStoredReviews(); repo.reconcile() }
+        work(background = true) { repo.initialize(); repo.refreshStoredReviews(); repo.reconcile(); ledgerModel.startupComplete = true }
     }
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
         var firstResume = true
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { permission = repo.hasSmsPermission(); capture = repo.prefs.getBoolean("enabled", false); if (firstResume) firstResume = false else work { repo.reconcile() } } }
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { permission = repo.hasSmsPermission(); capture = repo.prefs.getBoolean("enabled", false); if (firstResume) firstResume = false else work(background = true) { repo.reconcile() } } }
         owner.lifecycle.addObserver(observer); onDispose { owner.lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(launchRequest) {
@@ -178,6 +202,8 @@ private fun LedgerRoute.depth(): Int = when (this) {
             tab = if (destination == "budget") Destination.Budgets else Destination.Overview
             if (destination == "income") openTransactions("INCOME", "ALL")
             if (destination == "expense") openTransactions("EXPENSE", "ALL")
+            // Consume the request so a later recreation or re-entry does not navigate again.
+            launchRequest?.removeExtra("ledger_route")
         }
     }
     LaunchedEffect(launchRequest, snapshot) {
@@ -230,11 +256,14 @@ private fun LedgerRoute.depth(): Int = when (this) {
         }
     }
     val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
-    val calculationCache = remember { CalculationCache() }
+    val calculationCache = ledgerModel.calculationCache
     val lastHeaderInset = remember { floatArrayOf(0f, 0f) }
 
     // Keep the shared card data ready while detail pages are open, including during back previews.
-    val overviewReport by backgroundCalculation(entries, budgets, month) { calculateOverviewReport(entries, budgets, month) }
+    // Only the Overview (or a metric detail opened from it) shows this report, so other tabs skip the work.
+    val visibleRoot = if (tab in Destination.primary) tab else parentTab
+    val overviewVisible = visibleRoot == Destination.Overview || details?.category == "ALL"
+    val overviewReport by backgroundCalculation(entries, budgets, month, cacheKey = "overview-report", keepPrevious = true, enabled = overviewVisible) { calculateOverviewReport(entries, budgets, month) }
     val pending = remember(messages) { messages.count { it.status == "REVIEW" } }
     val expandedEditor = LocalLedgerWindowWidth.current >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.3f
     val editorContent by rememberUpdatedState<@Composable (Entry) -> Unit> { current -> EntryEditor(current, accounts, messages.find { it.key == current.smsKey }, { editor = null }, { entry, remember -> work { repo.save(entry, remember); withContext(Dispatchers.Main) { editor = null } } }, if (allEntries.any { it.id == current.id }) { { deleteCandidate = current } } else null, knownEntries = entries) }
@@ -330,15 +359,16 @@ private fun LedgerRoute.depth(): Int = when (this) {
             }
             if (snapshot != null) readState.error?.let { error ->
                 Surface(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).zIndex(1f).padding(bottom = if (showTabBar) bottomInset else 0.dp), color = MaterialTheme.colorScheme.errorContainer) {
-                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().padding(LedgerSpace.medium), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Text(error, Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
-                        TextButton(onClick = { readAttempt++ }) { Text("Retry") }
+                        TextButton(onClick = { ledgerModel.retry() }) { Text("Retry") }
                     }
                 }
             }
-            if (busy && shownRoute == LedgerRoute.Tabs && snapshot != null) {
+            if (updating && shownRoute == LedgerRoute.Tabs && snapshot != null) {
                 Text("Updating ledger...", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart).zIndex(1f).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp + (if (showTabBar) bottomInset else 0.dp)))
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart).zIndex(1f).semantics { liveRegion = LiveRegionMode.Polite }
+                        .padding(start = LedgerSpace.margin, end = LedgerSpace.margin, top = LedgerSpace.small, bottom = LedgerSpace.small + (if (showTabBar) bottomInset else 0.dp)))
             }
             if (showTabBar) PocketTabBar(shownDestination, pending,
                 Modifier.align(androidx.compose.ui.Alignment.BottomCenter).zIndex(1f).onSizeChanged { size ->
@@ -355,7 +385,7 @@ private fun LedgerRoute.depth(): Int = when (this) {
                 Transactions(entries, accounts, month, shownRoute.type, shownRoute.category, delete = { deleteCandidate = it },
                     categorize = { categoryEntry = it }, leading = if (shownRoute.category == "ALL") ({ MetricDetailHeader(shownRoute.type, month, overviewReport?.summary) }) else null) { editor = it }
             } else if (snapshot == null) {
-                if (readState.error == null) LedgerSkeleton() else ReadErrorState(readState.error!!) { readAttempt++ }
+                if (readState.error == null) LedgerSkeleton() else ReadErrorState(readState.error!!) { ledgerModel.retry() }
             } else Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
                 val page = shownDestination
@@ -363,7 +393,7 @@ private fun LedgerRoute.depth(): Int = when (this) {
                 pageState.SaveableStateProvider("tab-$page") {
                 Box(Modifier.widthIn(max = 840.dp).fillMaxSize().graphicsLayer { alpha = entrance.value }) {
                 when (page) {
-                    Destination.IncomePlan -> FluidList(contentPadding = PaddingValues(LedgerSpace.margin)) { item { IncomeAllocationPlan(entries, month) } }
+                    Destination.IncomePlan -> FluidList(contentPadding = PaddingValues(LedgerSpace.margin)) { item(key = "income-plan", contentType = "income-plan") { IncomeAllocationPlan(entries, month) } }
                     Destination.Management -> MoreScreen(pending, { tab = it }, { settings = true })
                     Destination.Overview -> Overview(accounts, entries, messages, month, budgets, overviewReport, { tab = Destination.Accounts }, { tab = Destination.Inbox }, openTransactions, insights = { parentTab = Destination.Overview; tab = Destination.Insights }) { editor = it }
                     Destination.Activity -> Transactions(entries, accounts, month, delete = { deleteCandidate = it }, categorize = { categoryEntry = it }) { editor = it }
@@ -388,7 +418,7 @@ private fun LedgerRoute.depth(): Int = when (this) {
                                 if (e is CancellationException) throw e
                                 snack.showSnackbar(e.message ?: "Could not dismiss alert")
                             }
-                        } }, { transferCandidate = it }, refreshing = busy, refresh = { work { repo.refreshStoredReviews(); repo.reconcile() } }, viewActivity = { tab = Destination.Activity })
+                        } }, { transferCandidate = it }, refreshing = updating, refresh = { work(background = true) { repo.refreshStoredReviews(); repo.reconcile() } }, viewActivity = { tab = Destination.Activity })
                 }
             }
         }
@@ -403,13 +433,10 @@ private fun LedgerRoute.depth(): Int = when (this) {
     } } } }
     if (!expandedEditor) FluidPresentation(editor) { presentEntry(it) }
     FluidPresentation(accountEditor) { a -> AccountEditor(a, { accountEditor = null }) { edited -> work {
-        require(edited.name.isNotBlank()) { "Name is required" }; require(edited.bank == "CASH" || edited.suffix.matches(Regex("\\d{4}"))) { "Enter the account's last four digits" }
-        require(accounts.none { it.id != edited.id && it.bank == edited.bank && it.suffix == edited.suffix && edited.bank != "CASH" }) { "This account is already mapped" }
-        require(entries.none { (it.accountId == edited.id || it.destinationId == edited.id) && it.date < edited.openingDate }) { "Opening date cannot be after an existing transaction" }
-        dao.account(edited); withContext(Dispatchers.Main) { accountEditor = null }
+        repo.saveAccount(edited); withContext(Dispatchers.Main) { accountEditor = null }
     } } }
     categoryEntry?.let { current -> CategoryReviewSheet(current, entries, { categoryEntry = null }) { category, remember -> work { repo.updateCategory(current.id, category, remember); withContext(Dispatchers.Main) { categoryEntry = null } } } }
-    deleteCandidate?.let { e -> Confirm("Delete transaction?", "This entry will leave your balances and reports. Its source SMS will stay dismissed during future scans.", { deleteCandidate = null }) { work { repo.delete(e); withContext(Dispatchers.Main) { deleteCandidate = null; editor = null } } } }
+    deleteCandidate?.let { e -> Confirm("Delete transaction?", "This entry will leave your balances and reports. Its source SMS will stay dismissed during future scans.", { deleteCandidate = null }, destructive = true) { work { repo.delete(e); withContext(Dispatchers.Main) { deleteCandidate = null; editor = null } } } }
     transferCandidate?.let { pair -> Confirm("Link as a transfer?", "Combine these two entries into one transfer between your accounts. It will be excluded from income and spending.", { transferCandidate = null }) { work { repo.linkTransfer(pair.first, pair.second); withContext(Dispatchers.Main) { transferCandidate = null } } } }
     trustCandidate?.let { t -> Confirm("Trust ${t.sender}?", "Confirm this is your ${t.bank} transaction sender. Complete messages for mapped accounts will be saved, including reviewed historical messages. Sender IDs alone cannot prove authenticity.", { trustCandidate = null }) { work { repo.trust(t.sender, t.bank); withContext(Dispatchers.Main) { trustCandidate = null } } } }
     if (disclosure) SmsPermissionSheet(
@@ -417,8 +444,9 @@ private fun LedgerRoute.depth(): Int = when (this) {
         proceed = { disclosure = false; requestSms.launch(arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS)) }
     )
     FluidPresentation(preview) { candidates ->
-        val knownKeys = messages.flatMap { listOf(it.key, SmsParser.key(it.parsed(), it.sender, it.body, it.received)) }.toSet()
-        ImportPreview(candidates, knownKeys, accounts, { preview = null }) { selected -> work { repo.ingest(selected, forceReview = true); repo.processReview(); withContext(Dispatchers.Main) { preview = null; snack.showSnackbar("Imported ${selected.size} selected messages. Check the review inbox.") } } }
+        // Hashing every stored message is not composition work; the sheet appears once the key set is ready.
+        val knownKeys by backgroundCalculation(messages) { messages.flatMap { listOf(it.key, it.semanticKey()) }.toSet() }
+        knownKeys?.let { known -> ImportPreview(candidates, known, accounts, { preview = null }) { selected -> work { repo.ingest(selected, forceReview = true); repo.processReview(); withContext(Dispatchers.Main) { preview = null }; notify("Imported ${selected.size} selected ${if (selected.size == 1) "message" else "messages"}. Check the review inbox.") } } }
     }
 
     FluidPresentation(passwordMode) { mode -> PasswordDialog(mode, { passwordMode = null; restoreUri = null }) { pass ->
@@ -433,7 +461,7 @@ private fun LedgerRoute.depth(): Int = when (this) {
                     output.toByteArray()
                 } ?: error("Cannot read this file")
                 Backup.restore(repo, bytes, pass)
-                withContext(Dispatchers.Main) { capture = false; settings = false; snack.showSnackbar("Backup restored. Review accounts before re-enabling SMS capture.") }
+                withContext(Dispatchers.Main) { capture = false; settings = false }; notify("Backup restored. Review accounts before re-enabling SMS capture.")
             } finally { pass.fill('\u0000') } }
         }
     } }

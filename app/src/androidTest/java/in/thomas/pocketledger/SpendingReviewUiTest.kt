@@ -41,7 +41,7 @@ class SpendingReviewUiTest {
             ui.onNode(hasText("Budgets") and isSelectable()).performClick()
             ui.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasText("Travel", substring = false))
             ui.onNodeWithText("Travel", substring = false).performClick()
-            ui.onNodeWithText("Remove budget", substring = false).performClick()
+            ui.onNodeWithText("Remove budget", substring = false).performScrollTo().performClick()
             ui.onNodeWithText("Remove", substring = false).performClick()
             ui.waitUntil(10000) { runBlocking { db.dao().allBudgets().isEmpty() } }
             assertEquals(entry.copy(category = "Travel"), db.dao().entry(entry.id))

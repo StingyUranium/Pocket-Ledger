@@ -274,3 +274,12 @@ Validation evidence is recorded below after final checks; the acceptance matrix 
 - Font scale and rotation settings were restored in `finally`. No benchmarks, display refresh changes or performance certification were performed. The benchmark journey selectors were updated for the renamed destinations without running profile generation.
 
 Remaining coverage limits: these journeys do not exhaustively certify every state in the design matrix, TalkBack reading order, a physical foldable/hinge, all narrow-window dimensions, every keyboard/IME, or system file-picker and notification-channel delivery. Import previews and password prompts retain their existing transient lifecycle; transaction/account/category editor drafts, budget editor state, Inbox date range, shared month and destination filters use saved state. The specification records intended states separately from measured evidence.
+
+## Grouped blocks and loading (24 October 2026)
+
+- `CardBlock` is replaced by `GroupedBlock`, built on `GroupedSection` and `GroupedItem`; the income plan's targets are one `GroupedSection` of `GroupedRow`s. Only `MoneyStat` and `MetricDetailHeader` keep their surfaces, for the shared-bounds metric transition.
+- Overview's report is no longer always loaded: it is computed only while Overview or a metric detail opened from it is visible. The statement above that it stays loaded while a detail page is open still holds.
+- Stale-while-revalidate: Overview, Transactions and Budgets keep the previous result while a recalculation runs, so editors and confirmations stay open and lists do not flash a skeleton. After a month change the previous month can show briefly.
+- Warning colour is a `warning` token (a darker amber in light mode, lighter in dark); `rust` is renamed `danger`.
+- `ChoiceSheet` rows expose selected and radio semantics, `GroupedField` focuses from the whole row and exposes errors, and the back control reads "Back to <screen>".
+- Evidence: unit tests, lint and 55 of 56 isolated device tests passed on the Motorola Edge 70 validation package; no frame-rate or jank measurements were taken for these changes.

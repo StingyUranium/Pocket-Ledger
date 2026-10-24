@@ -29,7 +29,7 @@ class CategoryMigrationTest {
                 old.execSQL("UPDATE room_master_table SET identity_hash = 'a3f3f91c693cdd966c2d1ce178f3f4ab' WHERE id = 42")
                 old.version = 2
             }
-            database = Room.databaseBuilder(context, LedgerDatabase::class.java, name).addMigrations(MIGRATION_2_3).build()
+            database = Room.databaseBuilder(context, LedgerDatabase::class.java, name).addMigrations(MIGRATION_2_3, MIGRATION_3_4).build()
             assertEquals(setOf(income, expense), database.dao().allEntries().toSet())
             val rules = database.dao().allRules().associateBy { it.merchant }
             assertEquals("INCOME", rules["EMPLOYER"]?.type)

@@ -25,7 +25,7 @@ class RepositoryTest {
         val context = object : ContextWrapper(app) { override fun getSharedPreferences(name: String, mode: Int) = app.getSharedPreferences("test-$tag-$name", mode) }
         prefs = context.getSharedPreferences("capture", Context.MODE_PRIVATE)
         db = Room.inMemoryDatabaseBuilder(context, LedgerDatabase::class.java).build(); repo = Repository(context, db)
-        repo.initialize()
+        repo.initialize(java.util.Properties().apply { setProperty("sbm.suffix", "6317"); setProperty("axis.suffix", "0424") })
         db.dao().allAccounts().forEach { db.dao().account(it.copy(openingDate = dayMillis("2026-01-01"), opening = 1000000)) }
     }
     @After fun teardown() { db.close(); prefs.edit().clear().commit() }

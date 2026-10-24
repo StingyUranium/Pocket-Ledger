@@ -3,6 +3,6 @@
         <solid android:color="@color/widget_panel" /><corners android:radius="@dimen/widget_space" />
     </shape></item>
     <item android:id="@android:id/progress"><scale android:scaleWidth="100%" android:gravity="start"><shape>
-        <solid android:color="@color/widget_accent" /><corners android:radius="@dimen/widget_space" />
+        <solid android:color="@android:color/white" /><corners android:radius="@dimen/widget_space" />
     </shape></scale></item>
 </layer-list>

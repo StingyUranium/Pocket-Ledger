@@ -33,6 +33,24 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 The metadata application ID must be `in.thomas.pocketledger`. Use `adb -s <serial>` if multiple devices are connected. Keep the signing key consistent; do not uninstall the personal app to resolve an install problem because that removes its data.
 
+## Release build, signing and lint baseline
+
+- Release builds use R8 minification and resource shrinking with `app/proguard-rules.pro` (WorkManager workers, Room database/entities, enum names). Backup JSON uses explicit string keys, so it does not depend on field names surviving obfuscation.
+- Release signing reads `keystore.properties` (ignored) at the repository root with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. Without it the release APK is unsigned. Never commit keystores, passwords or `*.mapping.txt` (ignored; keep the mapping file from each shipped release outside the repository to decode stack traces).
+- `LedgerFrameTracker` and `androidx.metrics` are compiled only into debug and benchmark builds (`app/src/tracking/java`); `app/src/release/java` holds a no-op stub with the same API. `ui-tooling` and `ui-tooling-preview` are `debugImplementation`.
+- Dependency versions live in `gradle/libs.versions.toml`; `app` and `benchmark` consume it.
+- `app/build.gradle.kts` has a `lint {}` block pointing at `app/lint-baseline.xml`. The baseline has not been generated yet: run `.\gradlew.bat :app:lintDebug` once (the first run writes the baseline and reports a failure), review it, then commit it. New issues beyond the baseline fail lint.
+
+### Minified release backup round trip
+
+Run this when changing `Backup.kt`, Room entities or ProGuard rules. Use the validation package only; never the personal one.
+
+1. Build a minified release for the validation ID: `.\gradlew.bat "-Pledger.testApplicationId=in.thomas.pocketledger.validation" :app:assembleRelease`. Sign it with a local keystore through `keystore.properties`, or an unsigned APK will not install.
+2. Confirm `app/build/outputs/apk/release/output-metadata.json` has application ID `in.thomas.pocketledger.validation`, then `adb install -r` the APK.
+3. In the validation app, add synthetic accounts and a few transactions (including a transfer), then export an encrypted backup from Settings.
+4. Clear the app's data or add a different entry, then restore that backup with the same password. Accounts, transactions, budgets, rules and dismissed messages must match, with no crash from missing classes. Also restore a backup exported by a debug build (and a `PKTLGR01` fixture if one is available).
+5. Keep the mapping file and any logs out of git. No script automates this because it needs interactive password entry; do not add one that touches the personal package.
+
 ## Category notification checks
 
 Use synthetic SMS and data in an isolated validation installation. Confirm permission grant and denial, a newly saved uncategorized alert, duplicate delivery/reconciliation, remembered categories, matched transfers, and sender-review processing. Tap reminders with the app closed and already open; verify the correct editor opens. Check that saving a category clears its reminder and denied permission does not prevent saving. Do not send synthetic alerts to the personal ledger.
@@ -71,3 +89,11 @@ landscape, foldable, TalkBack or frame-time acceptance.
 The spending-review redesign adds `SpendingReviewUiTest` (focused category save and explicit budget removal) and extends `RedesignUiTest` with widget-route and notification-entry routing checks. `VisualReviewTest` follows Manage and Insights rather than the former More destination. Select vertical scroll containers explicitly when a page also contains a horizontal filter list.
 
 For screenshots that must remain available after a run, build both validation APKs, verify the application ID, install those APKs, and invoke `adb shell am instrument -w` against `in.thomas.pocketledger.validation.test/androidx.test.runner.AndroidJUnitRunner` with `-e class in.thomas.pocketledger.VisualReviewTest -e ledger.visualReview true`. Pull the validation application's `files/ui-review` directory into ignored `artifacts/`. Some Gradle-managed runs remove the validation installation after collecting results. Save and restore font scale and rotation settings in `finally` when testing those configurations. Do not install an APK built without the validation property for these checks.
+
+## Database v4, local seed accounts, and backup safety (unmeasured until run on a device)
+
+- Schema 4 adds a unique index on `Entry.smsKey` (NULLs allowed), indices on `Entry.date` and `Entry.accountId`, and purges stored SMS text for SAVED, DISMISSED and LINKED messages (`body` becomes `purged:<sha256 of sender + normalized body>`; identity keys, parsed fields and tombstones are unchanged). Migration 3 to 4 first detaches duplicate `smsKey` entries (keeps live, then transfer, then categorized, then oldest) and soft-deletes the extras instead of removing them. Dismissed rows keep their text until the next launch so undo works. After building, commit the generated `app/schemas/.../4.json`.
+- Migration tests live in `LedgerMigrationTest` (androidTest, `room-testing`, schemas as test assets). Run only with `-Pledger.testApplicationId=in.thomas.pocketledger.validation`.
+- Seeded SBM/Axis suffixes are no longer in source. First run reads the git-ignored `app/src/main/assets/local-accounts.properties` (`sbm.suffix=`, `axis.suffix=`); without it only Cash is created and bank accounts are added in Accounts.
+- Backups are verified by reading the written file back (`Backup.writeVerified`). Restore first writes an encrypted safety copy of the current data to `files/backup-safety/pre-restore.plbackup` (same password as the restore file) and aborts if that fails.
+- The 15-minute SMS reconcile is scheduled only while capture is enabled (`ReconcileWork`, kept in sync by a preference listener). Bulk imports of more than three uncategorized entries post one summary notification with no financial text.

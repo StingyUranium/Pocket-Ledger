@@ -6,7 +6,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.unit.dp
 import java.time.YearMonth
 
 val LocalLedgerSharedScope = staticCompositionLocalOf<SharedTransitionScope?> { null }
@@ -27,9 +26,9 @@ fun Modifier.metricBounds(key: String): Modifier = composed {
 }
 
 @Composable fun MetricDetailHeader(type: String, month: YearMonth, summary: MonthlySummary?) {
-    Surface(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).metricBounds("$type:$month").fillMaxWidth(),
+    Surface(Modifier.padding(horizontal = LedgerSpace.margin, vertical = LedgerSpace.small).metricBounds("$type:$month").fillMaxWidth(),
         shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(LedgerSpace.margin), verticalArrangement = Arrangement.spacedBy(LedgerSpace.small)) {
             Text(if (type == "INCOME") "Income this month" else "Spent this month", style = MaterialTheme.typography.bodyLarge)
             summary?.let { Text(money(if (type == "INCOME") it.income else it.spent), style = MaterialTheme.typography.headlineMedium) }
         }

@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.4.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.4.1)" variant="all" version="9.4.1">
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `targetCellHeight` is only used in API level 31 and higher (current min is 28)"
+        errorLine1="    android:targetCellWidth=&quot;4&quot; android:targetCellHeight=&quot;2&quot; android:resizeMode=&quot;horizontal|vertical&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/widget_budget_info.xml"
+            line="3"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `targetCellWidth` is only used in API level 31 and higher (current min is 28)"
+        errorLine1="    android:targetCellWidth=&quot;4&quot; android:targetCellHeight=&quot;2&quot; android:resizeMode=&quot;horizontal|vertical&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/widget_budget_info.xml"
+            line="3"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `previewLayout` is only used in API level 31 and higher (current min is 28)"
+        errorLine1="    android:initialLayout=&quot;@layout/widget_budget&quot; android:previewLayout=&quot;@layout/widget_budget&quot; android:previewImage=&quot;@drawable/widget_preview_budget&quot;"
+        errorLine2="                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/widget_budget_info.xml"
+            line="4"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `targetCellHeight` is only used in API level 31 and higher (current min is 28)"
+        errorLine1="    android:targetCellWidth=&quot;3&quot; android:targetCellHeight=&quot;2&quot; android:resizeMode=&quot;horizontal|vertical&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/widget_monthly_info.xml"
+            line="3"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `targetCellWidth` is only used in API level 31 and higher (current min is 28)"
+        errorLine1="    android:targetCellWidth=&quot;3&quot; android:targetCellHeight=&quot;2&quot; android:resizeMode=&quot;horizontal|vertical&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/widget_monthly_info.xml"
+            line="3"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `previewLayout` is only used in API level 31 and higher (current min is 28)"
+        errorLine1="    android:initialLayout=&quot;@layout/widget_monthly&quot; android:previewLayout=&quot;@layout/widget_monthly&quot; android:previewImage=&quot;@drawable/widget_preview_monthly&quot;"
+        errorLine2="                                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/widget_monthly_info.xml"
+            line="4"
+            column="52"/>
+    </issue>
+
+    <issue
+        id="VectorRaster"
+        message="Limit vector icons sizes to 200×200 to keep icon drawing fast; see https://developer.android.com/studio/write/vector-asset-studio#when for more"
+        errorLine1="    android:width=&quot;250dp&quot; android:height=&quot;110dp&quot; android:viewportWidth=&quot;250&quot; android:viewportHeight=&quot;110&quot;>"
+        errorLine2="                   ~~~~~">
+        <location
+            file="src/main/res/drawable/widget_preview_budget.xml"
+            line="2"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="VectorRaster"
+        message="Limit vector icons sizes to 200×200 to keep icon drawing fast; see https://developer.android.com/studio/write/vector-asset-studio#when for more"
+        errorLine1="    android:width=&quot;250dp&quot; android:height=&quot;110dp&quot; android:viewportWidth=&quot;250&quot; android:viewportHeight=&quot;110&quot;>"
+        errorLine2="                   ~~~~~">
+        <location
+            file="src/main/res/drawable/widget_preview_monthly.xml"
+            line="2"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.json:json than 20240303 is available: 20260814"
+        errorLine1="orgJson = &quot;20240303&quot;"
+        errorLine2="          ~~~~~~~~~~">
+        <location
+            file="$HOME/AppData/Local/PocketLedgerProject/gradle/libs.versions.toml"
+            line="16"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-serialization-core than 1.8.1 is available: 1.12.0"
+        errorLine1="kotlinx-serialization-core = { module = &quot;org.jetbrains.kotlinx:kotlinx-serialization-core&quot;, version = &quot;1.8.1&quot; }"
+        errorLine2="                                                                                                      ~~~~~~~">
+        <location
+            file="$HOME/AppData/Local/PocketLedgerProject/gradle/libs.versions.toml"
+            line="42"
+            column="103"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="@Composable fun GroupedSection(header: String? = null, footer: String? = null, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {"
+        errorLine2="                                                                               ~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/DesignSystem.kt"
+            line="360"
+            column="80"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="@Composable fun GroupedBlock(header: String? = null, footer: String? = null, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {"
+        errorLine2="                                                                             ~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/DesignSystem.kt"
+            line="375"
+            column="78"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="This folder configuration (`v26`) is unnecessary; `minSdkVersion` is 28. Merge all the resources in this folder into `mipmap-anydpi`.">
+        <location
+            file="src/main/res/mipmap-anydpi-v26"/>
+    </issue>
+
+    <issue
+        id="MonochromeLauncherIcon"
+        message="The application adaptive icon is missing a monochrome tag"
+        errorLine1="&lt;adaptive-icon xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;>"
+        errorLine2="^">
+        <location
+            file="src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="    restore = { if (it.isEmpty()) null else Uri.parse(it) }"
+        errorLine2="                                            ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/DraftSavers.kt"
+            line="40"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="                preferences.edit().putLong(&quot;monthly_income&quot;, value).apply()"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/IncomeAllocationPlan.kt"
+            line="79"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="                context.getSharedPreferences(LedgerWidgets.TABS_PREFS, Context.MODE_PRIVATE).edit()"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/LedgerWidgets.kt"
+            line="38"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        val editor = context.getSharedPreferences(LedgerWidgets.TABS_PREFS, Context.MODE_PRIVATE).edit()"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/LedgerWidgets.kt"
+            line="49"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            repo.prefs.edit().putBoolean(&quot;notification_permission_requested&quot;, true).apply()"
+        errorLine2="            ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/MainActivity.kt"
+            line="168"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    SettingsDialog(capture, permission, senders, rules, { passwordMode = &quot;export&quot; }, { chooseRestore.launch(arrayOf(&quot;*/*&quot;)) }, { work { dao.untrust(it.sender, it.bank) } }, { work { dao.removeRule(it.merchant, it.type) } }, { repo.context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse(&quot;package:${repo.context.packageName}&quot;)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })"
+        errorLine2="                                                                                                                                                                                                                                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/MainActivity.kt"
+            line="382"
+            column="323"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="                                capture = enabled; repo.prefs.edit().putBoolean(&quot;enabled&quot;, enabled).putLong(&quot;from&quot;, System.currentTimeMillis()).apply()"
+        errorLine2="                                                   ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/MainActivity.kt"
+            line="406"
+            column="52"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().putBoolean(&quot;enabled&quot;, false).remove(&quot;from&quot;).commit()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/Repository.kt"
+            line="313"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        mutex.withLock { if (prefs.getBoolean(&quot;enabled&quot;, false)) prefs.edit().putLong(&quot;from&quot;, maxOf(from, now - 86_400_000L)).apply() }"
+        errorLine2="                                                                 ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/Repository.kt"
+            line="332"
+            column="66"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="                preferences.edit().putString(&quot;mode&quot;, it).apply()"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/SmsScreens.kt"
+            line="163"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            GroupedRow(&quot;Dynamic color&quot;, trailing = { PocketSwitch(dynamic, &quot;Dynamic color&quot;) { dynamic = it; preferences.edit().putBoolean(&quot;dynamic&quot;, it).apply() } })"
+        errorLine2="                                                                                                            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/SmsScreens.kt"
+            line="166"
+            column="109"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            GroupedRow(&quot;High contrast&quot;, trailing = { PocketSwitch(contrast, &quot;High contrast&quot;) { contrast = it; preferences.edit().putBoolean(&quot;contrast&quot;, it).apply() } })"
+        errorLine2="                                                                                                              ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/SmsScreens.kt"
+            line="168"
+            column="111"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            GroupedRow(&quot;Reduce motion&quot;, trailing = { PocketSwitch(reduceMotion, &quot;Reduce motion&quot;) { reduceMotion = it; preferences.edit().putBoolean(&quot;reduceMotion&quot;, it).apply() } })"
+        errorLine2="                                                                                                                      ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/in/thomas/pocketledger/SmsScreens.kt"
+            line="170"
+            column="119"/>
+    </issue>
+
+</issues>
